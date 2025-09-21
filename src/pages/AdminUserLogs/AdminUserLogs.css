@@ -1,0 +1,61 @@
+/* src/pages/AdminSystemLogs/AdminSystemLogs.css */
+.admin-system-logs-page {
+  /* No specific styles here yet, MainLayout handles padding */
+}
+
+.system-logs-list {
+  padding: var(--spacing-xl);
+}
+
+.system-logs-list h3 {
+  margin-bottom: var(--spacing-lg);
+}
+
+.log-header, .log-item {
+  display: grid;
+  grid-template-columns: 180px 80px 1fr; /* Adjust column widths as needed */
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) 0;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.log-header {
+  font-weight: 600;
+  background-color: var(--light-bg);
+  padding: var(--spacing-md) 0;
+  border-bottom: 2px solid var(--primary-blue);
+}
+
+.log-item:last-child {
+  border-bottom: none;
+}
+
+.log-item span {
+  font-size: 0.9rem;
+  color: var(--text-color);
+}
+
+.log-level-badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  text-align: center;
+  min-width: 50px;
+}
+
+.level-info {
+  background-color: var(--primary-blue);
+  color: var(--white);
+}
+.level-warn {
+  background-color: var(--warning-yellow);
+  color: var(--dark-bg);
+}
+.level-error {
+  background-color: var(--error-red); /* Ensure this variable exists */
+  color: var(--white);
+}

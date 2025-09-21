@@ -1,0 +1,39 @@
+/* src/pages/AdminCourseManagement/AdminCourseManagement.css */
+.admin-course-management-page{
+  /* No specific styles here yet, MainLayout handles padding */
+}
+
+.page-actions-header {
+  margin-bottom: var(--spacing-xl);
+  display: flex;
+  justify-content: flex-end; /* Align button to the right */
+}
+
+.course-list-section {
+  /* Already has .card class for basic styling */
+  padding: var(--spacing-xl);
+}
+
+.course-list-section h3 {
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Status Badges for the table */
+.status-badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-active {
+  background-color: var(--success-green);
+  color: var(--white);
+}
+
+.status-inactive {
+  background-color: var(--secondary-gray);
+  color: var(--white);
+}

@@ -1,0 +1,54 @@
+/* src/pages/LoginPage/LoginPage.css */
+/* src/pages/LoginPage/LoginPage.css */
+/* src/pages/LoginPage/LoginPage.css */
+.login-form-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /*min-height: 100vh;*/
+  /*padding: var(--spacing-lg);
+
+  /* New Background Image Styles */
+  /*background-image: url('/login_bg.jpg'); /* <-- Use the path relative to public folder */
+  
+  /*background-size: cover; /* Ensures the image covers the entire container */
+  /*background-position: center; /* Centers the image */
+  /*background-repeat: no-repeat; /* Prevents the image from repeating */
+  /*background-attachment: fixed; /* (Optional) Makes the background fixed when scrolling */
+}
+.login-card {
+  width: 400px;
+  text-align: center;
+}
+
+.login-logo {
+  height: 60px;
+  margin-bottom: var(--spacing-md);
+}
+
+.login-form {
+  margin-top: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.forgot-password {
+  display: block;
+  margin-top: var(--spacing-md);
+  font-size: 0.9rem;
+}
+/* src/pages/LoginPage/LoginPage.css */
+
+/* ... all your existing styles ... */
+
+/*.form-label-hidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}*/
