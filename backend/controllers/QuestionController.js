@@ -1,289 +1,295 @@
-// QuestionController.js
-import { pool } from "../config/db.js";
+import { Question } from "../models/Question.js";
+import { Option } from "../models/Option.js";
+import { Course } from "../models/Course.js";
+import { QuestionMedia } from "../models/QuestionMedia.js";
 
-// Add a subjective question
-export const addSubjective = async (req, res) => {
-  const { course_id, content, co_id } = req.body;
-  const userId = req.user.user_id;
+// Utility to attach options + media
+const attachExtras = async (questions) => {
+  if (!questions.length) return [];
 
-  const client = await pool.connect();
+  const questionIds = questions.map((q) => q.question_id);
+
+  // Batch fetch options for all MCQs
+  const optionsQuery = `
+    SELECT option_id, question_id, option_text, is_correct
+    FROM options
+    WHERE question_id = ANY($1)
+    ORDER BY option_id;
+  `;
+  const { rows: allOptions } = await pool.query(optionsQuery, [questionIds]);
+
+  // Batch fetch media for all questions
+  const mediaQuery = `
+    SELECT id, question_id, media_url, caption
+    FROM question_media
+    WHERE question_id = ANY($1)
+    ORDER BY id;
+  `;
+  const { rows: allMedia } = await pool.query(mediaQuery, [questionIds]);
+
+  // Group by question_id
+  const optionsByQ = {};
+  allOptions.forEach((opt) => {
+    if (!optionsByQ[opt.question_id]) optionsByQ[opt.question_id] = [];
+    optionsByQ[opt.question_id].push(opt);
+  });
+
+  const mediaByQ = {};
+  allMedia.forEach((m) => {
+    if (!mediaByQ[m.question_id]) mediaByQ[m.question_id] = [];
+    mediaByQ[m.question_id].push(m);
+  });
+
+  // Attach to each question
+  return questions.map((q) => ({
+    ...q,
+    options: q.question_type === "mcq" ? optionsByQ[q.question_id] || [] : [],
+    media: mediaByQ[q.question_id] || [],
+  }));
+};
+
+// ------------------- CREATE -------------------
+
+export const addSubjectiveQuestion = async (req, res) => {
   try {
-    await client.query("BEGIN");
+    const { courseId } = req.params;
+    const { content, coId, media = [] } = req.body;
+    const user = req.user;
 
-    const result = await client.query(
-      `INSERT INTO questions (course_id, author_id, question_type, content, co_id) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [course_id, userId, "subjective", content, co_id]
-    );
-    const question = result.rows[0];
+    if (!content || content.trim() === "") {
+      return res.status(400).json({ success: false, message: "Question content is required" });
+    }
 
-    // Log the action
-    await client.query(
-      "INSERT INTO logs (user_id, action, details) VALUES ($1, $2, $3)",
-      [userId, "ADD_QUESTION", `${req.user.role} ${userId} added subjective Q${question.question_id}`]
-    );
+    const course = await Course.getById(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
 
-    await client.query("COMMIT");
-    res.status(201).json(question);
-  } catch (err) {
-    await client.query("ROLLBACK");
-    res.status(400).json({ error: err.message });
-  } finally {
-    client.release();
+    if (user.role === "instructor" && course.created_by !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    const question = await Question.create({
+      courseId,
+      authorId: user.user_id,
+      questionType: "subjective",
+      content,
+      coId,
+    });
+
+    const mediaResults = [];
+    for (const m of media) {
+      const savedMedia = await QuestionMedia.create({
+        questionId: question.question_id,
+        mediaUrl: m.mediaUrl,
+        caption: m.caption || "",
+      });
+      mediaResults.push(savedMedia);
+    }
+
+    question.options = [];
+    question.media = mediaResults;
+
+    res.status(201).json({ success: true, question });
+  } catch (error) {
+    console.error("Error adding subjective question:", error);
+    res.status(500).json({ success: false, message: "Failed to add question" });
   }
 };
 
-// Add an MCQ with options
-export const addMCQ = async (req, res) => {
-  const { course_id, content, co_id, options } = req.body; 
-  // options = [{ text: "Stack", is_correct: false }, { text: "Queue", is_correct: true }]
-
-  const userId = req.user.user_id;
-  const client = await pool.connect();
-
+export const addMCQQuestion = async (req, res) => {
   try {
-    await client.query("BEGIN");
+    const { courseId } = req.params;
+    const { content, coId, options, media = [] } = req.body;
+    const user = req.user;
 
-    // Insert question
-    const result = await client.query(
-      `INSERT INTO questions (course_id, author_id, question_type, content, co_id) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [course_id, userId, "mcq", content, co_id]
-    );
-    const question = result.rows[0];
+    const course = await Course.getById(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
 
-    // Insert options
+    if (user.role === "instructor" && course.created_by !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    if (!Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({ success: false, message: "MCQ must have at least 2 options" });
+    }
+    if (!options.some((o) => o.isCorrect)) {
+      return res.status(400).json({ success: false, message: "MCQ must have at least 1 correct option" });
+    }
+
+    const question = await Question.create({
+      courseId,
+      authorId: user.user_id,
+      questionType: "mcq",
+      content,
+      coId,
+    });
+
+    const optionResults = [];
     for (const opt of options) {
-  await client.query(
-    `INSERT INTO options (question_id, option_text, is_correct) VALUES ($1, $2, $3)`,
-    [question.question_id, opt.option_text, opt.is_correct]  // ✅ fixed
-  );
-}
+      const savedOption = await Option.create({
+        questionId: question.question_id,
+        optionText: opt.optionText,
+        isCorrect: opt.isCorrect,
+      });
+      optionResults.push(savedOption);
+    }
 
+    const mediaResults = [];
+    for (const m of media) {
+      const savedMedia = await QuestionMedia.create({
+        questionId: question.question_id,
+        mediaUrl: m.mediaUrl,
+        caption: m.caption || "",
+      });
+      mediaResults.push(savedMedia);
+    }
 
-    // Log the action
-    await client.query(
-      "INSERT INTO logs (user_id, action, details) VALUES ($1, $2, $3)",
-      [userId, "ADD_QUESTION", `${req.user.role} ${userId} added MCQ Q${question.question_id}`]
-    );
+    question.options = optionResults;
+    question.media = mediaResults;
 
-    await client.query("COMMIT");
-    res.status(201).json({ ...question, options });
-  } catch (err) {
-    await client.query("ROLLBACK");
-    res.status(400).json({ error: err.message });
-  } finally {
-    client.release();
+    res.status(201).json({ success: true, question });
+  } catch (error) {
+    console.error("Error adding MCQ question:", error);
+    res.status(500).json({ success: false, message: "Failed to add MCQ question" });
   }
 };
 
-// Get all questions by course
-export const getQuestionsByCourse = async (req, res) => {
-  const { courseId } = req.params;
+// ------------------- GET -------------------
 
+export const getQuestionsForPaper = async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT q.*, co.co_number, co.description AS co_description, u.name AS author_name
-       FROM questions q
-       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-       LEFT JOIN users u ON q.author_id = u.user_id
-       WHERE q.course_id = $1
-       ORDER BY q.created_at DESC`,
-      [courseId]
-    );
-
-    // Attach options if MCQ
-    const questions = await Promise.all(
-      result.rows.map(async (q) => {
-        if (q.question_type === "mcq") {
-          const opts = await pool.query(
-            "SELECT option_id, option_text, is_correct FROM options WHERE question_id = $1",
-            [q.question_id]
-          );
-          return { ...q, options: opts.rows };
-        }
-        return q;
-      })
-    );
-
-    res.json(questions);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const { paperId } = req.params;
+    const query = `
+      SELECT pq.paper_id, q.*, co.co_number
+      FROM paper_questions pq
+      JOIN questions q ON pq.question_id = q.question_id
+      LEFT JOIN course_outcomes co ON q.co_id = co.co_id
+      WHERE pq.paper_id = $1 AND q.is_active = true
+      ORDER BY pq.sequence;
+    `;
+    const { rows } = await pool.query(query, [paperId]);
+    const questions = await attachExtras(rows);
+    res.json({ success: true, total: questions.length, questions });
+  } catch (error) {
+    console.error("Error fetching paper questions:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch paper questions" });
   }
 };
 
-// ✅ New: Get questions by Course Outcome (CO)
-export const getQuestionsByCO = async (req, res) => {
-  const { coId } = req.params;
-
+export const getQuestionsForCourse = async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT q.*, c.code AS course_code, c.title AS course_title,
-              co.co_number, co.description AS co_description, u.name AS author_name
-       FROM questions q
-       LEFT JOIN courses c ON q.course_id = c.course_id
-       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-       LEFT JOIN users u ON q.author_id = u.user_id
-       WHERE q.co_id = $1
-       ORDER BY q.created_at DESC`,
-      [coId]
-    );
-
-    const questions = await Promise.all(
-      result.rows.map(async (q) => {
-        if (q.question_type === "mcq") {
-          const opts = await pool.query(
-            "SELECT option_id, option_text, is_correct FROM options WHERE question_id = $1",
-            [q.question_id]
-          );
-          return { ...q, options: opts.rows };
-        }
-        return q;
-      })
-    );
-
-    res.json(questions);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const { courseId } = req.params;
+    const questions = await Question.getByCourse(courseId);
+    const withExtras = await attachExtras(questions);
+    res.json({ success: true, total: withExtras.length, questions: withExtras });
+  } catch (error) {
+    console.error("Error fetching course questions:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch course questions" });
   }
 };
 
-// Edit a question (only by owner)
-// Edit a question (with versioning)
-export const editQuestion = async (req, res) => {
-  const { questionId } = req.params;
-  const { content, options } = req.body;
-  const userId = req.user.user_id;
-
-  const client = await pool.connect();
+export const getQuestionsForCourseAndPaper = async (req, res) => {
   try {
-    await client.query("BEGIN");
+    const { courseId, paperId } = req.params;
+    const query = `
+      SELECT q.*, co.co_number, pq.paper_id
+      FROM paper_questions pq
+      JOIN questions q ON pq.question_id = q.question_id
+      LEFT JOIN course_outcomes co ON q.co_id = co.co_id
+      WHERE q.course_id = $1 AND pq.paper_id = $2 AND q.is_active = true
+      ORDER BY pq.sequence;
+    `;
+    const { rows } = await pool.query(query, [courseId, paperId]);
+    const withExtras = await attachExtras(rows);
+    res.json({ success: true, total: withExtras.length, questions: withExtras });
+  } catch (error) {
+    console.error("Error fetching course+paper questions:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch course+paper questions" });
+  }
+};
 
-    // Fetch existing question
-    const check = await client.query(
-      "SELECT * FROM questions WHERE question_id = $1",
-      [questionId]
-    );
-    if (check.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Question not found" });
+// ------------------- UPDATE -------------------
+
+export const updateQuestion = async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const { content, coId, options, media } = req.body;
+    const user = req.user;
+
+    const question = await Question.getById(questionId);
+    if (!question) return res.status(404).json({ success: false, message: "Question not found" });
+
+    if (user.role === "instructor" && question.author_id !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
     }
-    const existing = check.rows[0];
 
-    if (existing.author_id !== userId) {
-      await client.query("ROLLBACK");
-      return res.status(403).json({ error: "Not authorized to edit this question" });
-    }
+    const updated = await Question.update(questionId, { content, coId });
 
-    // Fetch existing options if MCQ
-    let currentOptions = [];
-    if (existing.question_type === "mcq") {
-      const optRes = await client.query(
-        "SELECT option_text, is_correct FROM options WHERE question_id=$1",
-        [questionId]
-      );
-      currentOptions = optRes.rows;
-    }
-
-    // Insert snapshot into question_versions
-    await client.query(
-      `INSERT INTO question_versions (question_id, content, options, edited_by) 
-       VALUES ($1, $2, $3, $4)`,
-      [questionId, existing.content, JSON.stringify(currentOptions), userId]
-    );
-
-    // Update main question
-    const updated = await client.query(
-      "UPDATE questions SET content = $1, updated_at = NOW() WHERE question_id = $2 RETURNING *",
-      [content, questionId]
-    );
-    const question = updated.rows[0];
-
-    // If MCQ, replace options
+    let updatedOptions = [];
     if (question.question_type === "mcq" && Array.isArray(options)) {
-      await client.query("DELETE FROM options WHERE question_id = $1", [questionId]);
+      if (options.length < 2) {
+        return res.status(400).json({ success: false, message: "MCQ must have at least 2 options" });
+      }
+      if (!options.some((o) => o.isCorrect)) {
+        return res.status(400).json({ success: false, message: "MCQ must have at least 1 correct option" });
+      }
+
+      await Option.deleteByQuestion(questionId);
       for (const opt of options) {
-        await client.query(
-          "INSERT INTO options (question_id, option_text, is_correct) VALUES ($1, $2, $3)",
-          [questionId, opt.text, opt.is_correct]
-        );
+        const savedOpt = await Option.create({
+          questionId,
+          optionText: opt.optionText,
+          isCorrect: opt.isCorrect,
+        });
+        updatedOptions.push(savedOpt);
       }
     }
 
-    // Log
-    await client.query(
-      "INSERT INTO logs (user_id, action, details) VALUES ($1, $2, $3)",
-      [userId, "EDIT_QUESTION", `User ${userId} edited question ${questionId}`]
-    );
+    let updatedMedia = [];
+    if (Array.isArray(media)) {
+      await QuestionMedia.deleteByQuestion(questionId);
+      for (const m of media) {
+        const savedMedia = await QuestionMedia.create({
+          questionId,
+          mediaUrl: m.mediaUrl,
+          caption: m.caption || "",
+        });
+        updatedMedia.push(savedMedia);
+      }
+    }
 
-    await client.query("COMMIT");
-    res.json({ ...question, options: options || [] });
-  } catch (err) {
-    await client.query("ROLLBACK");
-    res.status(400).json({ error: err.message });
-  } finally {
-    client.release();
+    updated.options = updatedOptions;
+    updated.media = updatedMedia;
+
+    res.json({ success: true, question: updated });
+  } catch (error) {
+    console.error("Error updating question:", error);
+    res.status(500).json({ success: false, message: "Failed to update question" });
   }
 };
 
-// Get version history of a question
-export const getQuestionVersions = async (req, res) => {
-  const { questionId } = req.params;
+// ------------------- DELETE -------------------
 
-  try {
-    const result = await pool.query(
-      `SELECT v.*, u.name as edited_by_name
-       FROM question_versions v
-       LEFT JOIN users u ON v.edited_by = u.user_id
-       WHERE v.question_id = $1
-       ORDER BY v.created_at DESC`,
-      [questionId]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Delete a question (only by owner)
 export const deleteQuestion = async (req, res) => {
-  const { questionId } = req.params;
-  const userId = req.user.user_id;
-
-  const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    const { questionId } = req.params;
+    const user = req.user;
 
-    // Verify question exists and belongs to user
-    const check = await client.query(
-      "SELECT * FROM questions WHERE question_id = $1",
-      [questionId]
-    );
-    if (check.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Question not found" });
-    }
-    if (check.rows[0].author_id !== userId) {
-      await client.query("ROLLBACK");
-      return res.status(403).json({ error: "Not authorized to delete this question" });
+    const question = await Question.getById(questionId);
+    if (!question) return res.status(404).json({ success: false, message: "Question not found" });
+
+    if (user.role === "instructor" && question.author_id !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    // Delete question → cascade deletes options (due to FK ON DELETE CASCADE)
-    await client.query("DELETE FROM questions WHERE question_id = $1", [questionId]);
+    await Question.softDelete(questionId);
 
-    // Log action
-    await client.query(
-      "INSERT INTO logs (user_id, action, details) VALUES ($1, $2, $3)",
-      [userId, "DELETE_QUESTION", `User ${userId} deleted question ${questionId}`]
-    );
+    // Use models to clean up
+    await QuestionMedia.deleteByQuestion(questionId);
+    await Option.deleteByQuestion(questionId);
 
-    await client.query("COMMIT");
-    res.json({ message: "Question deleted successfully" });
-  } catch (err) {
-    await client.query("ROLLBACK");
-    res.status(500).json({ error: err.message });
-  } finally {
-    client.release();
+    res.json({ success: true, message: "Question deleted" });
+  } catch (error) {
+    console.error("Error deleting question:", error);
+    res.status(500).json({ success: false, message: "Failed to delete question" });
   }
 };
-

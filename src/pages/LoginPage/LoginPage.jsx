@@ -1,58 +1,54 @@
 // src/pages/LoginPage/LoginPage.jsx
-import React, { useState } from 'react'; // Make sure useState is imported
+import React, { useState } from 'react';
 import Button from '../../components/Button/Button';
 import './LoginPage.css';
 
 const LoginPage = () => {
-  // State for all form fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('instructor'); // Default role is 'instructor'
 
-  const handleLogin = (e) => {
-    e.preventDefault(); // Prevents the form from reloading the page
-    
-    // Log all the captured data
-    console.log(`Login attempt with Email: ${email}, Password: [hidden], Role: ${role}`);
-    
-    // In a real application, you would send this data to a backend for authentication.
-    // For now, we'll just show an alert.
-    alert(`Simulating login for role: ${role}. In a real app, you would now be redirected.`);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        sessionStorage.setItem("token", data.token);
+sessionStorage.setItem("role", data.user.role);
+sessionStorage.setItem("username", data.user.name);
+ 
+        alert("Login successful!");
+
+        if (data.user.role === "admin") window.location.href = "/admin/dashboard";
+        else if (data.user.role === "instructor") window.location.href = "/instructor/dashboard";
+        else if (data.user.role === "moderator") window.location.href = "/moderator/dashboard";
+      } else {
+        alert(data.error || "Invalid login");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Server error, please try again later.");
+    }
   };
 
   return (
-    <div className="login-form-wrapper"> {/* Note: We are using the wrapper class */}
+    <div className="login-form-wrapper">
       <div className="card login-card">
         <img src="/logo.png" alt="University Logo" className="login-logo" />
         <h2>TEZPUR UNIVERSITY</h2>
         <h3>QAMS - Login</h3>
         <form onSubmit={handleLogin} className="login-form">
-            {/* ## ADD THIS NEW DROPDOWN ## */}
-            
-          <div className="form-group">
-            <label htmlFor="role-select" className="form-label-hidden"><b>Select Role</b></label>
-               <hr></hr>
-              
-               <br></br>
-            <select
-              id="role-select"
-              className="form-control"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-            >
-           
-              <option value="admin">Admin</option>
-              <option value="instructor">Instructor</option>
-              <option value="moderator">Moderator</option>
-            </select>
-          </div>
-          {/* ## END OF NEW DROPDOWN ## */}
-
           <div className="form-group">
             <input
               type="text"
               className="form-control"
-              placeholder="Email/Username"
+              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -68,8 +64,6 @@ const LoginPage = () => {
               required
             />
           </div>
-          
-        
           <Button type="submit" variant="primary">
             LOGIN
           </Button>

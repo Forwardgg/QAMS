@@ -4,52 +4,52 @@ import Button from '../../components/Button/Button';
 import './SignupPage.css';
 
 const SignupPage = () => {
-  // State for all form fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-   const [mobilenumber, setMobilenumber] = useState('');
-  const [department, setDepartment] = useState('');
-  
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState(''); // New state for role
+  const [role, setRole] = useState('');
 
-  const handleSignup = (e) => {
-    e.preventDefault(); // Prevents the form from reloading the page
-
+  const handleSignup = async (e) => {
+    e.preventDefault();
     if (password !== confirmPassword) {
       alert("Passwords do not match!");
       return;
     }
-    if (!role) { // Check if a role has been selected
-        alert("Please select a role.");
-        return;
+    if (!role) {
+      alert("Please select a role.");
+      return;
     }
 
-    // Log all the captured data
-    console.log(`Signup attempt for Name: ${name}, Department:${department},Mobilenumber:${mobilenumber} Email: ${email}, Role: ${role}, Password: [hidden]`);
-    
-    // In a real application, you would send this data to a backend for user registration.
-    alert(`Simulating signup for ${name} as a ${role}. Welcome!`);
-    
-    // Clear form fields after successful signup
-    setName('');
-    setDepartment('');
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setRole(''); // Reset role
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password, role }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("Signup successful! Please login.");
+        window.location.href = "/auth";
+      } else {
+        alert(data.error || "Signup failed");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Server error, please try again later.");
+    }
   };
 
   return (
-    <div className="signup-form-wrapper"> {/* We use the wrapper class */}
+    <div className="signup-form-wrapper">
       <div className="card signup-card">
         <img src="/logo.png" alt="University Logo" className="signup-logo" />
         <h2>TEZPUR UNIVERSITY</h2>
         <h3>QAMS - Sign Up</h3>
         <form onSubmit={handleSignup} className="signup-form">
           <div className="form-group">
-                    <div className="form-group">
             <select
               id="signup-role-select"
               className="form-control"
@@ -57,12 +57,12 @@ const SignupPage = () => {
               onChange={(e) => setRole(e.target.value)}
               required
             >
-              <option value="" disabled selected>Select Your Role</option>
-              <option value="admin">Admin</option>
+              <option value="" disabled>Select Your Role</option>
               <option value="instructor">Instructor</option>
               <option value="moderator">Moderator</option>
             </select>
           </div>
+          <div className="form-group">
             <input
               type="text"
               className="form-control"
@@ -71,27 +71,7 @@ const SignupPage = () => {
               onChange={(e) => setName(e.target.value)}
               required
             />
-          </div>    
-          <div className="form-group">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Department"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              required
-            />
           </div>
-           <div className="form-group">
-            <input
-              type="mobilenumber"
-              className="form-control"
-              placeholder="Mobile number"
-              value={mobilenumber}
-              onChange={(e) => setMobilenumber(e.target.value)}
-              required
-            />
-            </div>
           <div className="form-group">
             <input
               type="email"
@@ -122,11 +102,6 @@ const SignupPage = () => {
               required
             />
           </div>
-
-          {/* ## ADD THIS NEW DROPDOWN FOR ROLE SELECTION ## */}
-  
-          {/* ## END OF NEW DROPDOWN ## */}
-
           <Button type="submit" variant="primary">
             SIGN UP
           </Button>

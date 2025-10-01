@@ -1,118 +1,148 @@
-// coController.js
-import { pool } from "../config/db.js";
+// controllers/coController.js
+import { CourseOutcome } from "../models/CourseOutcome.js";
+import { Course } from "../models/Course.js";
 
-// Add a new CO to a course
-export const addCO = async (req, res) => {
-  const { courseId } = req.params;
-  const { co_number, description } = req.body;
 
+// Create CO (admin or instructor for their own course)
+export const createCO = async (req, res) => {
   try {
-    const result = await pool.query(
-      "INSERT INTO course_outcomes (course_id, co_number, description) VALUES ($1, $2, $3) RETURNING *",
-      [courseId, co_number, description]
-    );
+    const { courseId } = req.params;
+    const { coNumber, description } = req.body;
+    const user = req.user;
 
-    // Log the CO creation
-    await pool.query(
-      "INSERT INTO logs (user_id, action, details) VALUES ($1, $2, $3)",
-      [req.user.user_id, "ADD_CO", `Added ${co_number} to course ${courseId}`]
-    );
+    const course = await Course.getById(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
 
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    // Ownership check for instructors
+    if (user.role === "instructor" && course.created_by !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized to add COs to this course" });
+    }
+
+    const co = await CourseOutcome.create({ courseId, coNumber, description });
+    res.status(201).json({ success: true, outcome: co });
+  } catch (error) {
+    console.error("Error creating CO:", error);
+
+    // Handle unique violation (course_id + co_number)
+    if (error.code === "23505") {
+      return res.status(400).json({ success: false, message: "CO number already exists for this course" });
+    }
+
+    res.status(500).json({ success: false, message: "Failed to create CO" });
   }
 };
 
-// Get all COs for a course
+// 1. Get all COs for a specific course (everyone can see)
 export const getCOsByCourse = async (req, res) => {
-  const { courseId } = req.params;
   try {
-    const result = await pool.query(
-      "SELECT * FROM course_outcomes WHERE course_id = $1",
-      [courseId]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const { courseId } = req.params;
+
+    const course = await Course.getById(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+
+    const cos = await CourseOutcome.getByCourse(courseId);
+
+    res.json({
+      success: true,
+      course: {
+        title: course.title,
+        code: course.code,
+        l: course.l,
+        t: course.t,
+        p: course.p,
+      },
+      outcomes: cos.map((co) => ({
+        co_number: co.co_number,
+        description: co.description,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching COs by course:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch COs" });
   }
 };
 
-// Update a CO
+// 2. Get all courses with their COs (everyone can see)
+export const getAllCoursesWithCOs = async (req, res) => {
+  try {
+    const courses = await Course.getAll();
+    const result = [];
+
+    for (const course of courses) {
+      const cos = await CourseOutcome.getByCourse(course.course_id);
+      result.push({
+        title: course.title,
+        code: course.code,
+        l: course.l,
+        t: course.t,
+        p: course.p,
+        outcomes: cos.map((co) => ({
+          co_number: co.co_number,
+          description: co.description,
+        })),
+      });
+    }
+
+    res.json({ success: true, courses: result });
+  } catch (error) {
+    console.error("Error fetching all courses with COs:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch data" });
+  }
+};
+
+// Update CO (admin or instructor for own course)
 export const updateCO = async (req, res) => {
-  const { coId } = req.params;
-  const { co_number, description } = req.body;
-
   try {
-    const result = await pool.query(
-      `UPDATE course_outcomes
-       SET co_number = $1, description = $2
-       WHERE co_id = $3
-       RETURNING *`,
-      [co_number, description, coId]
-    );
+    const { coId } = req.params;
+    const { coNumber, description } = req.body;
+    const user = req.user;
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "CO not found" });
+    const co = await CourseOutcome.getById(coId);
+    if (!co) return res.status(404).json({ success: false, message: "CO not found" });
+
+    const course = await Course.getById(co.course_id);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+
+    // Ownership check for instructors
+    if (user.role === "instructor" && course.created_by !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized to update this CO" });
     }
 
-    // Log update
-    await pool.query(
-      "INSERT INTO logs (user_id, action, details) VALUES ($1, $2, $3)",
-      [req.user.user_id, "UPDATE_CO", `Updated CO ${coId}`]
-    );
+    const updated = await CourseOutcome.update(coId, { coNumber, description });
+    res.json({ success: true, outcome: updated });
+  } catch (error) {
+    console.error("Error updating CO:", error);
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    if (err.code === "23505") {
-      return res.status(400).json({ error: "CO number must be unique per course" });
+    // Handle unique violation
+    if (error.code === "23505") {
+      return res.status(400).json({ success: false, message: "CO number already exists for this course" });
     }
-    res.status(400).json({ error: err.message });
+
+    res.status(500).json({ success: false, message: "Failed to update CO" });
   }
 };
 
-// Delete a CO
+// 4. Delete CO (admin or instructor for own course)
 export const deleteCO = async (req, res) => {
-  const { coId } = req.params;
-
   try {
-    const result = await pool.query(
-      "DELETE FROM course_outcomes WHERE co_id = $1 RETURNING *",
-      [coId]
-    );
+    const { coId } = req.params;
+    const user = req.user;
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "CO not found" });
+    const co = await CourseOutcome.getById(coId);
+    if (!co) return res.status(404).json({ success: false, message: "CO not found" });
+
+    const course = await Course.getById(co.course_id);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+
+    // Ownership check for instructors
+    if (user.role === "instructor" && course.created_by !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized to delete this CO" });
     }
 
-    // Log delete
-    await pool.query(
-      "INSERT INTO logs (user_id, action, details) VALUES ($1, $2, $3)",
-      [req.user.user_id, "DELETE_CO", `Deleted CO ${coId}`]
-    );
-
-    res.json({ message: "CO deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Get single CO by ID
-export const getCOById = async (req, res) => {
-  const { coId } = req.params;
-
-  try {
-    const result = await pool.query(
-      "SELECT * FROM course_outcomes WHERE co_id = $1",
-      [coId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "CO not found" });
-    }
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    await CourseOutcome.delete(coId);
+    res.json({ success: true, message: "CO deleted" });
+  } catch (error) {
+    console.error("Error deleting CO:", error);
+    res.status(500).json({ success: false, message: "Failed to delete CO" });
   }
 };

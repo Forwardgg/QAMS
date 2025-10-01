@@ -1,61 +1,62 @@
 /* src/pages/AdminSystemLogs/AdminSystemLogs.css */
+
 .admin-system-logs-page {
-  /* No specific styles here yet, MainLayout handles padding */
+  /* MainLayout already handles padding, so nothing special here */
 }
 
 .system-logs-list {
-  padding: var(--spacing-xl);
+  padding: 1rem;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 .system-logs-list h3 {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: 1rem;
 }
 
-.log-header, .log-item {
-  display: grid;
-  grid-template-columns: 180px 80px 1fr; /* Adjust column widths as needed */
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm) 0;
+/* Table headers and rows */
+.log-header,
+.log-item {
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid #ddd;
   align-items: center;
-  border-bottom: 1px solid var(--border-color);
 }
 
 .log-header {
-  font-weight: 600;
-  background-color: var(--light-bg);
-  padding: var(--spacing-md) 0;
-  border-bottom: 2px solid var(--primary-blue);
+  font-weight: bold;
+  background-color: #f5f5f5;
+  border-bottom: 2px solid #007bff;
 }
 
 .log-item:last-child {
   border-bottom: none;
 }
 
+.log-item:hover {
+  background-color: #f9f9f9;
+}
+
 .log-item span {
   font-size: 0.9rem;
-  color: var(--text-color);
+  color: #333;
 }
 
-.log-level-badge {
-  display: inline-block;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  text-align: center;
-  min-width: 50px;
+/* Buttons */
+.btn {
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.level-info {
-  background-color: var(--primary-blue);
-  color: var(--white);
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+  transition: background 0.2s;
 }
-.level-warn {
-  background-color: var(--warning-yellow);
-  color: var(--dark-bg);
-}
-.level-error {
-  background-color: var(--error-red); /* Ensure this variable exists */
-  color: var(--white);
+
+.btn-primary:hover {
+  background-color: #0056b3;
 }

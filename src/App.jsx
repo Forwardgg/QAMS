@@ -6,16 +6,14 @@ import AdminUserManagement from './pages/AdminUserManagement/AdminUserManagement
 import AdminUserLogs from './pages/AdminUserLogs/AdminUserLogs';
 import InstructorDashboard from './pages/InstructorDashboard/InstructorDashboard';
 import InstructorMyQuestions from './pages/InstructorMyQuestions/InstructorMyQuestions';
+import InstructorMyCourses from './pages/InstructorMyCourses/InstructorMyCourses';
 import ModeratorDashboard from './pages/ModeratorDashboard/ModeratorDashboard';
 import ModeratorPending from './pages/ModeratorPending/ModeratorPending';
-import InstructorMyCourses from './pages/InstructorMyCourses/InstructorMyCourses';
 import ForgotPassword from './pages/ForgotPassword/ForgotPassword';
+import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
+
 function App() {
-  // For now, we'll simulate a logged-in state and role
-  const isAuthenticated = true; // Set to true to see dashboard, false to see auth pages
-  const userRole = "admin"; // 'admin', 'instructor', 'moderator'
-  //const userRole = "instructor";
-   const getDefaultDashboardPath = (role) => {
+  const getDefaultDashboardPath = (role) => {
     switch (role) {
       case 'admin':
         return '/admin/dashboard';
@@ -24,136 +22,106 @@ function App() {
       case 'moderator':
         return '/moderator/dashboard';
       default:
-        return '/auth'; // Fallback if role is not recognized
+        return '/auth';
     }
   };
+
   return (
-    
     <Router>
-      
       <Routes>
         {/* Public/Auth Routes */}
         <Route path="/auth" element={<AuthContainerPage />} />
         <Route path="/login" element={<Navigate to="/auth" replace />} />
         <Route path="/signup" element={<Navigate to="/auth" replace />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
-        <Route path="/forgot-password" element={<ForgotPassword/>} />
-        {/* Protected Routes - Example for Admin Dashboard */}
+        {/* Admin Routes */}
         <Route
           path="/admin/dashboard"
           element={
-            isAuthenticated && userRole === 'admin' ? (
+            <ProtectedRoute allowedRoles={["admin"]}>
               <AdminDashboard />
-            ) : (
-              <Navigate to="/auth" replace /> // Redirect if not authenticated or not admin
-            )
+            </ProtectedRoute>
           }
         />
-      <Route
-  path="/admin/dashboard"
-  element={
-    isAuthenticated && userRole === 'admin' ? (
-      <AdminDashboard />
-    ) : (
-      <Navigate to="/auth" replace />
-    )
-  }
-/>
-<Route // <--- ADD THIS NEW ROUTE
-  path="/admin/courses"
-  element={
-    isAuthenticated && userRole === 'admin' ? (
-      <AdminCourseManagement />
-    ) : (
-      <Navigate to="/auth" replace />
-    )
-  }
-/>
-<Route // <--- ADD THIS NEW ROUTE
-         path="/admin/users"
+        <Route
+          path="/admin/courses"
           element={
-            isAuthenticated && userRole === 'admin' ? (
-              <AdminUserManagement />
-            ) : (
-              <Navigate to="/auth" replace />
-            )
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminCourseManagement />
+            </ProtectedRoute>
           }
         />
-        <Route // <--- ADD THIS NEW ROUTE
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminUserManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/logs"
           element={
-            isAuthenticated && userRole === 'admin' ? (
+            <ProtectedRoute allowedRoles={["admin"]}>
               <AdminUserLogs />
-            ) : (
-              <Navigate to="/auth" replace />
-           )
-         }
+            </ProtectedRoute>
+          }
         />
-        <Route // <--- ADD THIS NEW ROUTE
+
+        {/* Instructor Routes */}
+        <Route
           path="/instructor/dashboard"
           element={
-            isAuthenticated && userRole === 'instructor' ? (
+            <ProtectedRoute allowedRoles={["instructor"]}>
               <InstructorDashboard />
-            ) : (
-              <Navigate to="/auth" replace />
-            )
+            </ProtectedRoute>
           }
         />
-         <Route // <--- ADD THIS NEW ROUTE
+        <Route
           path="/instructor/my-questions"
           element={
-            isAuthenticated && userRole === 'instructor' ? (
+            <ProtectedRoute allowedRoles={["instructor"]}>
               <InstructorMyQuestions />
-            ) : (
-              <Navigate to="/auth" replace />
-            )
+            </ProtectedRoute>
           }
         />
-         {/* Moderator Routes */}
-+        <Route // <--- ADD THIS NEW ROUTE
+        <Route
+          path="/instructor/my-courses"
+          element={
+            <ProtectedRoute allowedRoles={["instructor"]}>
+              <InstructorMyCourses />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Moderator Routes */}
+        <Route
           path="/moderator/dashboard"
           element={
-            isAuthenticated && userRole === 'moderator' ? (
+            <ProtectedRoute allowedRoles={["moderator"]}>
               <ModeratorDashboard />
-            ) : (
-              <Navigate to="/auth" replace />
-            )
+            </ProtectedRoute>
           }
         />
-        <Route // <--- ADD THIS NEW ROUTE
-         path="/moderator/pending"
-         element={
-           isAuthenticated && userRole === 'moderator' ? (
-             <ModeratorPending />
-           ) : (
-             <Navigate to="/auth" replace />
-           )
-         }
-       />
-        <Route // <--- ADD THIS NEW ROUTE
-         path="/instructor/my-courses"
-         element={
-           isAuthenticated && userRole === 'instructor' ? (
-             <InstructorMyCourses />
-           ) : (
-             <Navigate to="/auth" replace />
-           )
-         }
-       />
-       +       <Route
-         path="/"
-         element={
-           isAuthenticated ? (
-             <Navigate to={getDefaultDashboardPath(userRole)} replace />
-           ) : (
-             <Navigate to="/auth" replace />
-           )
-         }
-      />
+        <Route
+          path="/moderator/pending"
+          element={
+            <ProtectedRoute allowedRoles={["moderator"]}>
+              <ModeratorPending />
+            </ProtectedRoute>
+          }
+        />
 
-        {/* Default Route */}
-        <Route path="/" element={<Navigate to={isAuthenticated ? "/admin/dashboard" : "/auth"} replace />} />
-
+        {/* Root Redirect */}
+        <Route
+          path="/"
+          element={
+            localStorage.getItem("role")
+              ? <Navigate to={getDefaultDashboardPath(localStorage.getItem("role"))} replace />
+              : <Navigate to="/auth" replace />
+          }
+        />
       </Routes>
     </Router>
   );

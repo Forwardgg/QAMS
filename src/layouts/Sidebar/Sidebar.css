@@ -78,3 +78,18 @@
 .sidebar-nav a.active {
     background-color: rgba(255, 255, 255, 0.1);
 }
+
+.logout-btn {
+  background: none;
+  border: none;
+  color: #c0392b;
+  font-size: 16px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  padding: 10px 15px;
+}
+
+.logout-btn:hover {
+  background-color: #f8d7da;
+}

@@ -1,13 +1,32 @@
 // src/layouts/Sidebar/Sidebar.jsx
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTachometerAlt, faBook, faUsers, faHistory, faQuestionCircle, faBookOpen } from '@fortawesome/free-solid-svg-icons';
+import {
+  faTachometerAlt,
+  faBook,
+  faUsers,
+  faHistory,
+  faQuestionCircle,
+  faBookOpen,
+  faSignOutAlt
+} from '@fortawesome/free-solid-svg-icons';
 
 import './Sidebar.css';
 
-const Sidebar = ({ role = 'admin', username = 'Admin User' }) => {
+const Sidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // ✅ Load role + username from sessionStorage (not localStorage)
+  const [role, setRole] = useState(sessionStorage.getItem("role") || "guest");
+  const [username, setUsername] = useState(sessionStorage.getItem("username") || "User");
+
+  useEffect(() => {
+    // Re-sync on mount
+    setRole(sessionStorage.getItem("role") || "guest");
+    setUsername(sessionStorage.getItem("username") || "User");
+  }, []);
 
   const sidebarItems = {
     admin: [
@@ -25,20 +44,35 @@ const Sidebar = ({ role = 'admin', username = 'Admin User' }) => {
       { path: '/moderator/dashboard', icon: faTachometerAlt, label: 'Dashboard' },
       { path: '/moderator/pending', icon: faQuestionCircle, label: 'Pending Moderations' },
     ],
+    guest: [] // no items for guests
   };
 
-  const currentItems = sidebarItems[role] || sidebarItems.admin;
+  const currentItems = sidebarItems[role] || [];
+
+  const handleLogout = () => {
+    // ✅ Clear sessionStorage
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("role");
+    sessionStorage.removeItem("username");
+    navigate("/auth", { replace: true });
+  };
 
   return (
     <div className="sidebar">
       <div className="logo-section">
-        <img src="/logo.png" alt="Logo" /> {/* Ensure logo.png is in your public folder */}
-        <h3>QAMS - {role.charAt(0).toUpperCase() + role.slice(1)}</h3>
+        <img src="/logo.png" alt="Logo" /> 
+        <h3>
+          QAMS - {role !== "guest" ? role.charAt(0).toUpperCase() + role.slice(1) : "Guest"}
+        </h3>
       </div>
-      <div className="user-info-section">
-        <p className="user-name">Welcome, {username}</p>
-        <p className="user-role">{role.toUpperCase()}</p>
-      </div>
+
+      {role !== "guest" && (
+        <div className="user-info-section">
+          <p className="user-name">Welcome, {username}</p>
+          <p className="user-role">{role.toUpperCase()}</p>
+        </div>
+      )}
+
       <nav className="sidebar-nav">
         <ul>
           {currentItems.map((item) => (
@@ -51,6 +85,14 @@ const Sidebar = ({ role = 'admin', username = 'Admin User' }) => {
               </Link>
             </li>
           ))}
+
+          {role !== "guest" && (
+            <li>
+              <button className="logout-btn" onClick={handleLogout}>
+                <FontAwesomeIcon icon={faSignOutAlt} /> Logout
+              </button>
+            </li>
+          )}
         </ul>
       </nav>
     </div>
