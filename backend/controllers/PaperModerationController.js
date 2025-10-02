@@ -2,7 +2,6 @@ import { PaperModeration } from "../models/PaperModeration.js";
 import { QuestionPaper } from "../models/QuestionPaper.js";
 import { Log } from "../models/Log.js";
 
-// ------------------- CLAIM -------------------
 export const claimPaperForModeration = async (req, res) => {
   try {
     const { paperId } = req.params;
@@ -43,8 +42,6 @@ export const claimPaperForModeration = async (req, res) => {
   }
 };
 
-// ------------------- GET -------------------
-
 // All moderation records for a paper
 export const getModerationForPaper = async (req, res) => {
   try {
@@ -73,7 +70,6 @@ export const getMyModerations = async (req, res) => {
   }
 };
 
-// ------------------- ACTIONS -------------------
 export const approvePaperModeration = async (req, res) => {
   try {
     const { id } = req.params;

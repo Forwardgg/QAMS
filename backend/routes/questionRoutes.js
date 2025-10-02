@@ -14,7 +14,6 @@ import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// ------------------- CREATE -------------------
 // Add subjective question (with optional media)
 router.post(
   "/subjective/:courseId",
@@ -31,7 +30,6 @@ router.post(
   addMCQQuestion
 );
 
-// ------------------- READ -------------------
 // Get all questions for a paper
 router.get("/paper/:paperId", getQuestionsForPaper);
 
@@ -41,7 +39,6 @@ router.get("/course/:courseId", getQuestionsForCourse);
 // Get questions for a specific course & paper
 router.get("/course/:courseId/paper/:paperId", getQuestionsForCourseAndPaper);
 
-// ------------------- UPDATE -------------------
 // Update question (content, CO, options, media)
 router.put(
   "/:questionId",
@@ -50,7 +47,6 @@ router.put(
   updateQuestion
 );
 
-// ------------------- DELETE -------------------
 // Soft delete question (and hard delete media)
 router.delete(
   "/:questionId",

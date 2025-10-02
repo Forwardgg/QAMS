@@ -37,7 +37,7 @@ app.use("/api/logs", logRoutes);
 // app.use("/api/export", exportRoutes);
 // app.use("/api/report", reportRoutes);
 
-// ------------------- DB TEST -------------------
+// DB test
 app.get("/api/test", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -47,11 +47,11 @@ app.get("/api/test", async (req, res) => {
   }
 });
 
-// ------------------- START SERVER -------------------
+// server start
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
 }
 
-export default app; // 👈 allows Jest/Supertest to import the app
+export default app; // allows Jest/Supertest to import the app

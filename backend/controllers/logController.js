@@ -1,10 +1,7 @@
 import { Log } from "../models/Log.js";
 
-// ------------------- CREATE -------------------
-// Usually created internally, not exposed as a route
-// e.g., called from controllers after actions
+//  created internally, not exposed as a route
 
-// ------------------- READ -------------------
 export const getAllLogs = async (req, res) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit) : 50;
@@ -28,7 +25,6 @@ export const getLogsByUser = async (req, res) => {
   }
 };
 
-// ------------------- DELETE -------------------
 export const deleteLog = async (req, res) => {
   try {
     const { logId } = req.params;

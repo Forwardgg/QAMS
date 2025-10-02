@@ -1,7 +1,6 @@
 import { QuestionPaper } from "../models/QuestionPaper.js";
 import { Course } from "../models/Course.js";
 
-// ------------------- CREATE -------------------
 export const createPaper = async (req, res) => {
   try {
     const { courseId, title, examType, semester, academicYear, fullMarks, duration } = req.body;
@@ -79,7 +78,6 @@ export const getPaperById = async (req, res) => {
   }
 };
 
-// ------------------- UPDATE -------------------
 export const updatePaper = async (req, res) => {
   try {
     const { paperId } = req.params;
@@ -102,7 +100,6 @@ export const updatePaper = async (req, res) => {
   }
 };
 
-// ------------------- DELETE -------------------
 export const deletePaper = async (req, res) => {
   try {
     const { paperId } = req.params;
@@ -125,7 +122,6 @@ export const deletePaper = async (req, res) => {
   }
 };
 
-// ------------------- WORKFLOW -------------------
 export const submitPaper = async (req, res) => {
   try {
     const { paperId } = req.params;

@@ -1,7 +1,7 @@
 import { pool } from "../config/db.js";
 
 export class PaperQuestion {
-  // ------------------- CREATE -------------------
+
   static async add({ paperId, questionId, sequence, marks, section }) {
     const query = `
       INSERT INTO paper_questions (paper_id, question_id, sequence, marks, section)
@@ -13,7 +13,6 @@ export class PaperQuestion {
     return rows[0];
   }
 
-  // ------------------- READ -------------------
   static async getByPaper(paperId) {
     const query = `
       SELECT pq.*, q.content, q.question_type, co.co_number, co.description as co_description
@@ -39,7 +38,6 @@ export class PaperQuestion {
     return rows[0];
   }
 
-  // ------------------- UPDATE -------------------
   static async update(id, { sequence, marks, section }) {
     const query = `
       UPDATE paper_questions
@@ -54,7 +52,6 @@ export class PaperQuestion {
     return rows[0];
   }
 
-  // ------------------- DELETE -------------------
   static async remove(id) {
     const query = `
       DELETE FROM paper_questions WHERE id = $1 RETURNING id;
@@ -62,8 +59,6 @@ export class PaperQuestion {
     const { rows } = await pool.query(query, [id]);
     return rows[0];
   }
-
-  // ------------------- EXTRA HELPERS -------------------
 
   // Check if question already exists in a paper
   static async exists(paperId, questionId) {

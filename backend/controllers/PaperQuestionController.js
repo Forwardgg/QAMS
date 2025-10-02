@@ -2,7 +2,6 @@ import { PaperQuestion } from "../models/PaperQuestion.js";
 import { QuestionPaper } from "../models/QuestionPaper.js";
 import { Log } from "../models/Log.js";
 
-// ------------------- ADD -------------------
 export const addQuestionToPaper = async (req, res) => {
   try {
     const { paperId, questionId } = req.params;
@@ -38,7 +37,6 @@ export const addQuestionToPaper = async (req, res) => {
   }
 };
 
-// ------------------- GET -------------------
 export const getQuestionsInPaper = async (req, res) => {
   try {
     const { paperId } = req.params;
@@ -58,7 +56,6 @@ export const getQuestionsInPaper = async (req, res) => {
   }
 };
 
-// ------------------- UPDATE -------------------
 export const updatePaperQuestion = async (req, res) => {
   try {
     const { id } = req.params; // paper_questions.id
@@ -89,7 +86,6 @@ export const updatePaperQuestion = async (req, res) => {
   }
 };
 
-// ------------------- REMOVE -------------------
 export const removeQuestionFromPaper = async (req, res) => {
   try {
     const { id } = req.params;
@@ -120,7 +116,6 @@ export const removeQuestionFromPaper = async (req, res) => {
   }
 };
 
-// ------------------- REORDER -------------------
 export const reorderPaperQuestions = async (req, res) => {
   try {
     const { paperId } = req.params;
@@ -147,7 +142,7 @@ export const reorderPaperQuestions = async (req, res) => {
   }
 };
 
-// ------------------- BULK ADD -------------------
+// bulk add
 export const bulkAddQuestionsToPaper = async (req, res) => {
   try {
     const { paperId } = req.params;

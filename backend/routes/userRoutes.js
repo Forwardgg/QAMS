@@ -44,7 +44,7 @@ router.put("/:userId", authenticate, authorizeRoles("admin"), updateUser);
 // Update user password (admin can reset for any user)
 router.patch("/:userId/password", authenticate, authorizeRoles("admin"), updateUserPassword);
 
-// ------------------- SELF SERVICE -------------------
+//  SELF SERVICE 
 
 // A user updates their own password
 router.patch("/me/password", authenticate, async (req, res, next) => {

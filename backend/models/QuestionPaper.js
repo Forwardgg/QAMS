@@ -81,8 +81,7 @@ export class QuestionPaper {
     return rows[0];
   }
 
-  // ------------------- Moderation Workflow -------------------
-
+  // moderation workflow
   static async submit(paperId) {
     return this._setStatus(paperId, "submitted");
   }

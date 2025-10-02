@@ -13,7 +13,6 @@ import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// ------------------- ADD -------------------
 // Add question to paper
 router.post(
   "/:paperId/:questionId",
@@ -22,7 +21,6 @@ router.post(
   addQuestionToPaper
 );
 
-// ------------------- GET -------------------
 // Get all questions in a paper
 router.get("/:paperId", authenticate, getQuestionsInPaper);
 
@@ -35,7 +33,6 @@ router.put(
   updatePaperQuestion
 );
 
-// ------------------- DELETE -------------------
 // Remove a question from paper
 router.delete(
   "/:id",

@@ -75,7 +75,7 @@ export class Course {
     return rows;
   }
 
-  // === New: Search by course code (exact match) ===
+  // Search by course code (exact match)
   static async getByCode(code) {
     const query = `
       SELECT c.course_id, c.code, c.title, c.l, c.t, c.p,
@@ -88,7 +88,7 @@ export class Course {
     return rows[0]; // since code is UNIQUE
   }
 
-  // === New: Search by course title (case-insensitive partial match) ===
+  // Search by course title (case-insensitive partial match)
   static async searchByTitle(title) {
     const query = `
       SELECT c.course_id, c.code, c.title, c.l, c.t, c.p,

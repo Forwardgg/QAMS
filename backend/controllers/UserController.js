@@ -2,7 +2,6 @@ import bcrypt from "bcrypt";
 import { User } from "../models/User.js";
 import { Log } from "../models/Log.js";
 
-// ------------------- CREATE -------------------
 export const createUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -30,7 +29,6 @@ export const createUser = async (req, res) => {
   }
 };
 
-// ------------------- READ -------------------
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.getAll();
@@ -76,7 +74,6 @@ export const getTotalInstructors = async (req, res) => {
   }
 };
 
-// ------------------- UPDATE -------------------
 export const deactivateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -143,7 +140,6 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// ------------------- PASSWORD -------------------
 export const updateUserPassword = async (req, res) => {
   try {
     const { userId } = req.params;

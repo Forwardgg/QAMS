@@ -48,7 +48,6 @@ const attachExtras = async (questions) => {
   }));
 };
 
-// ------------------- CREATE -------------------
 
 export const addSubjectiveQuestion = async (req, res) => {
   try {
@@ -153,7 +152,6 @@ export const addMCQQuestion = async (req, res) => {
   }
 };
 
-// ------------------- GET -------------------
 
 export const getQuestionsForPaper = async (req, res) => {
   try {
@@ -207,7 +205,6 @@ export const getQuestionsForCourseAndPaper = async (req, res) => {
   }
 };
 
-// ------------------- UPDATE -------------------
 
 export const updateQuestion = async (req, res) => {
   try {
@@ -267,7 +264,6 @@ export const updateQuestion = async (req, res) => {
   }
 };
 
-// ------------------- DELETE -------------------
 
 export const deleteQuestion = async (req, res) => {
   try {

@@ -2,6 +2,7 @@
 import { pool } from "../config/db.js";
 
 export class CourseOutcome {
+  
   static async create({ courseId, coNumber, description }) {
     const query = `
       INSERT INTO course_outcomes (course_id, co_number, description)

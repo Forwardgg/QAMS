@@ -3,7 +3,7 @@ import { pool } from "../config/db.js";
 export class QuestionModeration {
   static allowedStatuses = ["pending", "approved", "rejected"];
 
-  // ------------------- CREATE -------------------
+  // create
   static async create({ paperId, questionId, moderatorId, status = "pending", comments = "" }) {
     if (!this.allowedStatuses.includes(status)) {
       throw new Error(`Invalid status. Allowed: ${this.allowedStatuses.join(", ")}`);
@@ -19,7 +19,7 @@ export class QuestionModeration {
     return rows[0];
   }
 
-  // ------------------- READ -------------------
+  // read
   static async getByPaper(paperId) {
     const query = `
       SELECT qm.*, u.name as moderator_name, q.content, q.question_type
@@ -58,7 +58,7 @@ export class QuestionModeration {
     return rows;
   }
 
-  // ------------------- UPDATE -------------------
+  // update
   static async updateStatus(id, { status, comments }) {
     if (!this.allowedStatuses.includes(status)) {
       throw new Error(`Invalid status. Allowed: ${this.allowedStatuses.join(", ")}`);
@@ -75,7 +75,7 @@ export class QuestionModeration {
     return rows[0];
   }
 
-  // ------------------- HELPERS -------------------
+  // helpers
   static async approve(id, comments = "") {
     return this.updateStatus(id, { status: "approved", comments });
   }
