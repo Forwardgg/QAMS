@@ -3,17 +3,27 @@ import { pool } from "../config/db.js";
 
 export class CourseOutcome {
   
+  // Create a new CO (course outcome)
   static async create({ courseId, coNumber, description }) {
     const query = `
       INSERT INTO course_outcomes (course_id, co_number, description)
       VALUES ($1, $2, $3)
       RETURNING co_id, course_id, co_number, description;
     `;
-    const values = [courseId, coNumber, description];
-    const { rows } = await pool.query(query, values);
-    return rows[0];
+    try {
+      const values = [courseId, coNumber, description];
+      const { rows } = await pool.query(query, values);
+      return rows[0] || null;
+    } catch (error) {
+      // Handle duplicate CO number within the same course
+      if (error.code === "23505") {
+        throw new Error("DUPLICATE_CO_NUMBER");
+      }
+      throw error;
+    }
   }
 
+  // Get all COs for a course
   static async getByCourse(courseId) {
     const query = `
       SELECT co_id, course_id, co_number, description
@@ -25,6 +35,7 @@ export class CourseOutcome {
     return rows;
   }
 
+  // Get CO by ID
   static async getById(coId) {
     const query = `
       SELECT co_id, course_id, co_number, description
@@ -32,26 +43,58 @@ export class CourseOutcome {
       WHERE co_id = $1;
     `;
     const { rows } = await pool.query(query, [coId]);
-    return rows[0];
+    return rows[0] || null;
   }
 
+  // Update CO (flexible: updates only provided fields)
   static async update(coId, { coNumber, description }) {
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (coNumber !== undefined) {
+      updates.push(`co_number = $${idx}`);
+      values.push(coNumber);
+      idx++;
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${idx}`);
+      values.push(description);
+      idx++;
+    }
+
+    if (updates.length === 0) {
+      return null; // nothing to update
+    }
+
+    values.push(coId);
+
     const query = `
       UPDATE course_outcomes
-      SET co_number = $1, description = $2
-      WHERE co_id = $3
+      SET ${updates.join(", ")}
+      WHERE co_id = $${idx}
       RETURNING co_id, course_id, co_number, description;
     `;
-    const values = [coNumber, description, coId];
-    const { rows } = await pool.query(query, values);
-    return rows[0];
+
+    try {
+      const { rows } = await pool.query(query, values);
+      return rows[0] || null;
+    } catch (error) {
+      if (error.code === "23505") {
+        throw new Error("DUPLICATE_CO_NUMBER");
+      }
+      throw error;
+    }
   }
 
+  // Delete CO (return full record for logging/UI)
   static async delete(coId) {
     const query = `
-      DELETE FROM course_outcomes WHERE co_id = $1 RETURNING co_id;
+      DELETE FROM course_outcomes 
+      WHERE co_id = $1 
+      RETURNING co_id, course_id, co_number, description;
     `;
     const { rows } = await pool.query(query, [coId]);
-    return rows[0];
+    return rows[0] || null;
   }
 }
