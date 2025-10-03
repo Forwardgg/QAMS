@@ -1,8 +1,8 @@
 // jest.setup.js
-import { pool } from "../backend/config/db.js";
+import { pool } from "./config/db.js";
 import bcrypt from "bcrypt";
 
-// Run once before all tests
+// Run once before all tests in every test file
 beforeAll(async () => {
   await pool.query(`
     TRUNCATE 
@@ -21,7 +21,7 @@ beforeAll(async () => {
   `);
 
   // Seed admin
-  const adminHash = await bcrypt.hash("adminpassword", 6); // lower salt for faster tests
+  const adminHash = await bcrypt.hash("adminpassword", 6); // lower salt for speed
   await pool.query(
     `INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at)
      VALUES ($1, $2, $3, $4, 'active', NOW(), NOW())
@@ -39,7 +39,7 @@ beforeAll(async () => {
   );
 });
 
-// Clean up pool once at the end
+// Run once after ALL test suites are finished
 afterAll(async () => {
   await pool.end();
 });

@@ -17,25 +17,25 @@ const router = express.Router();
 // Create course (admin or instructor)
 router.post("/", authenticate, authorizeRoles("admin", "instructor"), createCourse);
 
-// Admin → get all courses with total
-router.get("/admin", authenticate, authorizeRoles("admin"), getAllCoursesAdmin);
+// Admin → get all courses
+router.get("/", authenticate, authorizeRoles("admin"), getAllCoursesAdmin);
 
-// Instructor → get own courses with total
-router.get("/instructor", authenticate, authorizeRoles("instructor"), getAllCoursesInstructor);
+// Instructor → get own courses
+router.get("/mine", authenticate, authorizeRoles("instructor"), getAllCoursesInstructor);
 
-// Public → everyone can see course code, title, ltp
+// Public → everyone can see course code, title, LTP
 router.get("/public", getCoursesPublic);
 
-// Search by code (everyone can access)
+// Get course by code (public)
 router.get("/code/:code", getCourseByCode);
 
-// Search by title (everyone can access)
+// Search courses (public) - by title
 router.get("/search", searchCoursesByTitle);
 
-// Update (admin can update all, instructor only own)
+// Update course (admin can update all, instructor only own)
 router.put("/:id", authenticate, authorizeRoles("admin", "instructor"), updateCourse);
 
-// Delete (admin can delete all, instructor only own)
+// Delete course (admin can delete all, instructor only own)
 router.delete("/:id", authenticate, authorizeRoles("admin", "instructor"), deleteCourse);
 
 export default router;

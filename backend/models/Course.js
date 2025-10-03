@@ -42,25 +42,27 @@ export class Course {
 
   // Update course
   static async update(courseId, { code, title, l, t, p }) {
-    const query = `
-      UPDATE courses
-      SET code = $1, title = $2, l = $3, t = $4, p = $5
-      WHERE course_id = $6
-      RETURNING course_id, code, title, l, t, p, created_by, created_at;
-    `;
-    const values = [code, title, l, t, p, courseId];
-    const { rows } = await pool.query(query, values);
-    return rows[0];
-  }
+  const query = `
+    UPDATE courses
+    SET code = $1, title = $2, l = $3, t = $4, p = $5
+    WHERE course_id = $6
+    RETURNING course_id, code, title, l, t, p, created_by, created_at, updated_at;
+  `;
+  const values = [code, title, l, t, p, courseId];
+  const { rows } = await pool.query(query, values);
+  return rows[0] || null; // explicit null if not found
+}
 
-  // Delete course
-  static async delete(courseId) {
-    const query = `
-      DELETE FROM courses WHERE course_id = $1 RETURNING course_id;
-    `;
-    const { rows } = await pool.query(query, [courseId]);
-    return rows[0];
-  }
+  // Delete course (return id, code, title for confirmation/logging/ 4th version lol)
+static async delete(courseId) {
+  const query = `
+    DELETE FROM courses
+    WHERE course_id = $1
+    RETURNING course_id, code, title, created_by, created_at;
+  `;
+  const { rows } = await pool.query(query, [courseId]);
+  return rows[0] || null; // null if not found
+}
 
   static async getByCreator(userId) {
     const query = `
