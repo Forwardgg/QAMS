@@ -1,3 +1,4 @@
+// backend/models/QuestionPaper.js
 import { pool } from "../config/db.js";
 
 export class QuestionPaper {
@@ -16,13 +17,13 @@ export class QuestionPaper {
         (course_id, instructor_id, title, exam_type, semester, academic_year, full_marks, duration)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING paper_id, course_id, instructor_id, title, status, version,
-                exam_type, semester, academic_year, full_marks, duration, created_at, updated_at;
+                exam_type, semester, academic_year, full_marks, duration,
+                created_at, updated_at;
     `;
     const values = [courseId, instructorId, title, examType, semester, academicYear, fullMarks, duration];
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
   static async getAll(limit = 50, offset = 0) {
     const query = `
       SELECT p.*, c.code as course_code, c.title as course_title, u.name as instructor_name
@@ -35,7 +36,6 @@ export class QuestionPaper {
     const { rows } = await pool.query(query, [limit, offset]);
     return rows;
   }
-
   static async getById(paperId) {
     const query = `
       SELECT p.*, c.code as course_code, c.title as course_title, u.name as instructor_name
@@ -47,7 +47,6 @@ export class QuestionPaper {
     const { rows } = await pool.query(query, [paperId]);
     return rows[0];
   }
-
   static async update(paperId, { title, examType, semester, academicYear, fullMarks, duration, status }) {
     const allowedStatuses = ["draft", "submitted", "approved", "rejected"];
     if (status && !allowedStatuses.includes(status)) {
@@ -66,34 +65,34 @@ export class QuestionPaper {
           version = version + 1,
           updated_at = CURRENT_TIMESTAMP
       WHERE paper_id = $8
-      RETURNING *;
+      RETURNING paper_id, course_id, instructor_id, title, status, version,
+                exam_type, semester, academic_year, full_marks, duration,
+                created_at, updated_at;
     `;
     const values = [title, examType, semester, academicYear, fullMarks, duration, status, paperId];
     const { rows } = await pool.query(query, values);
+
+    if (rows.length === 0) throw new Error("Paper not found");
     return rows[0];
   }
-
   static async delete(paperId) {
     const query = `
       DELETE FROM question_papers WHERE paper_id = $1 RETURNING paper_id;
     `;
     const { rows } = await pool.query(query, [paperId]);
+    if (rows.length === 0) throw new Error("Paper not found");
     return rows[0];
   }
-
   // moderation workflow
   static async submit(paperId) {
     return this._setStatus(paperId, "submitted");
   }
-
   static async approve(paperId) {
     return this._setStatus(paperId, "approved");
   }
-
   static async reject(paperId) {
     return this._setStatus(paperId, "rejected");
   }
-
   // Private helper for status update
   static async _setStatus(paperId, status) {
     const query = `
@@ -102,9 +101,13 @@ export class QuestionPaper {
           version = version + 1,
           updated_at = CURRENT_TIMESTAMP
       WHERE paper_id = $2
-      RETURNING *;
+      RETURNING paper_id, course_id, instructor_id, title, status, version,
+                exam_type, semester, academic_year, full_marks, duration,
+                created_at, updated_at;
     `;
     const { rows } = await pool.query(query, [status, paperId]);
+
+    if (rows.length === 0) throw new Error("Paper not found");
     return rows[0];
   }
 }

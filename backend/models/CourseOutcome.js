@@ -2,8 +2,6 @@
 import { pool } from "../config/db.js";
 
 export class CourseOutcome {
-  
-  // Create a new CO (course outcome)
   static async create({ courseId, coNumber, description }) {
     const query = `
       INSERT INTO course_outcomes (course_id, co_number, description)
@@ -22,8 +20,6 @@ export class CourseOutcome {
       throw error;
     }
   }
-
-  // Get all COs for a course
   static async getByCourse(courseId) {
     const query = `
       SELECT co_id, course_id, co_number, description
@@ -34,8 +30,6 @@ export class CourseOutcome {
     const { rows } = await pool.query(query, [courseId]);
     return rows;
   }
-
-  // Get CO by ID
   static async getById(coId) {
     const query = `
       SELECT co_id, course_id, co_number, description
@@ -45,8 +39,6 @@ export class CourseOutcome {
     const { rows } = await pool.query(query, [coId]);
     return rows[0] || null;
   }
-
-  // Update CO (flexible: updates only provided fields)
   static async update(coId, { coNumber, description }) {
     const updates = [];
     const values = [];
@@ -86,8 +78,6 @@ export class CourseOutcome {
       throw error;
     }
   }
-
-  // Delete CO (return full record for logging/UI)
   static async delete(coId) {
     const query = `
       DELETE FROM course_outcomes 

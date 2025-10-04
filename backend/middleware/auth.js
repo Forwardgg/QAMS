@@ -37,7 +37,6 @@ export const authenticate = async (req, res, next) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
 };
-
 //Role-based Authorization
 export const authorizeRoles = (...roles) => {
   return (req, res, next) => {
@@ -47,7 +46,6 @@ export const authorizeRoles = (...roles) => {
     next();
   };
 };
-
 // Validation Middleware
 export const validateRegister = (req, res, next) => {
   const { name, email, password, role } = req.body;
@@ -81,7 +79,6 @@ export const validateRegister = (req, res, next) => {
 
   next();
 };
-
 export const validateLogin = (req, res, next) => {
   const { email, password } = req.body;
 

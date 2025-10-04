@@ -1,7 +1,6 @@
 import { Course } from "../models/Course.js";
 import { Log } from "../models/Log.js"; // ✅ add this import
 
-// Create course (admin or instructor)
 export const createCourse = async (req, res) => {
   try {
     const { code, title, l, t, p } = req.body;
@@ -30,7 +29,6 @@ export const createCourse = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to create course" });
   }
 };
-
 // Admin → get all courses
 export const getAllCoursesAdmin = async (req, res) => {
   try {
@@ -41,7 +39,6 @@ export const getAllCoursesAdmin = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch courses" });
   }
 };
-
 // Instructor → get only their own courses
 export const getAllCoursesInstructor = async (req, res) => {
   try {
@@ -53,7 +50,6 @@ export const getAllCoursesInstructor = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch instructor courses" });
   }
 };
-
 // Everyone → public list
 export const getCoursesPublic = async (req, res) => {
   try {
@@ -72,7 +68,6 @@ export const getCoursesPublic = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch courses" });
   }
 };
-
 // Update course
 export const updateCourse = async (req, res) => {
   try {
@@ -102,7 +97,6 @@ export const updateCourse = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to update course" });
   }
 };
-
 // Delete course
 export const deleteCourse = async (req, res) => {
   try {
@@ -131,7 +125,6 @@ export const deleteCourse = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to delete course" });
   }
 };
-
 // Get by code
 export const getCourseByCode = async (req, res) => {
   try {
@@ -144,7 +137,6 @@ export const getCourseByCode = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch course" });
   }
 };
-
 // Search by title
 export const searchCoursesByTitle = async (req, res) => {
   try {

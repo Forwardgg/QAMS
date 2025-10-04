@@ -28,7 +28,6 @@ export const createUser = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.getAll();
@@ -38,7 +37,6 @@ export const getAllUsers = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 export const getTotalUsers = async (req, res) => {
   try {
     const users = await User.getAll();
@@ -48,7 +46,6 @@ export const getTotalUsers = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-
 export const getUserCountsByRole = async (req, res) => {
   try {
     const users = await User.getAll();
@@ -62,7 +59,6 @@ export const getUserCountsByRole = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-
 export const getTotalInstructors = async (req, res) => {
   try {
     const users = await User.getAll();
@@ -73,7 +69,6 @@ export const getTotalInstructors = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-
 export const deactivateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -92,7 +87,6 @@ export const deactivateUser = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 export const activateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -111,7 +105,6 @@ export const activateUser = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -139,7 +132,6 @@ export const updateUser = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 export const updateUserPassword = async (req, res) => {
   try {
     const { userId } = req.params;

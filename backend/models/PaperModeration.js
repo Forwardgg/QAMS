@@ -22,7 +22,6 @@ export class PaperModeration {
 
     return rows[0];
   }
-
   static async getByPaper(paperId) {
     const query = `
       SELECT pm.*, u.name as moderator_name, p.title as paper_title
@@ -35,7 +34,6 @@ export class PaperModeration {
     const { rows } = await pool.query(query, [paperId]);
     return rows;
   }
-
   static async getByModerator(moderatorId) {
     const query = `
       SELECT pm.*, p.title as paper_title
@@ -47,7 +45,6 @@ export class PaperModeration {
     const { rows } = await pool.query(query, [moderatorId]);
     return rows;
   }
-
   static async updateStatus(id, { status, comments }) {
     if (!this.allowedStatuses.includes(status)) {
       throw new Error(`Invalid status. Allowed: ${this.allowedStatuses.join(", ")}`);
@@ -68,16 +65,12 @@ export class PaperModeration {
 
     return rows[0];
   }
-
   static async approve(id, comments = "") {
     return this.updateStatus(id, { status: "approved", comments });
   }
-
   static async reject(id, comments = "") {
     return this.updateStatus(id, { status: "rejected", comments });
   }
-
-  // ------------------- NEW -------------------
   static async updatePaperStatus(paperId) {
     // Get all moderation records for this paper
     const moderations = await this.getByPaper(paperId);

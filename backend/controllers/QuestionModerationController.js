@@ -2,7 +2,6 @@ import { QuestionModeration } from "../models/QuestionModeration.js";
 import { QuestionPaper } from "../models/QuestionPaper.js";
 import { Log } from "../models/Log.js";
 
-// ------------------- CLAIM -------------------
 // Moderator claims a question for review
 export const claimQuestionForModeration = async (req, res) => {
   try {
@@ -38,8 +37,6 @@ export const claimQuestionForModeration = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to claim question for moderation" });
   }
 };
-
-// ------------------- GET -------------------
 export const getModerationForPaperQuestions = async (req, res) => {
   try {
     const { paperId } = req.params;
@@ -50,7 +47,6 @@ export const getModerationForPaperQuestions = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch question moderation" });
   }
 };
-
 export const getModerationForQuestion = async (req, res) => {
   try {
     const { questionId } = req.params;
@@ -61,7 +57,6 @@ export const getModerationForQuestion = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch moderation for question" });
   }
 };
-
 export const getMyQuestionModerations = async (req, res) => {
   try {
     const user = req.user;
@@ -76,8 +71,6 @@ export const getMyQuestionModerations = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch your question moderations" });
   }
 };
-
-// ------------------- ACTIONS -------------------
 export const approveQuestionModeration = async (req, res) => {
   try {
     const { id } = req.params;
@@ -102,7 +95,6 @@ export const approveQuestionModeration = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to approve question" });
   }
 };
-
 export const rejectQuestionModeration = async (req, res) => {
   try {
     const { id } = req.params;

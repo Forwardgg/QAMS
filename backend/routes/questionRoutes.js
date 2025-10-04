@@ -8,7 +8,7 @@ import {
   getQuestionsForCourseAndPaper,
   updateQuestion,
   deleteQuestion,
-} from "../controllers/questionController.js";
+} from "../controllers/QuestionController.js";
 
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 

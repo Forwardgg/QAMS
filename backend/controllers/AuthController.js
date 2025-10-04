@@ -4,10 +4,9 @@ import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
 import { Log } from "../models/Log.js";
 
-const allowedRoles = ["instructor", "moderator"]; // self-registration only
+const allowedRoles = ["instructor", "moderator"];
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
-
 
 export const registerUser = async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -18,7 +17,6 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ error: "Email already registered" });
     }
 
-    // Normalize
     const roleNormalized = role.toLowerCase();
     if (!allowedRoles.includes(roleNormalized)) {
       return res.status(400).json({ error: "Invalid role" });
@@ -49,7 +47,6 @@ export const registerUser = async (req, res) => {
     res.status(500).json({ error: "Server error during registration" });
   }
 };
-
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
@@ -96,7 +93,6 @@ export const loginUser = async (req, res) => {
     res.status(500).json({ error: "Server error during login" });
   }
 };
-
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
   try {
@@ -112,7 +108,7 @@ export const forgotPassword = async (req, res) => {
     );
 
     const resetLink = `${process.env.FRONTEND_URL || 'https://your-frontend.com'}/reset-password?token=${resetToken}`;
-    console.log(`Password reset link for ${email}: ${resetLink}`); // replace later
+    console.log(`Password reset link for ${email}: ${resetLink}`); // temp
     await Log.create({
       userId: user.user_id,
       action: "FORGOT_PASSWORD",
@@ -125,7 +121,6 @@ export const forgotPassword = async (req, res) => {
     res.status(500).json({ error: "Server error during password reset request" });
   }
 };
-
 export const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
@@ -162,7 +157,6 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ error: "Server error during password reset" });
   }
 };
-
 // soft delete
 export const deleteUser = async (req, res) => {
   const { id } = req.params;
@@ -182,7 +176,7 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ error: "Server error during soft delete" });
   }
 };
-
+// hard delete with cascade
 export const forceDeleteUser = async (req, res) => {
   const { id } = req.params;
   try {

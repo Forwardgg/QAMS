@@ -3,7 +3,7 @@ import { pool } from "../config/db.js";
 export class QuestionModeration {
   static allowedStatuses = ["pending", "approved", "rejected"];
 
-  // create
+
   static async create({ paperId, questionId, moderatorId, status = "pending", comments = "" }) {
     if (!this.allowedStatuses.includes(status)) {
       throw new Error(`Invalid status. Allowed: ${this.allowedStatuses.join(", ")}`);
@@ -18,8 +18,6 @@ export class QuestionModeration {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
-  // read
   static async getByPaper(paperId) {
     const query = `
       SELECT qm.*, u.name as moderator_name, q.content, q.question_type
@@ -32,7 +30,6 @@ export class QuestionModeration {
     const { rows } = await pool.query(query, [paperId]);
     return rows;
   }
-
   static async getByQuestion(questionId) {
     const query = `
       SELECT qm.*, u.name as moderator_name
@@ -44,7 +41,6 @@ export class QuestionModeration {
     const { rows } = await pool.query(query, [questionId]);
     return rows;
   }
-
   static async getByModerator(moderatorId) {
     const query = `
       SELECT qm.*, q.content, q.question_type, p.title as paper_title
@@ -57,8 +53,6 @@ export class QuestionModeration {
     const { rows } = await pool.query(query, [moderatorId]);
     return rows;
   }
-
-  // update
   static async updateStatus(id, { status, comments }) {
     if (!this.allowedStatuses.includes(status)) {
       throw new Error(`Invalid status. Allowed: ${this.allowedStatuses.join(", ")}`);
@@ -74,12 +68,9 @@ export class QuestionModeration {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
-  // helpers
   static async approve(id, comments = "") {
     return this.updateStatus(id, { status: "approved", comments });
   }
-
   static async reject(id, comments = "") {
     return this.updateStatus(id, { status: "rejected", comments });
   }

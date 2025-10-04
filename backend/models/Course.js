@@ -2,7 +2,6 @@
 import { pool } from "../config/db.js";
 
 export class Course {
-  // Create a new course
   static async create({ code, title, l, t, p, createdBy }) {
     const query = `
       INSERT INTO courses (code, title, l, t, p, created_by)
@@ -13,8 +12,6 @@ export class Course {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
-  // Get all courses
   static async getAll() {
     const query = `
       SELECT c.course_id, c.code, c.title, c.l, c.t, c.p,
@@ -26,8 +23,6 @@ export class Course {
     const { rows } = await pool.query(query);
     return rows;
   }
-
-  // Get course by ID
   static async getById(courseId) {
     const query = `
       SELECT c.course_id, c.code, c.title, c.l, c.t, c.p,
@@ -39,8 +34,6 @@ export class Course {
     const { rows } = await pool.query(query, [courseId]);
     return rows[0];
   }
-
-  // Update course
   static async update(courseId, { code, title, l, t, p }) {
   const query = `
     UPDATE courses
@@ -52,8 +45,6 @@ export class Course {
   const { rows } = await pool.query(query, values);
   return rows[0] || null; // explicit null if not found
 }
-
-  // Delete course (return id, code, title for confirmation/logging/ 4th version lol)
 static async delete(courseId) {
   const query = `
     DELETE FROM courses
@@ -63,7 +54,6 @@ static async delete(courseId) {
   const { rows } = await pool.query(query, [courseId]);
   return rows[0] || null; // null if not found
 }
-
   static async getByCreator(userId) {
     const query = `
       SELECT c.course_id, c.code, c.title, c.l, c.t, c.p,
@@ -76,8 +66,6 @@ static async delete(courseId) {
     const { rows } = await pool.query(query, [userId]);
     return rows;
   }
-
-  // Search by course code (exact match)
   static async getByCode(code) {
     const query = `
       SELECT c.course_id, c.code, c.title, c.l, c.t, c.p,
@@ -89,8 +77,6 @@ static async delete(courseId) {
     const { rows } = await pool.query(query, [code]);
     return rows[0]; // since code is UNIQUE
   }
-
-  // Search by course title (case-insensitive partial match)
   static async searchByTitle(title) {
     const query = `
       SELECT c.course_id, c.code, c.title, c.l, c.t, c.p,
@@ -103,5 +89,4 @@ static async delete(courseId) {
     const { rows } = await pool.query(query, [`%${title}%`]);
     return rows;
   }
-
 }

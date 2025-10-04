@@ -1,8 +1,15 @@
+// backend/models/PaperQuestion.js
 import { pool } from "../config/db.js";
 
 export class PaperQuestion {
-
+  // Add a single question to a paper
   static async add({ paperId, questionId, sequence, marks, section }) {
+    // Prevent duplicates
+    const exists = await this.exists(paperId, questionId);
+    if (exists) {
+      throw new Error("Question already exists in this paper");
+    }
+
     const query = `
       INSERT INTO paper_questions (paper_id, question_id, sequence, marks, section)
       VALUES ($1, $2, $3, $4, $5)
@@ -12,7 +19,7 @@ export class PaperQuestion {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
+  // Get all questions in a paper (with joins for display)
   static async getByPaper(paperId) {
     const query = `
       SELECT pq.*, q.content, q.question_type, co.co_number, co.description as co_description
@@ -25,7 +32,7 @@ export class PaperQuestion {
     const { rows } = await pool.query(query, [paperId]);
     return rows;
   }
-
+  // Get one mapping by ID (with joins)
   static async getById(id) {
     const query = `
       SELECT pq.*, q.content, q.question_type, co.co_number, co.description as co_description
@@ -35,9 +42,9 @@ export class PaperQuestion {
       WHERE pq.id = $1;
     `;
     const { rows } = await pool.query(query, [id]);
-    return rows[0];
+    return rows[0] || null;
   }
-
+  // Update mapping (marks/sequence/section)
   static async update(id, { sequence, marks, section }) {
     const query = `
       UPDATE paper_questions
@@ -49,17 +56,18 @@ export class PaperQuestion {
     `;
     const values = [sequence, marks, section, id];
     const { rows } = await pool.query(query, values);
+    if (rows.length === 0) throw new Error("PaperQuestion not found");
     return rows[0];
   }
-
+  // Remove mapping
   static async remove(id) {
     const query = `
       DELETE FROM paper_questions WHERE id = $1 RETURNING id;
     `;
     const { rows } = await pool.query(query, [id]);
+    if (rows.length === 0) throw new Error("PaperQuestion not found");
     return rows[0];
   }
-
   // Check if question already exists in a paper
   static async exists(paperId, questionId) {
     const query = `
@@ -70,7 +78,6 @@ export class PaperQuestion {
     const { rows } = await pool.query(query, [paperId, questionId]);
     return rows.length > 0;
   }
-
   // Reorder all questions in a paper (compact sequence 1..N)
   static async reorder(paperId) {
     const questions = await this.getByPaper(paperId);
@@ -83,24 +90,44 @@ export class PaperQuestion {
     }
     return this.getByPaper(paperId);
   }
-
+  // Bulk add questions to a paper in a transaction
   static async bulkAdd(paperId, questions = []) {
-  if (!Array.isArray(questions) || questions.length === 0) {
-    return [];
-  }
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return [];
+    }
 
-  const inserted = [];
-  for (const q of questions) {
-    const query = `
-      INSERT INTO paper_questions (paper_id, question_id, sequence, marks, section)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, paper_id, question_id, sequence, marks, section;
-    `;
-    const values = [paperId, q.questionId, q.sequence, q.marks, q.section];
-    const { rows } = await pool.query(query, values);
-    inserted.push(rows[0]);
-  }
-  return inserted;
-}
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
+      const inserted = [];
+      for (const q of questions) {
+        // Check duplicates
+        const { rows: dupCheck } = await client.query(
+          `SELECT 1 FROM paper_questions WHERE paper_id = $1 AND question_id = $2 LIMIT 1;`,
+          [paperId, q.questionId]
+        );
+        if (dupCheck.length > 0) {
+          throw new Error(`Question ${q.questionId} already exists in this paper`);
+        }
+
+        const query = `
+          INSERT INTO paper_questions (paper_id, question_id, sequence, marks, section)
+          VALUES ($1, $2, $3, $4, $5)
+          RETURNING id, paper_id, question_id, sequence, marks, section;
+        `;
+        const values = [paperId, q.questionId, q.sequence, q.marks, q.section];
+        const { rows } = await client.query(query, values);
+        inserted.push(rows[0]);
+      }
+
+      await client.query("COMMIT");
+      return inserted;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
 }

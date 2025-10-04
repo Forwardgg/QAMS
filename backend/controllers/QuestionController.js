@@ -1,7 +1,9 @@
+import { pool } from "../config/db.js";
 import { Question } from "../models/Question.js";
 import { Option } from "../models/Option.js";
 import { Course } from "../models/Course.js";
 import { QuestionMedia } from "../models/QuestionMedia.js";
+import { Log } from "../models/Log.js"; // ✅ added logging
 
 // Utility to attach options + media
 const attachExtras = async (questions) => {
@@ -10,24 +12,24 @@ const attachExtras = async (questions) => {
   const questionIds = questions.map((q) => q.question_id);
 
   // Batch fetch options for all MCQs
-  const optionsQuery = `
-    SELECT option_id, question_id, option_text, is_correct
-    FROM options
-    WHERE question_id = ANY($1)
-    ORDER BY option_id;
-  `;
-  const { rows: allOptions } = await pool.query(optionsQuery, [questionIds]);
+  const { rows: allOptions } = await pool.query(
+    `SELECT option_id, question_id, option_text, is_correct
+     FROM options
+     WHERE question_id = ANY($1)
+     ORDER BY option_id;`,
+    [questionIds]
+  );
 
   // Batch fetch media for all questions
-  const mediaQuery = `
-    SELECT id, question_id, media_url, caption
-    FROM question_media
-    WHERE question_id = ANY($1)
-    ORDER BY id;
-  `;
-  const { rows: allMedia } = await pool.query(mediaQuery, [questionIds]);
+  const { rows: allMedia } = await pool.query(
+    `SELECT id, question_id, media_url, caption
+     FROM question_media
+     WHERE question_id = ANY($1)
+     ORDER BY id;`,
+    [questionIds]
+  );
 
-  // Group by question_id
+  // Group
   const optionsByQ = {};
   allOptions.forEach((opt) => {
     if (!optionsByQ[opt.question_id]) optionsByQ[opt.question_id] = [];
@@ -40,15 +42,13 @@ const attachExtras = async (questions) => {
     mediaByQ[m.question_id].push(m);
   });
 
-  // Attach to each question
+  // Attach
   return questions.map((q) => ({
     ...q,
     options: q.question_type === "mcq" ? optionsByQ[q.question_id] || [] : [],
     media: mediaByQ[q.question_id] || [],
   }));
 };
-
-
 export const addSubjectiveQuestion = async (req, res) => {
   try {
     const { courseId } = req.params;
@@ -87,13 +87,18 @@ export const addSubjectiveQuestion = async (req, res) => {
     question.options = [];
     question.media = mediaResults;
 
-    res.status(201).json({ success: true, question });
+    await Log.create({
+      userId: user.user_id,
+      action: "ADD_QUESTION",
+      details: `Added subjective question ${question.question_id} to course ${courseId}`,
+    });
+
+    res.status(201).json({ success: true, data: question });
   } catch (error) {
     console.error("Error adding subjective question:", error);
     res.status(500).json({ success: false, message: "Failed to add question" });
   }
 };
-
 export const addMCQQuestion = async (req, res) => {
   try {
     const { courseId } = req.params;
@@ -145,67 +150,69 @@ export const addMCQQuestion = async (req, res) => {
     question.options = optionResults;
     question.media = mediaResults;
 
-    res.status(201).json({ success: true, question });
+    await Log.create({
+      userId: user.user_id,
+      action: "ADD_QUESTION",
+      details: `Added MCQ question ${question.question_id} to course ${courseId}`,
+    });
+
+    res.status(201).json({ success: true, data: question });
   } catch (error) {
     console.error("Error adding MCQ question:", error);
     res.status(500).json({ success: false, message: "Failed to add MCQ question" });
   }
 };
-
-
 export const getQuestionsForPaper = async (req, res) => {
   try {
     const { paperId } = req.params;
-    const query = `
-      SELECT pq.paper_id, q.*, co.co_number
-      FROM paper_questions pq
-      JOIN questions q ON pq.question_id = q.question_id
-      LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-      WHERE pq.paper_id = $1 AND q.is_active = true
-      ORDER BY pq.sequence;
-    `;
-    const { rows } = await pool.query(query, [paperId]);
+    const { rows } = await pool.query(
+      `SELECT pq.paper_id, q.*, co.co_number
+       FROM paper_questions pq
+       JOIN questions q ON pq.question_id = q.question_id
+       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
+       WHERE pq.paper_id = $1 AND q.is_active = true
+       ORDER BY pq.sequence;`,
+      [paperId]
+    );
+
     const questions = await attachExtras(rows);
-    res.json({ success: true, total: questions.length, questions });
+    res.json({ success: true, total: questions.length, data: questions });
   } catch (error) {
     console.error("Error fetching paper questions:", error);
     res.status(500).json({ success: false, message: "Failed to fetch paper questions" });
   }
 };
-
 export const getQuestionsForCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
     const questions = await Question.getByCourse(courseId);
     const withExtras = await attachExtras(questions);
-    res.json({ success: true, total: withExtras.length, questions: withExtras });
+    res.json({ success: true, total: withExtras.length, data: withExtras });
   } catch (error) {
     console.error("Error fetching course questions:", error);
     res.status(500).json({ success: false, message: "Failed to fetch course questions" });
   }
 };
-
 export const getQuestionsForCourseAndPaper = async (req, res) => {
   try {
     const { courseId, paperId } = req.params;
-    const query = `
-      SELECT q.*, co.co_number, pq.paper_id
-      FROM paper_questions pq
-      JOIN questions q ON pq.question_id = q.question_id
-      LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-      WHERE q.course_id = $1 AND pq.paper_id = $2 AND q.is_active = true
-      ORDER BY pq.sequence;
-    `;
-    const { rows } = await pool.query(query, [courseId, paperId]);
+    const { rows } = await pool.query(
+      `SELECT q.*, co.co_number, pq.paper_id
+       FROM paper_questions pq
+       JOIN questions q ON pq.question_id = q.question_id
+       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
+       WHERE q.course_id = $1 AND pq.paper_id = $2 AND q.is_active = true
+       ORDER BY pq.sequence;`,
+      [courseId, paperId]
+    );
+
     const withExtras = await attachExtras(rows);
-    res.json({ success: true, total: withExtras.length, questions: withExtras });
+    res.json({ success: true, total: withExtras.length, data: withExtras });
   } catch (error) {
     console.error("Error fetching course+paper questions:", error);
     res.status(500).json({ success: false, message: "Failed to fetch course+paper questions" });
   }
 };
-
-
 export const updateQuestion = async (req, res) => {
   try {
     const { questionId } = req.params;
@@ -257,14 +264,18 @@ export const updateQuestion = async (req, res) => {
     updated.options = updatedOptions;
     updated.media = updatedMedia;
 
-    res.json({ success: true, question: updated });
+    await Log.create({
+      userId: user.user_id,
+      action: "UPDATE_QUESTION",
+      details: `Updated question ${questionId}`,
+    });
+
+    res.json({ success: true, data: updated });
   } catch (error) {
     console.error("Error updating question:", error);
     res.status(500).json({ success: false, message: "Failed to update question" });
   }
 };
-
-
 export const deleteQuestion = async (req, res) => {
   try {
     const { questionId } = req.params;
@@ -279,9 +290,15 @@ export const deleteQuestion = async (req, res) => {
 
     await Question.softDelete(questionId);
 
-    // Use models to clean up
+    // Clean up children
     await QuestionMedia.deleteByQuestion(questionId);
     await Option.deleteByQuestion(questionId);
+
+    await Log.create({
+      userId: user.user_id,
+      action: "DELETE_QUESTION",
+      details: `Deleted question ${questionId}`,
+    });
 
     res.json({ success: true, message: "Question deleted" });
   } catch (error) {

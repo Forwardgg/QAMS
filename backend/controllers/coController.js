@@ -30,7 +30,6 @@ export const createCO = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to create CO" });
   }
 };
-
 // Get all COs for a specific course (everyone can see)
 export const getCOsByCourse = async (req, res) => {
   try {
@@ -61,7 +60,6 @@ export const getCOsByCourse = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch COs" });
   }
 };
-
 // Get all courses with their COs (everyone can see)
 export const getAllCoursesWithCOs = async (req, res) => {
   try {
@@ -88,7 +86,6 @@ export const getAllCoursesWithCOs = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch data" });
   }
 };
-
 // Update CO (admin or instructor for own course)
 export const updateCO = async (req, res) => {
   try {
@@ -126,7 +123,6 @@ export const updateCO = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to update CO" });
   }
 };
-
 // Delete CO (admin or instructor for own course)
 export const deleteCO = async (req, res) => {
   try {

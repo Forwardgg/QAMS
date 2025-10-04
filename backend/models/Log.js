@@ -12,7 +12,6 @@ export class Log {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
   static async getAll(limit = 50) {
     const query = `
       SELECT l.*, u.name as user_name, u.role as user_role
@@ -24,7 +23,6 @@ export class Log {
     const { rows } = await pool.query(query, [limit]);
     return rows;
   }
-
   static async getByUser(userId, limit = 50) {
     const query = `
       SELECT l.*, u.name as user_name, u.role as user_role
@@ -37,7 +35,6 @@ export class Log {
     const { rows } = await pool.query(query, [userId, limit]);
     return rows;
   }
-
   static async delete(logId) {
     const query = `
       DELETE FROM logs WHERE log_id = $1 RETURNING log_id;

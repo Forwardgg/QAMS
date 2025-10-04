@@ -12,7 +12,6 @@ export class Option {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
   static async getByQuestion(questionId) {
     const query = `
       SELECT option_id, question_id, option_text, is_correct
@@ -23,7 +22,6 @@ export class Option {
     const { rows } = await pool.query(query, [questionId]);
     return rows;
   }
-
   static async update(optionId, { optionText, isCorrect }) {
     const query = `
       UPDATE options
@@ -35,7 +33,6 @@ export class Option {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
   static async delete(optionId) {
     const query = `
       DELETE FROM options WHERE option_id = $1 RETURNING option_id;
@@ -43,4 +40,9 @@ export class Option {
     const { rows } = await pool.query(query, [optionId]);
     return rows[0];
   }
+  static async deleteByQuestion(questionId) {
+  const query = `DELETE FROM options WHERE question_id = $1 RETURNING option_id;`;
+  const { rows } = await pool.query(query, [questionId]);
+  return rows;
+}
 }

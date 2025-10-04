@@ -20,7 +20,6 @@ export class User {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
   static async findByEmail(email) {
     const query = `
       SELECT * FROM users 
@@ -30,7 +29,6 @@ export class User {
     const { rows } = await pool.query(query, [email.toLowerCase()]);
     return rows[0];
   }
-
   static async findById(userId) {
     const query = `
       SELECT * FROM users 
@@ -39,7 +37,6 @@ export class User {
     const { rows } = await pool.query(query, [userId]);
     return rows[0];
   }
-
   static async getAll() {
     const query = `
       SELECT user_id, name, email, role, status, created_at, updated_at
@@ -63,7 +60,6 @@ export class User {
     const { rows } = await pool.query(query, [status, userId]);
     return rows[0];
   }
-
   static async updateProfile(userId, { name, email, role }) {
     let roleNormalized = null;
 
@@ -92,7 +88,6 @@ export class User {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
   static async updatePassword(userId, passwordHash) {
     const query = `
       UPDATE users
@@ -104,8 +99,7 @@ export class User {
     const { rows } = await pool.query(query, [passwordHash, userId]);
     return rows[0];
   }
-  
-  // Soft delete (recommended for normal use)
+  // Soft delete (normal use)
   static async softDelete(userId) {
     const query = `
       UPDATE users
@@ -117,7 +111,6 @@ export class User {
     const { rows } = await pool.query(query, [userId]);
     return rows[0];
   }
-
   // Hard delete (admin-only)
   static async forceDelete(userId) {
     const query = `

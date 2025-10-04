@@ -41,7 +41,6 @@ export const claimPaperForModeration = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to claim paper" });
   }
 };
-
 // All moderation records for a paper
 export const getModerationForPaper = async (req, res) => {
   try {
@@ -53,7 +52,6 @@ export const getModerationForPaper = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch moderation records" });
   }
 };
-
 // Papers claimed by current moderator
 export const getMyModerations = async (req, res) => {
   try {
@@ -69,7 +67,6 @@ export const getMyModerations = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch your moderations" });
   }
 };
-
 export const approvePaperModeration = async (req, res) => {
   try {
     const { id } = req.params;
@@ -94,7 +91,6 @@ export const approvePaperModeration = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to approve paper" });
   }
 };
-
 export const rejectPaperModeration = async (req, res) => {
   try {
     const { id } = req.params;

@@ -12,7 +12,6 @@ export class QuestionMedia {
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
-
   // Get all media attached to a question
   static async getByQuestion(questionId) {
     const query = `
@@ -24,7 +23,6 @@ export class QuestionMedia {
     const { rows } = await pool.query(query, [questionId]);
     return rows;
   }
-
   // Update media (if needed)
   static async update(id, { mediaUrl, caption }) {
     const query = `
@@ -36,7 +34,6 @@ export class QuestionMedia {
     const { rows } = await pool.query(query, [mediaUrl, caption, id]);
     return rows[0];
   }
-
   // Delete a media record
   static async delete(id) {
     const query = `
@@ -47,7 +44,6 @@ export class QuestionMedia {
     const { rows } = await pool.query(query, [id]);
     return rows[0];
   }
-
   // Delete all media for a given question
   static async deleteByQuestion(questionId) {
     const query = `

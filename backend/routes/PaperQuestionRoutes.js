@@ -13,7 +13,17 @@ import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Add question to paper
+// ------------------- CREATE -------------------
+
+// Bulk add questions to paper (⚠️ must come before single add)
+router.post(
+  "/:paperId/bulk",
+  authenticate,
+  authorizeRoles("admin", "instructor"),
+  bulkAddQuestionsToPaper
+);
+
+// Add single question to paper
 router.post(
   "/:paperId/:questionId",
   authenticate,
@@ -21,40 +31,38 @@ router.post(
   addQuestionToPaper
 );
 
+// ------------------- READ -------------------
+
 // Get all questions in a paper
+// If students shouldn't see this, add authorizeRoles("admin","instructor","moderator")
 router.get("/:paperId", authenticate, getQuestionsInPaper);
 
 // ------------------- UPDATE -------------------
-// Update marks/sequence/section of a question in paper
+
+// Update marks/sequence/section of a mapping
 router.put(
-  "/:id",
+  "/:pqId",
   authenticate,
   authorizeRoles("admin", "instructor"),
   updatePaperQuestion
 );
 
-// Remove a question from paper
-router.delete(
-  "/:id",
-  authenticate,
-  authorizeRoles("admin", "instructor"),
-  removeQuestionFromPaper
-);
-
-// Reorder questions in a paper
-router.post(
+// Reorder all questions in a paper
+router.put(
   "/:paperId/reorder",
   authenticate,
   authorizeRoles("admin", "instructor"),
   reorderPaperQuestions
 );
 
-// Bulk add questions
-router.post(
-  "/:paperId/bulk",
+// ------------------- DELETE -------------------
+
+// Remove a question from a paper
+router.delete(
+  "/:pqId",
   authenticate,
   authorizeRoles("admin", "instructor"),
-  bulkAddQuestionsToPaper
+  removeQuestionFromPaper
 );
 
 export default router;

@@ -1,5 +1,4 @@
 import { Log } from "../models/Log.js";
-
 //  created internally, not exposed as a route
 
 export const getAllLogs = async (req, res) => {
@@ -12,7 +11,6 @@ export const getAllLogs = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch logs" });
   }
 };
-
 export const getLogsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -24,7 +22,6 @@ export const getLogsByUser = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch user logs" });
   }
 };
-
 export const deleteLog = async (req, res) => {
   try {
     const { logId } = req.params;
