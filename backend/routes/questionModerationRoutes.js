@@ -12,7 +12,11 @@ import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Moderator claims a question inside a paper
+/**
+ * @route   POST /api/question-moderation/claim/:paperId/:questionId
+ * @desc    Moderator claims a specific question within a paper for moderation
+ * @access  Moderator
+ */
 router.post(
   "/claim/:paperId/:questionId",
   authenticate,
@@ -20,7 +24,11 @@ router.post(
   claimQuestionForModeration
 );
 
-// Get moderation records for all questions in a paper
+/**
+ * @route   GET /api/question-moderation/paper/:paperId
+ * @desc    Get all question moderation records for a specific paper
+ * @access  Admin, Instructor, Moderator
+ */
 router.get(
   "/paper/:paperId",
   authenticate,
@@ -28,7 +36,11 @@ router.get(
   getModerationForPaperQuestions
 );
 
-// Get moderation records for a specific question
+/**
+ * @route   GET /api/question-moderation/question/:questionId
+ * @desc    Get all moderation records for a single question
+ * @access  Admin, Instructor, Moderator
+ */
 router.get(
   "/question/:questionId",
   authenticate,
@@ -36,7 +48,11 @@ router.get(
   getModerationForQuestion
 );
 
-// Get logged-in moderator's question moderations
+/**
+ * @route   GET /api/question-moderation/my
+ * @desc    Get all question moderations claimed by the current moderator
+ * @access  Moderator
+ */
 router.get(
   "/my",
   authenticate,
@@ -44,15 +60,24 @@ router.get(
   getMyQuestionModerations
 );
 
-// Approve / Reject moderation
-router.post(
+/**
+ * @route   PATCH /api/question-moderation/:id/approve
+ * @desc    Approve a question moderation record
+ * @access  Moderator, Admin
+ */
+router.patch(
   "/:id/approve",
   authenticate,
   authorizeRoles("moderator", "admin"),
   approveQuestionModeration
 );
 
-router.post(
+/**
+ * @route   PATCH /api/question-moderation/:id/reject
+ * @desc    Reject a question moderation record
+ * @access  Moderator, Admin
+ */
+router.patch(
   "/:id/reject",
   authenticate,
   authorizeRoles("moderator", "admin"),

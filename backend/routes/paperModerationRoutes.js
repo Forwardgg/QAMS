@@ -11,7 +11,7 @@ import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Moderator claims a paper
+// Moderator claims a paper for moderation
 router.post(
   "/claim/:paperId",
   authenticate,
@@ -19,7 +19,7 @@ router.post(
   claimPaperForModeration
 );
 
-// Get moderation records for a paper (admin, instructor, moderator)
+// Get all moderation records for a specific paper
 router.get(
   "/paper/:paperId",
   authenticate,
@@ -27,7 +27,7 @@ router.get(
   getModerationForPaper
 );
 
-// Get papers claimed by logged-in moderator
+// Get papers claimed by the current moderator
 router.get(
   "/my",
   authenticate,
@@ -35,15 +35,16 @@ router.get(
   getMyModerations
 );
 
-// Moderator/Admin approves or rejects
-router.post(
+// Approve a paper moderation record
+router.patch(
   "/:id/approve",
   authenticate,
   authorizeRoles("moderator", "admin"),
   approvePaperModeration
 );
 
-router.post(
+// Reject a paper moderation record
+router.patch(
   "/:id/reject",
   authenticate,
   authorizeRoles("moderator", "admin"),
