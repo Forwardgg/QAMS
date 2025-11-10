@@ -1,0 +1,59 @@
+/* src/pages/InstructorMyQuestions/InstructorMyQuestions.css */
+.instructor-my-questions-page {
+  /* No specific styles here, MainLayout handles padding */
+}
+
+.page-actions-header {
+  margin-bottom: var(--spacing-xl);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.my-questions-list-section {
+  padding: var(--spacing-xl);
+}
+
+.my-questions-list-section h3 {
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Status Badges for the table (reused/extended from Admin pages) */
+.status-badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  min-width: 70px; /* Give badges consistent width */
+  text-align: center;
+}
+
+.status-approved {
+  background-color: var(--success-green);
+  color: var(--white);
+}
+
+.status-pending {
+  background-color: var(--warning-yellow);
+  color: var(--dark-bg);
+}
+
+.status-rejected {
+  background-color: var(--error-red);
+  color: var(--white);
+}
+
+/* Difficulty badges */
+.difficulty-easy {
+  background-color: #d4edda; /* Light green */
+  color: #155724;
+}
+.difficulty-medium {
+  background-color: #fff3cd; /* Light yellow */
+  color: #856404;
+}
+.difficulty-hard {
+  background-color: #f8d7da; /* Light red */
+  color: #721c24;
+}

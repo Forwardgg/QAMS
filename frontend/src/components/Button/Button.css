@@ -1,0 +1,62 @@
+/* src/components/Button/Button.css */
+.btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid transparent;
+    font-size: 0.9rem;
+}
+
+.btn-primary {
+    background-color: var(--primary-blue);
+    color: var(--white);
+    border-color: var(--primary-blue);
+}
+
+.btn-primary:hover {
+    background-color: #3359b8; /* A slightly darker blue */
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary {
+    background-color: var(--secondary-gray);
+    color: var(--white);
+    border-color: var(--secondary-gray);
+}
+
+.btn-outline-primary {
+    background-color: transparent;
+    color: var(--primary-blue);
+    border-color: var(--primary-blue);
+}
+/* src/components/Button/Button.css */
+/* ... existing styles ... */
+
+.btn-error { /* Or .btn-danger */
+  background-color: var(--error-red);
+  color: var(--white);
+  border-color: var(--error-red);
+}
+.btn-error:hover {
+  background-color: #c82333;
+}
+
+.btn-warning {
+  background-color: var(--warning-yellow);
+  color: var(--dark-bg);
+  border-color: var(--warning-yellow);
+}
+.btn-warning:hover {
+  background-color: #e0a800;
+}
+
+.btn-success {
+  background-color: var(--success-green);
+  color: var(--white);
+  border-color: var(--success-green);
+}
+.btn-success:hover {
+  background-color: #218838;
+}

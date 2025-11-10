@@ -1,0 +1,125 @@
+/* src/pages/ModeratorPending/ModeratorPending.css */
+.moderation-container {
+  display: flex;
+  gap: var(--spacing-xl);
+  align-items: flex-start; /* Align panels to the top */
+}
+
+.pending-list-panel {
+  flex: 0 0 300px; /* Panel has a fixed width of 300px */
+  padding: var(--spacing-lg);
+  max-height: 75vh; /* Limit height and allow scrolling */
+  display: flex;
+  flex-direction: column;
+}
+
+.pending-list-panel h3 {
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pending-list {
+  overflow-y: auto; /* Enable scrolling for the list */
+}
+
+.pending-list-item {
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-bottom: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+}
+
+.pending-list-item:hover {
+  background-color: var(--light-bg);
+}
+
+.pending-list-item.active {
+  background-color: var(--primary-blue);
+  color: var(--white);
+  border-color: var(--primary-blue);
+}
+
+.pending-list-item .question-id {
+  font-weight: 600;
+  display: block;
+}
+.pending-list-item .question-author {
+  font-size: 0.85rem;
+  color: var(--secondary-gray);
+}
+.pending-list-item.active .question-author {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.review-panel {
+  flex-grow: 1; /* Panel takes up the remaining space */
+  padding: var(--spacing-xl);
+}
+
+.review-panel h3 {
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.question-details {
+  display: flex;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+  font-size: 0.9rem;
+}
+
+.question-content-box {
+  background-color: var(--light-bg);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid var(--border-color);
+}
+
+.question-content-box h4 {
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+}
+
+.question-text {
+  /* Basic styling for rendered HTML from CKEditor */
+  line-height: 1.6;
+}
+.question-text p, .question-text ul, .question-text ol {
+  margin-bottom: var(--spacing-sm);
+}
+.question-text code {
+  background-color: #e9ecef;
+  padding: 2px 4px;
+  border-radius: var(--border-radius-sm);
+  font-family: monospace;
+}
+
+.feedback-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.feedback-section label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: var(--spacing-sm);
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+}
+
+.no-selection-message {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  color: var(--secondary-gray);
+  font-style: italic;
+}
