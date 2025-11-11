@@ -5,8 +5,6 @@ import path from "path";
 
 if (process.env.NODE_ENV === "test" && fs.existsSync(".env.test")) {
   dotenv.config({ path: ".env.test" });
-} else if (fs.existsSync(".env.local")) {
-  dotenv.config({ path: ".env.local" });
 } else {
   dotenv.config();
 }

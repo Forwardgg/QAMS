@@ -2,6 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import { pool } from "./config/db.js";
+import fs from "fs";
+import path from "path";
 
 // Routers
 import authRoutes from "./routes/authRoutes.js";
@@ -20,8 +22,31 @@ import logRoutes from "./routes/logRoutes.js";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// ------------------- CORS Configuration -------------------
+const corsOptions = {
+  origin: [
+    'http://localhost:3000', 
+    'http://frontend:3000', // For Docker container communication
+    process.env.FRONTEND_URL // If you set this environment variable
+  ].filter(Boolean), // Remove any undefined values
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// ------------------- Ensure Uploads Directory Exists -------------------
+const ensureUploadsDir = () => {
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('✅ Uploads directory created');
+  }
+};
+
+// Create uploads directory on startup
+ensureUploadsDir();
 
 // ------------------- API ROUTES -------------------
 app.use("/api/auth", authRoutes);
@@ -37,6 +62,15 @@ app.use("/api/logs", logRoutes);
 // app.use("/api/export", exportRoutes);
 // app.use("/api/report", reportRoutes);
 
+// ------------------- Health Check Endpoint -------------------
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ 
+    status: "OK", 
+    message: "Server is running",
+    timestamp: new Date().toISOString()
+  });
+});
+
 // DB test
 app.get("/api/test", async (req, res) => {
   try {
@@ -47,11 +81,33 @@ app.get("/api/test", async (req, res) => {
   }
 });
 
-// server start
+// ------------------- Error Handling Middleware -------------------
+app.use((err, req, res, next) => {
+  console.error('Error:', err.stack);
+  res.status(500).json({ 
+    error: 'Something went wrong!',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+  });
+});
+
+// ------------------- 404 Handler -------------------
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Route not found',
+    path: req.path,
+    method: req.method
+  });
+});
+
+// ------------------- Server Start -------------------
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`📁 Uploads directory: ${path.join(process.cwd(), 'uploads')}`);
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
 }
 
-export default app; // allows Jest/Supertest to import the app
+export default app;
