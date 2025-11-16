@@ -1,0 +1,197 @@
+
+.instructor-dashboard {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+/* Sidebar Styles */
+.sidebar {
+  width: 280px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 25px 20px;
+}
+
+.sidebar h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: white;
+  font-size: 1.5rem;
+}
+
+.instructor-info {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.instructor-info p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar button {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 12px 15px;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.sidebar button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.sidebar button.active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Main Content Styles */
+.main-content {
+  flex: 1;
+  padding: 25px;
+  overflow-y: auto;
+}
+
+.section {
+  background: white;
+  border-radius: 10px;
+  padding: 25px;
+}
+/* Course Management Buttons */
+.course-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.edit-btn {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+}
+
+.edit-btn:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+}
+
+.delete-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+  transform: translateY(-1px);
+}
+
+/* Course Outcomes Buttons */
+.co-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Question Bank Buttons */
+.question-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+/* Show Details/View Questions Buttons (Paper Management) */
+.toggle-questions-btn {
+  background: #054074; 
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+}
+
+.toggle-questions-btn:hover {
+  background: #5a6268; 
+  transform: translateY(-1px);
+}
+
+/* Submit Paper Button */
+.paper-actions button:nth-child(2) { 
+  background: #28a745; 
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.paper-actions button:nth-child(2):hover {
+  background: #218838; 
+}
+
+/* Create New Course/Paper/Question Buttons */
+.section-header button {
+  background: #667eea; 
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.section-header button:hover {
+  background: #5a6fd8; 
+  transform: translateY(-1px);
+}
+/* Paper Delete Button (in Paper Management section) */
+.paper-delete-btn {
+  background: #e74c3c ; 
+  color: white t;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+  margin-left: 10px;
+}
+
+.paper-delete-btn:hover {
+  background: #c0392b !important; 
+  transform: translateY(-1px);
+}
+
+/* Ensure paper actions have proper spacing */
+.paper-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

@@ -1,38 +1,34 @@
 {
-  "name": "qams-frontend",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "name": "qams-tezpur-university",
+  "version": "1.0.0",
+  "description": "Question Authoring and Moderation System for Tezpur University",
+  "main": "src/index.js",
+  "proxy": "http://localhost:5000",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
   },
   "dependencies": {
-    "@ckeditor/ckeditor5-basic-styles": "^46.1.1",
-    "@ckeditor/ckeditor5-build-classic": "^41.4.2",
-    "@ckeditor/ckeditor5-essentials": "^46.1.1",
-    "@ckeditor/ckeditor5-link": "^46.1.1",
-    "@ckeditor/ckeditor5-list": "^46.1.1",
-    "@ckeditor/ckeditor5-paragraph": "^46.1.1",
-    "@ckeditor/ckeditor5-react": "^11.0.0",
-    "@fortawesome/fontawesome-svg-core": "^7.0.1",
-    "@fortawesome/free-solid-svg-icons": "^7.0.1",
-    "@fortawesome/react-fontawesome": "^3.0.2",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.1"
+    "@ckeditor/ckeditor5-build-classic": "^38.1.0",
+    "@ckeditor/ckeditor5-react": "^6.0.0",
+    "axios": "^1.13.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.9.6",
+    "react-scripts": "5.0.1"
   },
-  "devDependencies": {
-    "@eslint/js": "^9.35.0",
-    "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
-    "@vitejs/plugin-react": "^5.0.2",
-    "eslint": "^9.35.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "globals": "^16.4.0",
-    "vite": "^7.1.6"
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }
