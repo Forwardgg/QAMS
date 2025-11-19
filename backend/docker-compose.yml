@@ -5,7 +5,7 @@ services:
       - "5000:5000"
     volumes:
       - ./uploads:/app/uploads
-      - ./certs:/app/certs  # Important for SSL connection!
+      - ./certs:/app/certs  # Important for SSL conn
     env_file:
       - .env
     restart: unless-stopped

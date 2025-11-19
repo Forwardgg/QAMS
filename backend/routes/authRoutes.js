@@ -12,13 +12,11 @@ import { validateRegister, validateLogin, authenticate, authorizeRoles } from ".
 
 const router = express.Router();
 
-router.post("/register", validateRegister, registerUser);
-router.post("/login", validateLogin, loginUser);
+router.post("/register", validateRegister, registerUser); // register
+router.post("/login", validateLogin, loginUser); // login
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
-
-// Admin-only user management
-router.delete("/users/:id", authenticate, authorizeRoles("admin"), deleteUser);
-router.delete("/users/:id/force", authenticate, authorizeRoles("admin"), forceDeleteUser);
+router.delete("/users/:id", authenticate, authorizeRoles("admin"), deleteUser); // soft delete
+router.delete("/users/:id/force", authenticate, authorizeRoles("admin"), forceDeleteUser); // force delete
 
 export default router;

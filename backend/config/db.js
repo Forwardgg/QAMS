@@ -4,9 +4,9 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 
-// Clear any existing PG environment variables in test mode to prevent conflicts
+// Clear existing PG env variables in test mode to prevent conflicts
 if (process.env.NODE_ENV === "test") {
-  // Remove any previously loaded PG env vars
+  // Remove previously loaded PG env vars
   Object.keys(process.env).forEach(key => {
     if (key.startsWith('PG')) {
       delete process.env[key];
@@ -14,24 +14,23 @@ if (process.env.NODE_ENV === "test") {
   });
 }
 
-// Load appropriate .env file
+// appropriate env file
 if (process.env.NODE_ENV === "test" && fs.existsSync(".env.test")) {
-  dotenv.config({ path: ".env.test", override: true }); // Add override: true
+  dotenv.config({ path: ".env.test", override: true });
 } else {
   dotenv.config();
 }
 
 const { Pool } = pkg;
 
-// Determine SSL configuration based on environment
 let ssl;
 
 if (process.env.NODE_ENV === "test") {
-  // For local test database, no SSL needed
+  // no SSL for local db
   ssl = false;
   console.log('[db] Test environment - SSL disabled for local DB');
 } else {
-  // For production/staging, use SSL with Aiven
+  // aiven
   const caPath = process.env.PGSSLROOTCERT
     ? path.resolve(process.env.PGSSLROOTCERT)
     : path.resolve("certs/ca.pem");
@@ -43,7 +42,7 @@ if (process.env.NODE_ENV === "test") {
     };
     console.log(`[db] Using CA file: ${caPath}`);
   } else {
-    console.warn(`[db] ⚠️ CA file not found at ${caPath}. Falling back to insecure SSL.`);
+    console.warn(`[db] CA file not found at ${caPath}. Falling back to insecure SSL.`);
     ssl = { require: true, rejectUnauthorized: false };
   }
 }
@@ -61,11 +60,11 @@ export const pool = new Pool({
 export const testConnection = async () => {
   try {
     const client = await pool.connect();
-    console.log('[db] ✅ Connected to database:', process.env.PGDATABASE);
+    console.log('[db] Connected to database:', process.env.PGDATABASE);
     client.release();
     return true;
   } catch (error) {
-    console.error('[db] ❌ Connection failed:', error.message);
+    console.error('[db] Connection failed:', error.message);
     return false;
   }
 };

@@ -23,12 +23,12 @@ dotenv.config();
 
 const app = express();
 
-// ------------------- CORS Configuration -------------------
+// CORS Configuration
 const corsOptions = {
   origin: [
     'http://localhost:3000', 
     'http://frontend:3000', // For Docker container communication
-    process.env.FRONTEND_URL // If you set this environment variable
+    process.env.FRONTEND_URL // If set this environment variable
   ].filter(Boolean), // Remove any undefined values
   credentials: true,
 };
@@ -36,19 +36,19 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// ------------------- Ensure Uploads Directory Exists -------------------
+// Ensure Uploads Directory Exists
 const ensureUploadsDir = () => {
   const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log('✅ Uploads directory created');
+    console.log('Uploads directory created');
   }
 };
 
 // Create uploads directory on startup
 ensureUploadsDir();
 
-// ------------------- API ROUTES -------------------
+// API ROUTES
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/courses", courseRoutes);
@@ -62,7 +62,7 @@ app.use("/api/logs", logRoutes);
 // app.use("/api/export", exportRoutes);
 // app.use("/api/report", reportRoutes);
 
-// ------------------- Health Check Endpoint -------------------
+// Health Check Endpoint
 app.get("/api/health", (req, res) => {
   res.status(200).json({ 
     status: "OK", 
@@ -81,7 +81,7 @@ app.get("/api/test", async (req, res) => {
   }
 });
 
-// ------------------- Error Handling Middleware -------------------
+// Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
   res.status(500).json({ 
@@ -90,7 +90,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ------------------- 404 Handler -------------------
+// 404 Handler
 app.use((req, res) => {
   res.status(404).json({ 
     error: 'Route not found',
@@ -99,14 +99,14 @@ app.use((req, res) => {
   });
 });
 
-// ------------------- Server Start -------------------
+// Server Start
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`📁 Uploads directory: ${path.join(process.cwd(), 'uploads')}`);
-    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Uploads directory: ${path.join(process.cwd(), 'uploads')}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 }
 
