@@ -1,13 +1,12 @@
-import { pool } from "../config/db.js";
 import { Question } from "../models/Question.js";
 import { Option } from "../models/Option.js";
 import { Course } from "../models/Course.js";
 import { QuestionMedia } from "../models/QuestionMedia.js";
-import { Log } from "../models/Log.js"; // ✅ added logging
+import { pool } from "../config/db.js";
 
 // Utility to attach options + media
 const attachExtras = async (questions) => {
-  if (!questions.length) return [];
+  if (!questions || !questions.length) return [];
 
   const questionIds = questions.map((q) => q.question_id);
 
@@ -49,10 +48,11 @@ const attachExtras = async (questions) => {
     media: mediaByQ[q.question_id] || [],
   }));
 };
+
 export const addSubjectiveQuestion = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const { content, coId, media = [] } = req.body;
+    const { content, coId, paperId = null, media = [] } = req.body;
     const user = req.user;
 
     if (!content || content.trim() === "") {
@@ -63,15 +63,15 @@ export const addSubjectiveQuestion = async (req, res) => {
     if (!course) return res.status(404).json({ success: false, message: "Course not found" });
 
     if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res.status(403).json({ success: false, message: "Not authorized to add questions to this course" });
     }
 
     const question = await Question.create({
-      courseId,
-      authorId: user.user_id,
+      courseId: parseInt(courseId),
+      paperId: paperId ? parseInt(paperId) : null,
       questionType: "subjective",
       content,
-      coId,
+      coId: coId ? parseInt(coId) : null,
     });
 
     const mediaResults = [];
@@ -84,14 +84,9 @@ export const addSubjectiveQuestion = async (req, res) => {
       mediaResults.push(savedMedia);
     }
 
+    // Attach empty options array for subjective questions
     question.options = [];
     question.media = mediaResults;
-
-    await Log.create({
-      userId: user.user_id,
-      action: "ADD_QUESTION",
-      details: `Added subjective question ${question.question_id} to course ${courseId}`,
-    });
 
     res.status(201).json({ success: true, data: question });
   } catch (error) {
@@ -99,17 +94,18 @@ export const addSubjectiveQuestion = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to add question" });
   }
 };
+
 export const addMCQQuestion = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const { content, coId, options, media = [] } = req.body;
+    const { content, coId, paperId = null, options, media = [] } = req.body;
     const user = req.user;
 
     const course = await Course.getById(courseId);
     if (!course) return res.status(404).json({ success: false, message: "Course not found" });
 
     if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res.status(403).json({ success: false, message: "Not authorized to add questions to this course" });
     }
 
     if (!Array.isArray(options) || options.length < 2) {
@@ -120,11 +116,11 @@ export const addMCQQuestion = async (req, res) => {
     }
 
     const question = await Question.create({
-      courseId,
-      authorId: user.user_id,
+      courseId: parseInt(courseId),
+      paperId: paperId ? parseInt(paperId) : null,
       questionType: "mcq",
       content,
-      coId,
+      coId: coId ? parseInt(coId) : null,
     });
 
     const optionResults = [];
@@ -150,42 +146,51 @@ export const addMCQQuestion = async (req, res) => {
     question.options = optionResults;
     question.media = mediaResults;
 
-    await Log.create({
-      userId: user.user_id,
-      action: "ADD_QUESTION",
-      details: `Added MCQ question ${question.question_id} to course ${courseId}`,
-    });
-
     res.status(201).json({ success: true, data: question });
   } catch (error) {
     console.error("Error adding MCQ question:", error);
     res.status(500).json({ success: false, message: "Failed to add MCQ question" });
   }
 };
+
 export const getQuestionsForPaper = async (req, res) => {
   try {
     const { paperId } = req.params;
-    const { rows } = await pool.query(
-      `SELECT pq.paper_id, q.*, co.co_number
-       FROM paper_questions pq
-       JOIN questions q ON pq.question_id = q.question_id
+    
+    // Get all questions for the course first, then filter by paper
+    const { rows: allQuestions } = await pool.query(
+      `SELECT q.*, co.co_number
+       FROM questions q
        LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-       WHERE pq.paper_id = $1 AND q.is_active = true
-       ORDER BY pq.sequence;`,
+       WHERE q.paper_id = $1 AND q.is_active = true
+       ORDER BY q.created_at DESC;`,
       [paperId]
     );
 
-    const questions = await attachExtras(rows);
+    const questions = await attachExtras(allQuestions);
     res.json({ success: true, total: questions.length, data: questions });
   } catch (error) {
     console.error("Error fetching paper questions:", error);
     res.status(500).json({ success: false, message: "Failed to fetch paper questions" });
   }
 };
+
 export const getQuestionsForCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const questions = await Question.getByCourse(courseId);
+    
+    // Use direct query since Question.getByCourse doesn't exist
+    const { rows: questions } = await pool.query(
+      `SELECT q.question_id, q.course_id, q.paper_id, q.question_type, q.content, q.co_id,
+              q.status, q.is_active, q.created_at,
+              co.co_number
+       FROM questions q
+       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
+       WHERE q.course_id = $1 AND q.is_active = true
+       ORDER BY q.created_at DESC;`,
+      [courseId]
+    );
+
     const withExtras = await attachExtras(questions);
     res.json({ success: true, total: withExtras.length, data: withExtras });
   } catch (error) {
@@ -193,26 +198,28 @@ export const getQuestionsForCourse = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch course questions" });
   }
 };
+
 export const getQuestionsForCourseAndPaper = async (req, res) => {
   try {
     const { courseId, paperId } = req.params;
-    const { rows } = await pool.query(
-      `SELECT q.*, co.co_number, pq.paper_id
-       FROM paper_questions pq
-       JOIN questions q ON pq.question_id = q.question_id
+    
+    const { rows: questions } = await pool.query(
+      `SELECT q.*, co.co_number
+       FROM questions q
        LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-       WHERE q.course_id = $1 AND pq.paper_id = $2 AND q.is_active = true
-       ORDER BY pq.sequence;`,
+       WHERE q.course_id = $1 AND q.paper_id = $2 AND q.is_active = true
+       ORDER BY q.created_at DESC;`,
       [courseId, paperId]
     );
 
-    const withExtras = await attachExtras(rows);
+    const withExtras = await attachExtras(questions);
     res.json({ success: true, total: withExtras.length, data: withExtras });
   } catch (error) {
     console.error("Error fetching course+paper questions:", error);
     res.status(500).json({ success: false, message: "Failed to fetch course+paper questions" });
   }
 };
+
 export const updateQuestion = async (req, res) => {
   try {
     const { questionId } = req.params;
@@ -222,11 +229,16 @@ export const updateQuestion = async (req, res) => {
     const question = await Question.getById(questionId);
     if (!question) return res.status(404).json({ success: false, message: "Question not found" });
 
-    if (user.role === "instructor" && question.author_id !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+    // Check authorization via course ownership
+    const course = await Course.getById(question.course_id);
+    if (user.role === "instructor" && course.created_by !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized to update this question" });
     }
 
-    const updated = await Question.update(questionId, { content, coId });
+    const updated = await Question.update(questionId, { 
+      content, 
+      coId: coId ? parseInt(coId) : null 
+    });
 
     let updatedOptions = [];
     if (question.question_type === "mcq" && Array.isArray(options)) {
@@ -240,7 +252,7 @@ export const updateQuestion = async (req, res) => {
       await Option.deleteByQuestion(questionId);
       for (const opt of options) {
         const savedOpt = await Option.create({
-          questionId,
+          questionId: parseInt(questionId),
           optionText: opt.optionText,
           isCorrect: opt.isCorrect,
         });
@@ -253,7 +265,7 @@ export const updateQuestion = async (req, res) => {
       await QuestionMedia.deleteByQuestion(questionId);
       for (const m of media) {
         const savedMedia = await QuestionMedia.create({
-          questionId,
+          questionId: parseInt(questionId),
           mediaUrl: m.mediaUrl,
           caption: m.caption || "",
         });
@@ -264,18 +276,13 @@ export const updateQuestion = async (req, res) => {
     updated.options = updatedOptions;
     updated.media = updatedMedia;
 
-    await Log.create({
-      userId: user.user_id,
-      action: "UPDATE_QUESTION",
-      details: `Updated question ${questionId}`,
-    });
-
     res.json({ success: true, data: updated });
   } catch (error) {
     console.error("Error updating question:", error);
     res.status(500).json({ success: false, message: "Failed to update question" });
   }
 };
+
 export const deleteQuestion = async (req, res) => {
   try {
     const { questionId } = req.params;
@@ -284,21 +291,19 @@ export const deleteQuestion = async (req, res) => {
     const question = await Question.getById(questionId);
     if (!question) return res.status(404).json({ success: false, message: "Question not found" });
 
-    if (user.role === "instructor" && question.author_id !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+    // Check authorization via course ownership
+    const course = await Course.getById(question.course_id);
+    if (user.role === "instructor" && course.created_by !== user.user_id) {
+      return res.status(403).json({ success: false, message: "Not authorized to delete this question" });
     }
 
     await Question.softDelete(questionId);
 
     // Clean up children
     await QuestionMedia.deleteByQuestion(questionId);
-    await Option.deleteByQuestion(questionId);
-
-    await Log.create({
-      userId: user.user_id,
-      action: "DELETE_QUESTION",
-      details: `Deleted question ${questionId}`,
-    });
+    if (question.question_type === "mcq") {
+      await Option.deleteByQuestion(questionId);
+    }
 
     res.json({ success: true, message: "Question deleted" });
   } catch (error) {

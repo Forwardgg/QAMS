@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
+// src/pages/auth/RegisterPage.js
+import React, { useState, useContext } from 'react';
 import './AuthPages.css';
-import authAPI from '../api/auth.api'; // ⬅️ NEW
+import { useNavigate } from 'react-router-dom';
+import AuthContext from '../../components/AuthProvider';
 
-const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
+const RegisterPage = () => {
+  const navigate = useNavigate();
+  const auth = useContext(AuthContext);
+
   const [formData, setFormData] = useState({
     role: '',
     name: '',
@@ -50,11 +55,11 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
       newErrors.email = 'Email is invalid';
     }
 
-    // Password validation
+    // Password validation - Backend requires at least 8 characters
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters long';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters long';
     }
 
     // Confirm password validation
@@ -80,30 +85,78 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
     }
 
     try {
-      // Call real backend register
-      const payload = {
-        role: formData.role,
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-      };
-
-      await authAPI.register(payload); // backend: POST /auth/register
-
-      // Let parent handle “go to login + alert”
-      if (typeof onRegister === 'function') {
-        onRegister(formData);
+      // Use AuthContext register if available, otherwise use authAPI directly
+      let result;
+      
+      if (auth.register) {
+        // If AuthProvider has a register method
+        result = await auth.register({
+          role: formData.role,
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        });
+      } else {
+        // Fallback to direct API call
+        const authAPI = await import('../../api/auth.api');
+        result = await authAPI.default.register({
+          role: formData.role,
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        });
       }
+
+      // If we have a result with ok: false, it's an error
+      if (result && result.ok === false) {
+        const errorMsg = result.error?.response?.data?.error || 
+                        result.error?.message || 
+                        'Registration failed';
+        setErrors({ submit: errorMsg });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Registration successful - Auto-login the user
+      if (auth.login) {
+        const loginResult = await auth.login({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (loginResult.ok) {
+          // Redirect based on role
+          const user = auth.user;
+          const role = user?.role?.toLowerCase();
+          const dashboardPaths = {
+            admin: '/admin/dashboard',
+            instructor: '/instructor/dashboard',
+            moderator: '/moderator/queue'
+          };
+          navigate(dashboardPaths[role] || '/');
+        } else {
+          // Login failed after registration - redirect to login
+          navigate('/auth/login');
+        }
+      } else {
+        // No auto-login, just go to login page
+        navigate('/auth/login');
+      }
+
     } catch (error) {
       console.error('Registration error:', error);
-      const serverMsg =
-        error?.response?.data?.error ||
-        error?.response?.data?.message ||
-        'Registration failed. Please try again.';
+      const serverMsg = error?.response?.data?.error ||
+                       error?.response?.data?.message ||
+                       error?.message ||
+                       'Registration failed. Please try again.';
       setErrors({ submit: serverMsg });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSwitchToLogin = () => {
+    navigate('/auth/login');
   };
 
   return (
@@ -171,10 +224,11 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="Create a password"
+              placeholder="Create a password (min. 8 characters)"
               className={errors.password ? 'error' : ''}
             />
             {errors.password && <span className="error-message">{errors.password}</span>}
+            <small className="password-hint">Minimum 8 characters required</small>
           </div>
 
           {/* Confirm Password Field */}
@@ -211,7 +265,7 @@ const RegisterPage = ({ onRegister, onSwitchToLogin }) => {
         <div className="auth-footer">
           <p>
             Already have an account?{' '}
-            <button type="button" className="link-btn" onClick={onSwitchToLogin}>
+            <button type="button" className="link-btn" onClick={handleSwitchToLogin}>
               Sign In
             </button>
           </p>

@@ -1,34 +1,27 @@
 import { Course } from "../models/Course.js";
-import { Log } from "../models/Log.js"; // ✅ add this import
 
 export const createCourse = async (req, res) => {
   try {
-    const { code, title, l, t, p } = req.body;
+    const { code, title, syllabus, l, t, p } = req.body;
     const createdBy = req.user.user_id;
 
-    // Validate LTP
-    if (![l, t, p].every((n) => Number.isInteger(n) && n >= 0)) {
-      return res.status(400).json({ success: false, message: "Invalid L-T-P values" });
+    // Validate LTP values (0-9 range as per model)
+    if (![l, t, p].every((n) => Number.isInteger(n) && n >= 0 && n <= 9)) {
+      return res.status(400).json({ success: false, message: "L-T-P values must be integers between 0-9" });
     }
 
-    const course = await Course.create({ code, title, l, t, p, createdBy });
-
-    // Log action
-    await Log.create({
-      userId: createdBy,
-      action: "CREATE_COURSE",
-      details: `Created course ${course.code} - ${course.title}`,
-    });
+    const course = await Course.create({ code, title, syllabus, l, t, p, createdBy });
 
     res.status(201).json({ success: true, data: course });
   } catch (error) {
-    if (error.code === "23505") {
+    if (error.message === "Course code already exists.") {
       return res.status(409).json({ success: false, message: "Course code already exists" });
     }
     console.error("Error creating course:", error);
     res.status(500).json({ success: false, message: "Failed to create course" });
   }
 };
+
 // Admin → get all courses
 export const getAllCoursesAdmin = async (req, res) => {
   try {
@@ -39,6 +32,7 @@ export const getAllCoursesAdmin = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch courses" });
   }
 };
+
 // Instructor → get only their own courses
 export const getAllCoursesInstructor = async (req, res) => {
   try {
@@ -50,10 +44,10 @@ export const getAllCoursesInstructor = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch instructor courses" });
   }
 };
+
 // Everyone → public list
 export const getCoursesPublic = async (req, res) => {
   try {
-    // Ideally use a Course.getPublic() query
     const courses = await Course.getAll();
     const publicCourses = courses.map((c) => ({
       code: c.code,
@@ -68,35 +62,34 @@ export const getCoursesPublic = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch courses" });
   }
 };
+
 // Update course
 export const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { code, title, l, t, p } = req.body;
+    const { code, title, syllabus, l, t, p } = req.body;
     const user = req.user;
 
     const course = await Course.getById(id);
     if (!course) return res.status(404).json({ success: false, message: "Course not found" });
 
     if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res.status(403).json({ success: false, message: "Not authorized to update this course" });
     }
 
-    const updated = await Course.update(id, { code, title, l, t, p });
+    const updated = await Course.update(id, { code, title, syllabus, l, t, p });
     if (!updated) return res.status(404).json({ success: false, message: "Course not found" });
-
-    await Log.create({
-      userId: user.user_id,
-      action: "UPDATE_COURSE",
-      details: `Updated course ${updated.code} - ${updated.title}`,
-    });
 
     res.json({ success: true, data: updated });
   } catch (error) {
+    if (error.message === "Course code already exists.") {
+      return res.status(409).json({ success: false, message: "Course code already exists" });
+    }
     console.error("Error updating course:", error);
     res.status(500).json({ success: false, message: "Failed to update course" });
   }
 };
+
 // Delete course
 export const deleteCourse = async (req, res) => {
   try {
@@ -107,17 +100,11 @@ export const deleteCourse = async (req, res) => {
     if (!course) return res.status(404).json({ success: false, message: "Course not found" });
 
     if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res.status(403).json({ success: false, message: "Not authorized to delete this course" });
     }
 
     const deleted = await Course.delete(id);
     if (!deleted) return res.status(404).json({ success: false, message: "Course not found" });
-
-    await Log.create({
-      userId: user.user_id,
-      action: "DELETE_COURSE",
-      details: `Deleted course ${deleted.code} - ${deleted.title}`,
-    });
 
     res.json({ success: true, data: deleted, message: `Deleted course ${deleted.code}` });
   } catch (error) {
@@ -125,6 +112,7 @@ export const deleteCourse = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to delete course" });
   }
 };
+
 // Get by code
 export const getCourseByCode = async (req, res) => {
   try {
@@ -137,12 +125,13 @@ export const getCourseByCode = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch course" });
   }
 };
+
 // Search by title
 export const searchCoursesByTitle = async (req, res) => {
   try {
     const { title } = req.query;
     if (!title) {
-      return res.status(400).json({ success: false, message: "Title query is required" });
+      return res.status(400).json({ success: false, message: "Title query parameter is required" });
     }
 
     const courses = await Course.searchByTitle(title);

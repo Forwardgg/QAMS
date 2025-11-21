@@ -12,14 +12,9 @@ import courseRoutes from "./routes/courseRoutes.js";
 import coRoutes from "./routes/coRoutes.js";
 import questionRoutes from "./routes/questionRoutes.js";
 import questionPaperRoutes from "./routes/QuestionPaperRoutes.js";
-import paperQuestionRoutes from "./routes/PaperQuestionRoutes.js";
-import paperModerationRoutes from "./routes/paperModerationRoutes.js";
-import questionModerationRoutes from "./routes/questionModerationRoutes.js";
-import logRoutes from "./routes/logRoutes.js";
+import ModerationRoutes from "./routes/ModerationRoutes.js";
 // import exportRoutes from "./routes/exportRoutes.js";
 // import reportRoutes from "./routes/reportRoutes.js";
-
-dotenv.config();
 
 const app = express();
 
@@ -55,10 +50,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/cos", coRoutes);
 app.use("/api/questions", questionRoutes);
 app.use("/api/papers", questionPaperRoutes);
-app.use("/api/paper-questions", paperQuestionRoutes);
-app.use("/api/paper-moderation", paperModerationRoutes);
-app.use("/api/question-moderation", questionModerationRoutes);
-app.use("/api/logs", logRoutes);
+app.use("/api/moderation", ModerationRoutes);
 // app.use("/api/export", exportRoutes);
 // app.use("/api/report", reportRoutes);
 

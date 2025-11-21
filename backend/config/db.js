@@ -14,9 +14,12 @@ if (process.env.NODE_ENV === "test") {
   });
 }
 
-// appropriate env file
+// appropriate env file (minimal change)
+// priority: .env.test (when NODE_ENV=test) -> .env.local (only in development) -> .env
 if (process.env.NODE_ENV === "test" && fs.existsSync(".env.test")) {
   dotenv.config({ path: ".env.test", override: true });
+} else if (process.env.NODE_ENV === "development" && fs.existsSync(".env.local")) {
+  dotenv.config({ path: ".env.local", override: true });
 } else {
   dotenv.config();
 }
@@ -30,20 +33,26 @@ if (process.env.NODE_ENV === "test") {
   ssl = false;
   console.log('[db] Test environment - SSL disabled for local DB');
 } else {
-  // aiven
-  const caPath = process.env.PGSSLROOTCERT
-    ? path.resolve(process.env.PGSSLROOTCERT)
-    : path.resolve("certs/ca.pem");
-
-  if (fs.existsSync(caPath)) {
-    ssl = {
-      ca: fs.readFileSync(caPath, "utf8"),
-      rejectUnauthorized: true,
-    };
-    console.log(`[db] Using CA file: ${caPath}`);
+  // If PGSSLMODE=disable, skip SSL entirely
+  if ((process.env.PGSSLMODE || '').toLowerCase() === 'disable') {
+    ssl = false;
+    console.log('[db] SSL disabled by PGSSLMODE');
   } else {
-    console.warn(`[db] CA file not found at ${caPath}. Falling back to insecure SSL.`);
-    ssl = { require: true, rejectUnauthorized: false };
+    // aiven
+    const caPath = process.env.PGSSLROOTCERT
+      ? path.resolve(process.env.PGSSLROOTCERT)
+      : path.resolve("certs/ca.pem");
+
+    if (fs.existsSync(caPath)) {
+      ssl = {
+        ca: fs.readFileSync(caPath, "utf8"),
+        rejectUnauthorized: true,
+      };
+      console.log(`[db] Using CA file: ${caPath}`);
+    } else {
+      console.warn(`[db] CA file not found at ${caPath}. Falling back to insecure SSL.`);
+      ssl = { require: true, rejectUnauthorized: false };
+    }
   }
 }
 

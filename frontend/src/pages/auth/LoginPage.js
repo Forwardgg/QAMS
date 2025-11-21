@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+// src/pages/auth/LoginPage.js
+import React, { useState, useContext } from 'react';
 import './AuthPages.css';
-import { useNavigate } from 'react-router-dom';   // ⬅️ NEW
-import authAPI from '../api/auth.api';
+import { useNavigate } from 'react-router-dom';
+import AuthContext from '../../components/AuthProvider';
 
-const LoginPage = ({ onLogin, onSwitchToRegister }) => {
-  const navigate = useNavigate(); // ⬅️ NEW
+const LoginPage = () => {
+  const navigate = useNavigate();
+  const auth = useContext(AuthContext);
 
   const [formData, setFormData] = useState({
-    role: '',
     email: '',
     password: ''
   });
@@ -28,9 +29,6 @@ const LoginPage = ({ onLogin, onSwitchToRegister }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.role) {
-      newErrors.role = 'Please select your role';
-    }
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -55,48 +53,41 @@ const LoginPage = ({ onLogin, onSwitchToRegister }) => {
     }
 
     try {
-      const data = await authAPI.login({
+      // Use AuthProvider's login method
+      const result = await auth.login({
         email: formData.email,
         password: formData.password,
       });
 
-      const { user } = data;
-
-      // role check (frontend only)
-      if (
-        formData.role &&
-        user?.role &&
-        formData.role.toLowerCase() !== user.role?.toLowerCase()
-      ) {
-        setErrors({
-          submit: `Selected role (${formData.role}) does not match your account role (${user.role}).`
-        });
+      if (!result.ok) {
+        const err = result.error;
+        const serverMsg = err?.response?.data?.error || err?.message || 'Login failed';
+        setErrors({ submit: serverMsg });
         setIsSubmitting(false);
         return;
       }
 
-      // authAPI already saves token + user in localStorage
-      if (typeof onLogin === 'function') onLogin(user);
-
-      // 🔁 Redirect based on role
-      const role = user?.role?.toLowerCase();
-      const roleDashboardMap = {
-        admin: '/admin/dashboard',
-        moderator: '/moderator/dashboard',
-        instructor: '/instructor/dashboard',
-      };
-
-      const target = roleDashboardMap[role] || '/dashboard';
-      navigate(target);
+      // Login successful - AuthProvider handles storage and state
+      // Redirect based on user role from AuthContext
+      const user = auth.user;
+      if (user?.role) {
+        const role = user.role.toLowerCase();
+        
+        // Navigate to appropriate dashboard
+        const dashboardPaths = {
+          admin: '/admin/dashboard',
+          instructor: '/instructor/dashboard', 
+          moderator: '/moderator/dashboard'
+        };
+        
+        navigate(dashboardPaths[role] || '/');
+      } else {
+        // Fallback if user role not available
+        navigate('/');
+      }
 
     } catch (err) {
-      console.error('Login error:', err);
-      const serverMsg =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err?.message ||
-        'Login failed';
-      setErrors({ submit: serverMsg });
+      setErrors({ submit: 'An unexpected error occurred' });
     } finally {
       setIsSubmitting(false);
     }
@@ -116,20 +107,25 @@ const LoginPage = ({ onLogin, onSwitchToRegister }) => {
     }
 
     try {
-      await authAPI.forgotPassword(emailToUse);
-      setForgotMessage(
-        'If that email exists, a reset link has been sent (check server logs in dev).'
-      );
+      // Use AuthProvider if it has forgotPassword method, otherwise use authAPI directly
+      if (auth.forgotPassword) {
+        await auth.forgotPassword(emailToUse);
+      } else {
+        // Import authAPI here to avoid circular dependency
+        const authAPI = await import('../../api/auth.api');
+        await authAPI.default.forgotPassword(emailToUse);
+      }
+      setForgotMessage('If that email exists, a reset link has been sent.');
     } catch (err) {
-      console.error('Forgot password error:', err);
-      const serverMsg =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        'Could not send reset link';
+      const serverMsg = err?.response?.data?.error || err?.message || 'Could not send reset link';
       setErrors({ submit: serverMsg });
     } finally {
       setForgotLoading(false);
     }
+  };
+
+  const handleSwitchToRegister = () => {
+    navigate('/auth/register');
   };
 
   return (
@@ -143,23 +139,6 @@ const LoginPage = ({ onLogin, onSwitchToRegister }) => {
         {!showForgotPassword ? (
           <>
             <form onSubmit={handleSubmit} className="auth-form">
-              <div className="form-group">
-                <label htmlFor="role">Select Role *</label>
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  className={errors.role ? 'error' : ''}
-                >
-                  <option value="">Choose your role</option>
-                  <option value="instructor">Instructor</option>
-                  <option value="moderator">Moderator</option>
-                  <option value="admin">Admin</option>
-                </select>
-                {errors.role && <span className="error-message">{errors.role}</span>}
-              </div>
-
               <div className="form-group">
                 <label htmlFor="email">Email Address *</label>
                 <input
@@ -220,7 +199,7 @@ const LoginPage = ({ onLogin, onSwitchToRegister }) => {
                 <button
                   type="button"
                   className="link-btn"
-                  onClick={onSwitchToRegister}
+                  onClick={handleSwitchToRegister}
                 >
                   Create Account
                 </button>
@@ -229,7 +208,7 @@ const LoginPage = ({ onLogin, onSwitchToRegister }) => {
 
             <div className="auth-info">
               <p>
-                <strong>Demo Credentials:</strong> Use a registered email and password
+                <strong>Note:</strong> Your account role is determined by registration
               </p>
             </div>
           </>

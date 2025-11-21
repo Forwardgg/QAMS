@@ -1,15 +1,6 @@
-import { QuestionModeration } from "../models/QuestionModeration.js";
 import { QuestionPaper } from "../models/QuestionPaper.js";
-import { Log } from "../models/Log.js";
 
-/**
- * Claim a specific question for moderation
- * Handles:
- *  - Role validation
- *  - Paper existence and status check
- *  - Duplicate claim prevention
- *  - Structured logging
- */
+
 export const claimQuestionForModeration = async (req, res) => {
   try {
     const { paperId, questionId } = req.params;
@@ -59,9 +50,6 @@ export const claimQuestionForModeration = async (req, res) => {
   }
 };
 
-/**
- * Fetch all question-level moderation records for a paper
- */
 export const getModerationForPaperQuestions = async (req, res) => {
   try {
     const { paperId } = req.params;
@@ -73,9 +61,6 @@ export const getModerationForPaperQuestions = async (req, res) => {
   }
 };
 
-/**
- * Fetch all moderation records for a single question
- */
 export const getModerationForQuestion = async (req, res) => {
   try {
     const { questionId } = req.params;
@@ -87,9 +72,6 @@ export const getModerationForQuestion = async (req, res) => {
   }
 };
 
-/**
- * Fetch all question moderations claimed by the current moderator
- */
 export const getMyQuestionModerations = async (req, res) => {
   try {
     const user = req.user;
@@ -105,13 +87,6 @@ export const getMyQuestionModerations = async (req, res) => {
   }
 };
 
-/**
- * Approve a question moderation record
- * Handles:
- *  - Role validation
- *  - Transactional update (in model)
- *  - Structured logging
- */
 export const approveQuestionModeration = async (req, res) => {
   try {
     const { id } = req.params;
@@ -144,9 +119,6 @@ export const approveQuestionModeration = async (req, res) => {
   }
 };
 
-/**
- * Reject a question moderation record
- */
 export const rejectQuestionModeration = async (req, res) => {
   try {
     const { id } = req.params;

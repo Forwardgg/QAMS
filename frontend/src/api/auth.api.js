@@ -1,111 +1,79 @@
 // src/api/auth.api.js
 import api from "./axios";
+import authService from "../services/authService";
 
-/**
- * Stores auth data in localStorage
- */
-const saveAuth = (token, user) => {
-  if (token) localStorage.setItem("token", token);
-  if (user) localStorage.setItem("user", JSON.stringify(user));
-};
-
-/**
- * Removes auth data
- */
-const clearAuth = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
-};
-
-/**
- * --- AUTH API ---
- */
 const authAPI = {
   /**
    * Register user
-   * Backend: POST /api/auth/register
    */
   register: async (data) => {
     const res = await api.post("/auth/register", data);
+    const payload = res.data || {};
 
-    // backend returns: { tokenType, token, user }
-    if (res.data.token) saveAuth(res.data.token, res.data.user);
+    // Your backend returns "token" (not "access_token")
+    if (payload.token) {
+      authService.setToken(payload.token);
+      if (payload.user) {
+        authService.setUser(payload.user);
+      }
+    }
 
-    return res.data;
+    return payload;
   },
 
   /**
    * Login user
-   * Backend: POST /api/auth/login
    */
   login: async ({ email, password }) => {
     const res = await api.post("/auth/login", { email, password });
+    const payload = res.data || {};
 
-    if (res.data.token) saveAuth(res.data.token, res.data.user);
+    // Your backend returns "token"
+    if (payload.token) {
+      authService.setToken(payload.token);
+      if (payload.user) {
+        authService.setUser(payload.user);
+      }
+    }
 
-    return res.data;
+    return payload;
+  },
+
+  /**
+   * Get profile - REMOVE OR IMPLEMENT IN BACKEND
+   */
+  getProfile: async () => {
+    try {
+      const res = await api.get("/auth/profile");
+      const user = res.data;
+      if (user) authService.setUser(user);
+      return user;
+    } catch (error) {
+      // Endpoint doesn't exist - return current user from storage
+      return authService.getUser();
+    }
   },
 
   /**
    * Forgot password
-   * Backend: POST /api/auth/forgot-password
    */
   forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
 
   /**
    * Reset password
-   * Backend: POST /api/auth/reset-password
    */
   resetPassword: (data) => api.post("/auth/reset-password", data),
 
   /**
-   * Soft delete user (admin only)
-   * Backend: DELETE /api/auth/users/:id
+   * Logout - SIMPLIFIED (backend endpoint doesn't exist)
    */
-  deleteUser: (id) => api.delete(`/auth/users/${id}`),
-
-  /**
-   * Force delete user (admin only)
-   * Backend: DELETE /api/auth/users/:id/force
-   */
-  forceDeleteUser: (id) => api.delete(`/auth/users/${id}/force`),
-
-  /**
-   * Logout (frontend only)
-   */
-  logout: () => {
-    clearAuth();
-    // do NOT redirect here — leave control to caller
+  logout: async () => {
+    authService.clear(); // Just clear local storage
+    return { message: "Logged out" };
   },
 
-  /**
-   * Helpers
-   */
-  getToken: () => localStorage.getItem("token"),
-
-  getCurrentUser: () => {
-    try {
-      const raw = localStorage.getItem("user");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  },
-
-  isAuthenticated: () => {
-    return !!localStorage.getItem("token");
-  },
-
-  hasRole: (role) => {
-    const user = authAPI.getCurrentUser();
-    return user?.role === role;
-  },
-
-  /**
-   * Utility (optional)
-   */
-  healthCheck: () => api.get("/health"),
-  testDB: () => api.get("/test"),
+  // Remove refreshToken for now since backend doesn't support it
+  // refreshToken: async () => { ... }
 };
 
 export default authAPI;
