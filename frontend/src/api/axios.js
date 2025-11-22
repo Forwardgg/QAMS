@@ -38,13 +38,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid → clear and redirect
+      // Clear storage
       localStorage.removeItem("token");
+      localStorage.removeItem("refresh_token");
       localStorage.removeItem("user");
-
-      // Let UI handle redirection (App.js checks auth on mount)
+      
+      // Redirect to login page with message
+      if (window.location.pathname !== '/auth/login') {
+        window.location.href = '/auth/login?message=session_expired';
+      }
     }
-
     return Promise.reject(error);
   }
 );
