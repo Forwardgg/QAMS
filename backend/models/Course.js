@@ -1,167 +1,132 @@
-// backend/models/Course.js
 import { pool } from "../config/db.js";
 
 export class Course {
-  // --- small helpers used by create/update ---
-  static ensureRequired(value, name) {
-    if (value === undefined || value === null || value === "") {
-      throw new Error(`${name} is required.`);
-    }
+  static DEFAULT_LIMIT = 25;
+
+  static _ensureRequiredString(val, name) {
+    if (val === undefined || val === null || String(val).trim() === "") throw new Error(`${name} is required`);
   }
 
-  static validateLTPrange(val, name) {
+  static _ensureString(val, name) {
+    if (val === undefined || val === null) return;
+    if (typeof val !== "string") throw new Error(`${name} must be a string`);
+  }
+
+  static _ensureIntRange(val, name, min = 0, max = 9) {
     if (val === undefined || val === null) return;
     if (!Number.isInteger(val)) throw new Error(`${name} must be an integer`);
-    if (val < 0 || val > 9) throw new Error(`${name} must be between 0 and 9`);
+    if (val < min || val > max) throw new Error(`${name} must be between ${min} and ${max}`);
   }
 
-  // Create a course
-  static async create({ code, title, syllabus, l, t, p }) {
-    // required checks
-    this.ensureRequired(code, "code");
-    this.ensureRequired(title, "title");
-    this.ensureRequired(syllabus, "syllabus");
+  static async createCourse({ code, title, syllabus, l = 0, t = 0, p = 0 }) {
+    this._ensureRequiredString(code, "code");
+    this._ensureRequiredString(title, "title");
+    this._ensureRequiredString(syllabus, "syllabus");
+    this._ensureIntRange(l, "l");
+    this._ensureIntRange(t, "t");
+    this._ensureIntRange(p, "p");
 
-    // l/t/p validation + sensible defaults if caller omitted them
-    const lVal = l === undefined || l === null ? 0 : l;
-    const tVal = t === undefined || t === null ? 0 : t;
-    const pVal = p === undefined || p === null ? 0 : p;
+    const query = `INSERT INTO courses (code, title, syllabus, l, t, p) VALUES ($1,$2,$3,$4,$5,$6) RETURNING course_id, code, title, syllabus, l, t, p, created_at, updated_at`;
+    const values = [String(code).trim(), String(title).trim(), syllabus, l, t, p];
 
-    this.validateLTPrange(lVal, "l");
-    this.validateLTPrange(tVal, "t");
-    this.validateLTPrange(pVal, "p");
+    try {
+      const { rows } = await pool.query(query, values);
+      return rows[0];
+    } catch (err) {
+      if (err.code === "23505") throw new Error("Course code already exists");
+      throw err;
+    }
+  }
 
-    const query = `
-      INSERT INTO courses (code, title, syllabus, l, t, p)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING course_id, code, title, syllabus, l, t, p, created_at;
-    `;
-    const values = [code, title, syllabus, lVal, tVal, pVal];
+  static async getAllCourses({ page = 1, limit = Course.DEFAULT_LIMIT, search = "", orderBy = "created_at", order = "desc" } = {}) {
+    page = Number(page) || 1;
+    limit = Number(limit) || Course.DEFAULT_LIMIT;
+    const offset = (page - 1) * limit;
+    const allowedOrderBy = new Set(["created_at", "updated_at", "title", "code"]);
+    if (!allowedOrderBy.has(orderBy)) orderBy = "created_at";
+    order = String(order).toLowerCase() === "asc" ? "ASC" : "DESC";
+
+    const filters = [];
+    const values = [];
+
+    if (search && String(search).trim() !== "") {
+      values.push(`%${String(search).trim()}%`);
+      filters.push(`(title ILIKE $${values.length} OR code ILIKE $${values.length})`);
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    const countQuery = `SELECT COUNT(*)::int AS total FROM courses ${whereClause}`;
+    const dataQuery = `SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at FROM courses ${whereClause} ORDER BY ${orderBy} ${order} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+
+    values.push(limit, offset);
+
+    const client = await pool.connect();
+    try {
+      const totalRes = await client.query(countQuery, values.slice(0, values.length - 2));
+      const total = totalRes.rows[0] ? totalRes.rows[0].total : 0;
+      const dataRes = await client.query(dataQuery, values);
+      return { rows: dataRes.rows, total, page, limit };
+    } finally {
+      client.release();
+    }
+  }
+
+  static async getCourseById(courseId) {
+    if (!Number.isInteger(courseId)) throw new Error("courseId must be an integer");
+    const query = `SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at FROM courses WHERE course_id = $1`;
+    const { rows } = await pool.query(query, [courseId]);
+    return rows[0] || null;
+  }
+
+  static async getCourseByCode(code) {
+    if (!code || String(code).trim() === "") throw new Error("code is required");
+    const query = `SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at FROM courses WHERE code = $1`;
+    const { rows } = await pool.query(query, [String(code).trim()]);
+    return rows[0] || null;
+  }
+
+  static async updateCourse(courseId, { code, title, syllabus, l, t, p } = {}) {
+    if (!Number.isInteger(courseId)) throw new Error("courseId must be an integer");
+    this._ensureString(code, "code");
+    this._ensureString(title, "title");
+    this._ensureString(syllabus, "syllabus");
+    this._ensureIntRange(l, "l");
+    this._ensureIntRange(t, "t");
+    this._ensureIntRange(p, "p");
+
+    const sets = [];
+    const values = [];
+    let idx = 1;
+
+    if (code !== undefined) { sets.push(`code = $${idx++}`); values.push(code === null ? null : String(code).trim()); }
+    if (title !== undefined) { sets.push(`title = $${idx++}`); values.push(title === null ? null : String(title).trim()); }
+    if (syllabus !== undefined) { sets.push(`syllabus = $${idx++}`); values.push(syllabus); }
+    if (l !== undefined) { sets.push(`l = $${idx++}`); values.push(l); }
+    if (t !== undefined) { sets.push(`t = $${idx++}`); values.push(t); }
+    if (p !== undefined) { sets.push(`p = $${idx++}`); values.push(p); }
+
+    if (sets.length === 0) return this.getCourseById(courseId);
+
+    const query = `UPDATE courses SET ${sets.join(", ")} WHERE course_id = $${idx} RETURNING course_id, code, title, syllabus, l, t, p, created_at, updated_at`;
+    values.push(courseId);
 
     try {
       const { rows } = await pool.query(query, values);
       return rows[0] || null;
     } catch (err) {
-      // Unique violation -> likely code conflict
-      if (err.code === "23505") {
-        throw new Error("Course code already exists.");
-      }
+      if (err.code === "23505") throw new Error("Course code already exists");
       throw err;
     }
   }
 
-  // Get all courses
-  static async getAll() {
-    const query = `
-      SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at
-      FROM courses
-      ORDER BY created_at DESC;
-    `;
-    const { rows } = await pool.query(query);
-    return rows;
-  }
-
-  // Get a course by id
-  static async getById(courseId) {
-    const query = `
-      SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at
-      FROM courses
-      WHERE course_id = $1;
-    `;
+  static async deleteCourse(courseId) {
+    if (!Number.isInteger(courseId)) throw new Error("courseId must be an integer");
+    const query = `DELETE FROM courses WHERE course_id = $1 RETURNING course_id, code, title`;
     const { rows } = await pool.query(query, [courseId]);
     return rows[0] || null;
   }
 
-  // Update course fields. Provide all fields (your current semantics).
-    static async update(courseId, { code, title, syllabus, l, t, p }) {
-    // basic courseId guard
-    if (!Number.isInteger(courseId)) {
-      throw new Error("courseId must be an integer.");
-    }
-
-    // validate l/t/p if provided
-    const validateLTPrangeLocal = (val, name) => {
-      if (val === undefined || val === null) return;
-      if (!Number.isInteger(val)) throw new Error(`${name} must be an integer.`);
-      if (val < 0 || val > 9) throw new Error(`${name} must be between 0 and 9.`);
-    };
-
-    validateLTPrangeLocal(l, "l");
-    validateLTPrangeLocal(t, "t");
-    validateLTPrangeLocal(p, "p");
-
-    // Treat empty strings as "no change" (optional - remove NULLIF if you want to allow empty string)
-    const query = `
-      UPDATE courses
-      SET
-        code = COALESCE(NULLIF($1, ''), code),
-        title = COALESCE(NULLIF($2, ''), title),
-        syllabus = COALESCE(NULLIF($3, ''), syllabus),
-        l = COALESCE($4, l),
-        t = COALESCE($5, t),
-        p = COALESCE($6, p)
-      WHERE course_id = $7
-      RETURNING course_id, code, title, syllabus, l, t, p, created_at, updated_at;
-    `;
-
-    const values = [
-      code ?? null,
-      title ?? null,
-      syllabus ?? null,
-      l ?? null,
-      t ?? null,
-      p ?? null,
-      courseId,
-    ];
-
-    try {
-      const { rows } = await pool.query(query, values);
-      return rows[0] || null;
-    } catch (err) {
-      if (err.code === "23505") {
-        // Optionally examine err.constraint to be more specific
-        throw new Error("Course code already exists.");
-      }
-      throw err;
-    }
+  static async searchCourses({ q = "", page = 1, limit = Course.DEFAULT_LIMIT } = {}) {
+    return this.getAllCourses({ page, limit, search: q });
   }
-  // Delete a course
-  static async delete(courseId) {
-    const query = `
-      DELETE FROM courses
-      WHERE course_id = $1
-      RETURNING course_id, code, title, syllabus, created_at;
-    `;
-    const { rows } = await pool.query(query, [courseId]);
-    return rows[0] || null;
-  }
-
-  // Get a course by its unique code
-  static async getByCode(code) {
-    const query = `
-      SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at
-      FROM courses
-      WHERE code = $1;
-    `;
-    const { rows } = await pool.query(query, [code]);
-    return rows[0] || null;
-  }
-
-// Search courses by title (case-insensitive)
-static async searchByTitle(title) {
-  // GUARD: avoid returning entire DB when empty search
-  if (!title || !title.trim()) {
-    return [];
-  }
-
-  const query = `
-    SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at
-    FROM courses
-    WHERE title ILIKE $1
-    ORDER BY created_at DESC;
-  `;
-  const { rows } = await pool.query(query, [`%${title}%`]);
-  return rows;
-}
-
 }

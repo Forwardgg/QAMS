@@ -1,25 +1,32 @@
 import express from "express";
 import {
-  createPaper,
+  createQuestionPaper,
   getAllPapers,
-  getPaperById,
+  getPapersByCourse,
+  getPapersByCourseAndCO,
   updatePaper,
-  deletePaper,
-  submitPaper,
-  approvePaper,
-  rejectPaper,
-} from "../controllers/QuestionPaperController.js";
+  deletePaper
+} from "../controllers/questionPaperController.js";
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.post("/", authenticate, authorizeRoles("admin", "instructor"), createPaper); // Create paper
-router.get("/", authenticate, getAllPapers); // Get all papers
-router.get("/:paperId", authenticate, getPaperById); // Get paper by ID
-router.put("/:paperId", authenticate, authorizeRoles("admin", "instructor"), updatePaper); // Update paper
-router.delete("/:paperId", authenticate, authorizeRoles("admin", "instructor"), deletePaper); // Delete paper
-router.post("/:paperId/submit", authenticate, authorizeRoles("admin", "instructor"), submitPaper); // Submit paper
-router.post("/:paperId/approve", authenticate, authorizeRoles("admin", "moderator"), approvePaper); // Approve paper
-router.post("/:paperId/reject", authenticate, authorizeRoles("admin", "moderator"), rejectPaper); // Reject paper
+// Create question paper (instructor only)
+router.post("/", authenticate, authorizeRoles("instructor"), createQuestionPaper);
+
+// Get all papers (all authenticated users)
+router.get("/", authenticate, getAllPapers);
+
+// Get papers by course code (all authenticated users)
+router.get("/course/:courseCode", authenticate, getPapersByCourse);
+
+// Get papers by course code and CO number (all authenticated users)
+router.get("/course/:courseCode/co/:coNumber", authenticate, getPapersByCourseAndCO);
+
+// Update paper (admin, instructor - their own paper)
+router.put("/:paperId", authenticate, authorizeRoles("admin", "instructor"), updatePaper);
+
+// Delete paper (admin, instructor - their own paper)
+router.delete("/:paperId", authenticate, authorizeRoles("admin", "instructor"), deletePaper);
 
 export default router;

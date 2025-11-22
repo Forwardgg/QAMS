@@ -3,60 +3,46 @@ import api from "./axios";
 
 const questionPaperAPI = {
   /**
-   * Create a new question paper
+   * Create a new question paper (instructor)
    * POST /api/papers
    */
   create: (paperData) =>
     api.post("/papers", paperData).then(res => res.data),
 
   /**
-   * Get all papers (role-based access)
+   * Get all papers (all authenticated users)
    * GET /api/papers
    */
-  getAll: () =>
-    api.get("/papers").then(res => res.data),
+  getAll: (params = {}) =>
+    api.get("/papers", { params }).then(res => res.data),
 
   /**
-   * Get paper by ID
-   * GET /api/papers/:paperId
+   * Get papers by course code (all authenticated users)
+   * GET /api/papers/course/:courseCode
    */
-  getById: (paperId) =>
-    api.get(`/papers/${paperId}`).then(res => res.data),
+  getByCourse: (courseCode) =>
+    api.get(`/papers/course/${courseCode}`).then(res => res.data),
 
   /**
-   * Update a paper
+   * Get papers by course code and CO number (all authenticated users)
+   * GET /api/papers/course/:courseCode/co/:coNumber
+   */
+  getByCourseAndCO: (courseCode, coNumber) =>
+    api.get(`/papers/course/${courseCode}/co/${coNumber}`).then(res => res.data),
+
+  /**
+   * Update a paper (admin, instructor - their own paper)
    * PUT /api/papers/:paperId
    */
   update: (paperId, paperData) =>
     api.put(`/papers/${paperId}`, paperData).then(res => res.data),
 
   /**
-   * Delete a paper
+   * Delete a paper (admin, instructor - their own paper)
    * DELETE /api/papers/:paperId
    */
   delete: (paperId) =>
     api.delete(`/papers/${paperId}`).then(res => res.data),
-
-  /**
-   * Submit paper for moderation
-   * POST /api/papers/:paperId/submit
-   */
-  submit: (paperId) =>
-    api.post(`/papers/${paperId}/submit`).then(res => res.data),
-
-  /**
-   * Approve a paper (admin/moderator)
-   * POST /api/papers/:paperId/approve
-   */
-  approve: (paperId) =>
-    api.post(`/papers/${paperId}/approve`).then(res => res.data),
-
-  /**
-   * Reject a paper (admin/moderator)
-   * POST /api/papers/:paperId/reject
-   */
-  reject: (paperId) =>
-    api.post(`/papers/${paperId}/reject`).then(res => res.data),
 };
 
 export default questionPaperAPI;

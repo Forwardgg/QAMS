@@ -1,26 +1,44 @@
 import express from "express";
 import {
+  getAllCourses,
+  getCourseById,
+  getCourseByCode,
   createCourse,
-  getAllCoursesAdmin,
-  getAllCoursesInstructor,
-  getCoursesPublic,
   updateCourse,
   deleteCourse,
-  getCourseByCode,
-  searchCoursesByTitle
+  searchCourses,
 } from "../controllers/CourseController.js";
 
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.post("/", authenticate, authorizeRoles("admin", "instructor"), createCourse); // create course
-router.get("/", authenticate, authorizeRoles("admin"), getAllCoursesAdmin); // get all courses (admin)
-router.get("/mine", authenticate, authorizeRoles("instructor"), getAllCoursesInstructor); // Instructor → get own courses
-router.get("/public", getCoursesPublic); // Public → course code, title, LTP
-router.get("/code/:code", getCourseByCode); // Get course by code (public)
-router.get("/search", searchCoursesByTitle); // Search courses (public) - by title
-router.put("/:id", authenticate, authorizeRoles("admin", "instructor"), updateCourse); // admin can update all, instructor only own
-router.delete("/:id", authenticate, authorizeRoles("admin", "instructor"), deleteCourse); // admin can delete all, instructor only own
+// Public / authenticated (your choice)
+router.get("/", getAllCourses);
+router.get("/search", searchCourses);
+router.get("/code/:code", getCourseByCode);
+router.get("/:id", getCourseById);
+
+// Admin-protected
+router.post(
+  "/",
+  authenticate,
+  authorizeRoles("admin"),
+  createCourse
+);
+
+router.put(
+  "/:id",
+  authenticate,
+  authorizeRoles("admin"),
+  updateCourse
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  authorizeRoles("admin"),
+  deleteCourse
+);
 
 export default router;

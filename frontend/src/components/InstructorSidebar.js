@@ -1,16 +1,17 @@
+// frontend/src/components/InstructorSidebar.js
 import React, { useState } from 'react';
 import './Sidebar.css';
 
-const AdminSidebar = ({ activePage, onPageChange }) => {
+const InstructorSidebar = ({ activePage, onPageChange }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'Moderation', label: 'Moderation', icon: '👥' },
-    { id: 'courses', label: 'Course Management', icon: '📚' },
-    { id: 'CO', label: 'CO Management', icon: '🛡️' },
-    { id: 'users', label: 'User management', icon: '📈' },
-    { id: 'reports', label: 'reports', icon: '⚙️' }
+    { id: 'courses', label: 'courses', icon: '👥' },
+    { id: 'CO', label: 'CO Management', icon: '📚' },
+    { id: 'Question Paper', label: 'Question Papers', icon: '🛡️' },
+    { id: 'Question', label: 'UQuestion Management', icon: '📈' },
+    { id: 'Moderation', label: 'Moderation', icon: '⚙️' }
   ];
 
   const toggleSidebar = () => {
@@ -48,4 +49,4 @@ const AdminSidebar = ({ activePage, onPageChange }) => {
   );
 };
 
-export default AdminSidebar;
+export default InstructorSidebar;

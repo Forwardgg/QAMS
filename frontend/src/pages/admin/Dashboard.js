@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+//src/pages/admin/Dashboard.js
+import React, { useState, useContext } from 'react';
+import { AuthContext } from '../../components/AuthProvider';
 import AdminHeader from '../../components/AdminHeader';
 import AdminSidebar from '../../components/AdminSidebar';
+import Courses from './Courses';
+import CO from './CO';
 import './Dashboard.css';
 
 const AdminDashboard = () => {
   const [activePage, setActivePage] = useState('dashboard');
-  const [user] = useState({
-    name: 'Admin User',
-    email: 'admin@example.com'
-  });
+  const auth = useContext(AuthContext);
 
   const handleLogout = () => {
-    // Add logout logic here
-    console.log('Logging out...');
+    auth.logout();
   };
 
   const handlePageChange = (pageId) => {
@@ -46,39 +46,37 @@ const AdminDashboard = () => {
             </div>
           </div>
         );
-      case 'users':
+      case 'Moderation':
         return (
           <div className="dashboard-content">
-            <h1>User Management</h1>
-            <p>User management content goes here...</p>
+            <h1>Moderation</h1>
+            <p>Moderation content goes here...</p>
           </div>
         );
       case 'courses':
         return (
           <div className="dashboard-content">
-            <h1>Courses Management</h1>
-            <p>Courses management content goes here...</p>
+            <Courses /> {}
           </div>
         );
-      case 'content':
+      case 'CO':
         return (
           <div className="dashboard-content">
-            <h1>Content Moderation</h1>
-            <p>Content moderation content goes here...</p>
+            <CO /> {}
+          </div>
+        );
+      case 'users':
+        return (
+          <div className="dashboard-content">
+            <h1>User mnagement</h1>
+            <p>usre mgmt content goes here...</p>
           </div>
         );
       case 'reports':
         return (
           <div className="dashboard-content">
-            <h1>Reports & Analytics</h1>
-            <p>Reports and analytics content goes here...</p>
-          </div>
-        );
-      case 'system':
-        return (
-          <div className="dashboard-content">
-            <h1>System Settings</h1>
-            <p>System settings content goes here...</p>
+            <h1>reports</h1>
+            <p>reports content goes here...</p>
           </div>
         );
       default:
@@ -93,7 +91,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard">
-      <AdminHeader user={user} onLogout={handleLogout} />
+      <AdminHeader user={auth.user} onLogout={handleLogout} />
       <div className="admin-dashboard-body">
         <AdminSidebar activePage={activePage} onPageChange={handlePageChange} />
         <main className="admin-main-content">

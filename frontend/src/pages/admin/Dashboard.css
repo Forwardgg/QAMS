@@ -10,10 +10,16 @@
 
 .admin-main-content {
   flex: 1;
-  margin-left: 260px;
+  margin-left: 260px; /* Default sidebar width */
   padding: 2rem;
   min-height: calc(100vh - 70px);
   background: #f8f9fa;
+  transition: margin-left 0.3s ease; /* Smooth transition */
+}
+
+/* When sidebar is collapsed */
+.admin-sidebar.collapsed ~ .admin-main-content {
+  margin-left: 70px; /* Collapsed sidebar width */
 }
 
 .dashboard-content h1 {
@@ -55,8 +61,12 @@
 /* Responsive design */
 @media (max-width: 768px) {
   .admin-main-content {
-    margin-left: 70px;
+    margin-left: 70px !important; /* Force collapsed on mobile */
     padding: 1rem;
+  }
+
+  .admin-sidebar:not(.collapsed) {
+    width: 260px;
   }
 
   .stats-grid {
@@ -79,7 +89,16 @@
 
 @media (max-width: 480px) {
   .admin-main-content {
-    margin-left: 0;
+    margin-left: 0 !important;
     padding: 0.5rem;
+  }
+  
+  .admin-sidebar {
+    transform: translateX(-100%);
+  }
+  
+  .admin-sidebar.collapsed {
+    transform: translateX(0);
+    width: 70px;
   }
 }

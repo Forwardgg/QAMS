@@ -1,21 +1,42 @@
 // routes/coRoutes.js
 import express from "express";
 import {
-  createCO,
-  getCOsByCourse,
-  getAllCoursesWithCOs,
-  updateCO,
-  deleteCO,
+  getAllCourseOutcomes,
+  getCourseOutcomesByCourseCode,
+  getCourseOutcomeByNumber,
+  getCourseOutcomeById,
+  createCourseOutcome,
+  updateCourseOutcome,
+  deleteCourseOutcome,
+  searchCourseOutcomes
 } from "../controllers/coController.js";
 
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.post("/course/:courseId", authenticate, authorizeRoles("admin", "instructor"), createCO); // create CO
-router.get("/by-course/:courseId", getCOsByCourse);  // Get COs for one course
-router.get("/", getAllCoursesWithCOs);               // Get all courses with COs
-router.put("/outcome/:coId", authenticate, authorizeRoles("admin", "instructor"), updateCO); // update CO
-router.delete("/outcome/:coId", authenticate, authorizeRoles("admin", "instructor"), deleteCO); // delete CO
+// Get all COs
+router.get("/", getAllCourseOutcomes);
+
+// Search COs
+router.get("/search", searchCourseOutcomes);
+
+// Get COs by course code
+router.get("/course/:code", getCourseOutcomesByCourseCode);
+
+// Get specific CO by course ID and CO number
+router.get("/course/:courseId/co/:coNumber", getCourseOutcomeByNumber);
+
+// Get CO by ID
+router.get("/:id", getCourseOutcomeById);
+
+// Create CO (admin only)
+router.post("/", authenticate, authorizeRoles("admin"), createCourseOutcome);
+
+// Update CO (admin only)
+router.put("/:id", authenticate, authorizeRoles("admin"), updateCourseOutcome);
+
+// Delete CO (admin only)
+router.delete("/:id", authenticate, authorizeRoles("admin"), deleteCourseOutcome);
 
 export default router;

@@ -2,11 +2,11 @@
 import React from 'react';
 import './Header.css';
 
-const AdminHeader = ({ user, onLogout }) => {
+const InstructorHeader = ({ user, onLogout }) => {
   return (
     <header className="admin-header">
       <div className="admin-header-left">
-        <h2 className="admin-header-title">Admin Dashboard</h2>
+        <h2 className="admin-header-title">Instructor Dashboard</h2>
       </div>
       <div className="admin-header-right">
         <div className="admin-user-info">
@@ -21,4 +21,4 @@ const AdminHeader = ({ user, onLogout }) => {
   );
 };
 
-export default AdminHeader;
+export default InstructorHeader;

@@ -1,22 +1,23 @@
-// backend/controllers/QuestionPaperController.js
+// backend/controllers/questionPaperController.js
 import { QuestionPaper } from "../models/QuestionPaper.js";
-import { Course } from "../models/Course.js";
 
-export const createPaper = async (req, res) => {
+export const createQuestionPaper = async (req, res) => {
   try {
-    const { courseId, title, examType, semester, academicYear, fullMarks, duration } = req.body;
-    const user = req.user;
+    const {
+      courseId,
+      title,
+      examType,
+      semester,
+      academicYear,
+      fullMarks,
+      duration
+    } = req.body;
 
-    const course = await Course.getById(courseId);
-    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
-
-    if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized to create paper for this course" });
-    }
+    const createdBy = req.user.user_id;
 
     const paper = await QuestionPaper.create({
       courseId,
-      instructorId: user.user_id,
+      createdBy,
       title,
       examType,
       semester,
@@ -25,161 +26,151 @@ export const createPaper = async (req, res) => {
       duration
     });
 
-    res.status(201).json({ success: true, data: paper });
+    res.status(201).json({
+      success: true,
+      message: "Question paper created successfully",
+      data: paper
+    });
   } catch (error) {
-    console.error("Error creating paper:", error);
-    res.status(500).json({ success: false, message: "Failed to create paper" });
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
   }
 };
+
 export const getAllPapers = async (req, res) => {
   try {
-    const user = req.user;
-    let papers;
+    const { limit = 50, offset = 0 } = req.query;
 
-    if (user.role === "admin") {
-      papers = await QuestionPaper.getAll();
-    } else if (user.role === "instructor") {
-      papers = (await QuestionPaper.getAll()).filter((p) => p.instructor_id === user.user_id);
-    } else if (user.role === "moderator") {
-      papers = await QuestionPaper.getAll(); // later: filter by paper_moderation
-    } else {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
+    const papers = await QuestionPaper.getAll(parseInt(limit), parseInt(offset));
 
-    res.json({ success: true, total: papers.length, data: papers });
+    res.json({
+      success: true,
+      data: papers,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
+    });
   } catch (error) {
-    console.error("Error fetching papers:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch papers" });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
-export const getPaperById = async (req, res) => {
+
+export const getPapersByCourse = async (req, res) => {
   try {
-    const { paperId } = req.params;
-    const user = req.user;
+    const { courseCode } = req.params;
 
-    const paper = await QuestionPaper.getById(paperId);
-    if (!paper) return res.status(404).json({ success: false, message: "Paper not found" });
+    const papers = await QuestionPaper.getByCourseCode(courseCode);
 
-    if (user.role === "instructor" && paper.instructor_id !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
-    }
-
-    res.json({ success: true, data: paper });
+    res.json({
+      success: true,
+      data: papers
+    });
   } catch (error) {
-    console.error("Error fetching paper:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch paper" });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
+
+// will change later. it will be searched  by course and CO of questions. the QP is linked to questions and questions to COs.
+export const getPapersByCourseAndCO = async (req, res) => {
+  try {
+    const { courseCode, coNumber } = req.params;
+
+    const papers = await QuestionPaper.getByCourseAndCO(courseCode, coNumber);
+
+    res.json({
+      success: true,
+      data: papers
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 export const updatePaper = async (req, res) => {
   try {
     const { paperId } = req.params;
-    const user = req.user;
+    const {
+      title,
+      examType,
+      semester,
+      academicYear,
+      fullMarks,
+      duration,
+      status
+    } = req.body;
 
-    // Check ownership for instructors before update
-    const paper = await QuestionPaper.getById(paperId);
-    if (!paper) return res.status(404).json({ success: false, message: "Paper not found" });
-
-    if (user.role === "instructor") {
-      if (paper.instructor_id !== user.user_id || paper.status !== "draft") {
-        return res.status(403).json({ success: false, message: "Instructors can only update their own draft papers" });
+    // Check if user is admin or owner of the paper
+    if (req.user.role !== 'admin') {
+      const isOwner = await QuestionPaper.isOwner(paperId, req.user.user_id);
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. You can only update your own papers."
+        });
       }
     }
 
-    const updated = await QuestionPaper.update(paperId, req.body);
-    res.json({ success: true, data: updated });
+    const updatedPaper = await QuestionPaper.update(paperId, {
+      title,
+      examType,
+      semester,
+      academicYear,
+      fullMarks,
+      duration,
+      status
+    });
+
+    res.json({
+      success: true,
+      message: "Question paper updated successfully",
+      data: updatedPaper
+    });
   } catch (error) {
-    if (error.message === "Paper not found") {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    console.error("Error updating paper:", error);
-    res.status(500).json({ success: false, message: "Failed to update paper" });
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
   }
 };
+
 export const deletePaper = async (req, res) => {
   try {
     const { paperId } = req.params;
-    const user = req.user;
 
-    const paper = await QuestionPaper.getById(paperId);
-    if (!paper) return res.status(404).json({ success: false, message: "Paper not found" });
-
-    if (user.role === "instructor") {
-      if (paper.instructor_id !== user.user_id || paper.status !== "draft") {
-        return res.status(403).json({ success: false, message: "Instructors can only delete their own draft papers" });
+    // Check if user is admin or owner of the paper
+    if (req.user.role !== 'admin') {
+      const isOwner = await QuestionPaper.isOwner(paperId, req.user.user_id);
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. You can only delete your own papers."
+        });
       }
     }
 
-    await QuestionPaper.delete(paperId);
-    res.json({ success: true, message: "Paper deleted" });
+    const deletedPaper = await QuestionPaper.delete(paperId);
+
+    res.json({
+      success: true,
+      message: "Question paper deleted successfully",
+      data: deletedPaper
+    });
   } catch (error) {
-    if (error.message === "Paper not found") {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    console.error("Error deleting paper:", error);
-    res.status(500).json({ success: false, message: "Failed to delete paper" });
-  }
-};
-export const submitPaper = async (req, res) => {
-  try {
-    const { paperId } = req.params;
-    const user = req.user;
-
-    const paper = await QuestionPaper.getById(paperId);
-    if (!paper) return res.status(404).json({ success: false, message: "Paper not found" });
-
-    if (user.role === "instructor" && paper.instructor_id !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
-    }
-
-    const updated = await QuestionPaper.submit(paperId);
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    if (error.message === "Paper not found") {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    console.error("Error submitting paper:", error);
-    res.status(500).json({ success: false, message: "Failed to submit paper" });
-  }
-};
-export const approvePaper = async (req, res) => {
-  try {
-    const { paperId } = req.params;
-    const user = req.user;
-
-    if (!["admin", "moderator"].includes(user.role)) {
-      return res.status(403).json({ success: false, message: "Only admins/moderators can approve papers" });
-    }
-
-    const updated = await QuestionPaper.approve(paperId);
-    if (!updated) return res.status(404).json({ success: false, message: "Paper not found" });
-
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    if (error.message === "Paper not found") {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    console.error("Error approving paper:", error);
-    res.status(500).json({ success: false, message: "Failed to approve paper" });
-  }
-};
-export const rejectPaper = async (req, res) => {
-  try {
-    const { paperId } = req.params;
-    const user = req.user;
-
-    if (!["admin", "moderator"].includes(user.role)) {
-      return res.status(403).json({ success: false, message: "Only admins/moderators can reject papers" });
-    }
-
-    const updated = await QuestionPaper.reject(paperId);
-    if (!updated) return res.status(404).json({ success: false, message: "Paper not found" });
-
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    if (error.message === "Paper not found") {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    console.error("Error rejecting paper:", error);
-    res.status(500).json({ success: false, message: "Failed to reject paper" });
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
   }
 };

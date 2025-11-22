@@ -1,156 +1,171 @@
-// controllers/coController.js
+// backend/controllers/coController.js
 import { CourseOutcome } from "../models/CourseOutcome.js";
-import { Course } from "../models/Course.js";
 
-// Create CO (admin or instructor for their own course)
-export const createCO = async (req, res) => {
+const parsePositiveInt = (v, fallback = undefined) => {
+  if (v === undefined || v === null || v === "") return fallback;
+  const n = Number.parseInt(v, 10);
+  return Number.isNaN(n) ? undefined : n;
+};
+
+const logRequest = (req) => {
   try {
-    const { courseId } = req.params;
-    const { coNumber, description } = req.body;
-    const user = req.user;
-
-    const course = await Course.getById(courseId);
-    if (!course) {
-      return res.status(404).json({ success: false, message: "Course not found" });
-    }
-
-    if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized to add COs to this course" });
-    }
-
-    const co = await CourseOutcome.create({ courseId, coNumber, description });
-    res.status(201).json({ success: true, data: co });
-  } catch (error) {
-    console.error("Error creating CO:", error);
-
-    if (error.message === "DUPLICATE_CO_NUMBER") {
-      return res.status(409).json({ success: false, message: "CO number already exists for this course" });
-    }
-
-    res.status(500).json({ success: false, message: "Failed to create CO" });
+    // minimal sensitive info only (no tokens)
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - params:`, req.params, "query:", req.query, "user:", req.user ? { user_id: req.user.user_id, role: req.user.role } : undefined);
+  } catch (e) {
+    console.error("Failed to log request:", e);
   }
 };
-// Get all COs for a specific course (everyone can see)
-export const getCOsByCourse = async (req, res) => {
+
+export const getAllCourseOutcomes = async (req, res) => {
+  logRequest(req);
   try {
-    const { courseId } = req.params;
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = parsePositiveInt(req.query.limit, 25);
+    const orderBy = req.query.orderBy ?? "co_number";
+    const order = (req.query.order || "asc").toLowerCase();
 
-    const course = await Course.getById(courseId);
-    if (!course) {
-      return res.status(404).json({ success: false, message: "Course not found" });
-    }
+    const data = await CourseOutcome.getAllCourseOutcomes({ page, limit, orderBy, order });
+    return res.json(data);
+  } catch (err) {
+    console.error("getAllCourseOutcomes error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while fetching course outcomes" });
+  }
+};
 
-    const cos = await CourseOutcome.getByCourse(courseId);
+export const getCourseOutcomesByCourseCode = async (req, res) => {
+  logRequest(req);
+  const courseCode = req.params?.code;
+  if (!courseCode || String(courseCode).trim() === "") {
+    return res.status(400).json({ error: "Course code is required" });
+  }
 
-    res.json({
-      success: true,
-      data: {
-        course: {
-          title: course.title,
-          code: course.code,
-          l: course.l,
-          t: course.t,
-          p: course.p,
-        },
-        outcomes: cos,
-      },
+  try {
+    const outcomes = await CourseOutcome.getCourseOutcomesByCourseCode(String(courseCode).trim());
+    return res.json(outcomes);
+  } catch (err) {
+    console.error("getCourseOutcomesByCourseCode error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while fetching course outcomes" });
+  }
+};
+
+export const getCourseOutcomeByNumber = async (req, res) => {
+  logRequest(req);
+  const courseIdRaw = req.params?.courseId;
+  const coNumber = req.params?.coNumber;
+  
+  const courseId = Number.parseInt(courseIdRaw, 10);
+  if (Number.isNaN(courseId)) return res.status(400).json({ error: "Invalid course id" });
+  if (!coNumber || String(coNumber).trim() === "") {
+    return res.status(400).json({ error: "CO number is required" });
+  }
+
+  try {
+    const outcome = await CourseOutcome.getCourseOutcomeByNumber(courseId, String(coNumber).trim());
+    if (!outcome) return res.status(404).json({ error: "Course outcome not found" });
+    return res.json(outcome);
+  } catch (err) {
+    console.error("getCourseOutcomeByNumber error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while fetching course outcome" });
+  }
+};
+
+export const getCourseOutcomeById = async (req, res) => {
+  logRequest(req);
+  const idRaw = req.params?.id;
+  const id = Number.parseInt(idRaw, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid course outcome id" });
+
+  try {
+    const outcome = await CourseOutcome.getCourseOutcomeById(id);
+    if (!outcome) return res.status(404).json({ error: "Course outcome not found" });
+    return res.json(outcome);
+  } catch (err) {
+    console.error("getCourseOutcomeById error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while fetching course outcome" });
+  }
+};
+
+export const createCourseOutcome = async (req, res) => {
+  // log writes as well (includes user info from auth middleware)
+  logRequest(req);
+  const { course_id, co_number, description } = req.body ?? {};
+
+  if (!course_id || !co_number || !description) {
+    return res.status(400).json({ error: "course_id, co_number and description are required" });
+  }
+
+  try {
+    const outcome = await CourseOutcome.createCourseOutcome({ 
+      course_id: Number(course_id), 
+      co_number, 
+      description 
     });
-  } catch (error) {
-    console.error("Error fetching COs by course:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch COs" });
+    return res.status(201).json(outcome);
+  } catch (err) {
+    if (err && (err.message || "").toLowerCase().includes("already exists")) {
+      return res.status(409).json({ error: err.message });
+    }
+    if (err && (err.message || "").toLowerCase().includes("not found")) {
+      return res.status(404).json({ error: err.message });
+    }
+    console.error("createCourseOutcome error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while creating course outcome" });
   }
 };
-// Get all courses with their COs (everyone can see)
-export const getAllCoursesWithCOs = async (req, res) => {
+
+export const updateCourseOutcome = async (req, res) => {
+  logRequest(req);
+  const idRaw = req.params?.id;
+  const id = Number.parseInt(idRaw, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid course outcome id" });
+
+  const payload = req.body ?? {};
+
   try {
-    const courses = await Course.getAll();
+    const outcome = await CourseOutcome.updateCourseOutcome(id, payload);
+    if (!outcome) return res.status(404).json({ error: "Course outcome not found" });
 
-    // Parallelize CO fetch for performance
-    const results = await Promise.all(
-      courses.map(async (course) => {
-        const cos = await CourseOutcome.getByCourse(course.course_id);
-        return {
-          title: course.title,
-          code: course.code,
-          l: course.l,
-          t: course.t,
-          p: course.p,
-          outcomes: cos,
-        };
-      })
-    );
-
-    res.json({ success: true, data: results });
-  } catch (error) {
-    console.error("Error fetching all courses with COs:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch data" });
+    const actor = req.user?.user_id ? { actorId: req.user.user_id } : undefined;
+    return res.json({ outcome, actor });
+  } catch (err) {
+    if (err && (err.message || "").toLowerCase().includes("already exists")) {
+      return res.status(409).json({ error: err.message });
+    }
+    console.error("updateCourseOutcome error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while updating course outcome" });
   }
 };
-// Update CO (admin or instructor for own course)
-export const updateCO = async (req, res) => {
+
+export const deleteCourseOutcome = async (req, res) => {
+  logRequest(req);
+  const idRaw = req.params?.id;
+  const id = Number.parseInt(idRaw, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid course outcome id" });
+
   try {
-    const { coId } = req.params;
-    const { coNumber, description } = req.body;
-    const user = req.user;
+    const outcome = await CourseOutcome.deleteCourseOutcome(id);
+    if (!outcome) return res.status(404).json({ error: "Course outcome not found" });
 
-    const co = await CourseOutcome.getById(coId);
-    if (!co) {
-      return res.status(404).json({ success: false, message: "CO not found" });
-    }
-
-    const course = await Course.getById(co.course_id);
-    if (!course) {
-      return res.status(404).json({ success: false, message: "Course not found" });
-    }
-
-    if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized to update this CO" });
-    }
-
-    const updated = await CourseOutcome.update(coId, { coNumber, description });
-    if (!updated) {
-      return res.status(404).json({ success: false, message: "CO not found or nothing to update" });
-    }
-
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    console.error("Error updating CO:", error);
-
-    if (error.message === "DUPLICATE_CO_NUMBER") {
-      return res.status(409).json({ success: false, message: "CO number already exists for this course" });
-    }
-
-    res.status(500).json({ success: false, message: "Failed to update CO" });
+    const actor = req.user?.user_id ? { actorId: req.user.user_id } : undefined;
+    return res.json({ message: "Course outcome deleted", outcome, actor });
+  } catch (err) {
+    console.error("deleteCourseOutcome error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while deleting course outcome" });
   }
 };
-// Delete CO (admin or instructor for own course)
-export const deleteCO = async (req, res) => {
+
+export const searchCourseOutcomes = async (req, res) => {
+  logRequest(req);
   try {
-    const { coId } = req.params;
-    const user = req.user;
+    const courseCode = req.query?.courseCode ?? "";
+    const coNumber = req.query?.coNumber ?? "";
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = parsePositiveInt(req.query.limit, 25);
 
-    const co = await CourseOutcome.getById(coId);
-    if (!co) {
-      return res.status(404).json({ success: false, message: "CO not found" });
-    }
-
-    const course = await Course.getById(co.course_id);
-    if (!course) {
-      return res.status(404).json({ success: false, message: "Course not found" });
-    }
-
-    if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized to delete this CO" });
-    }
-
-    const deleted = await CourseOutcome.delete(coId);
-    res.json({
-      success: true,
-      data: deleted,
-      message: `Deleted CO ${deleted.co_number} from course ${course.code}`,
-    });
-  } catch (error) {
-    console.error("Error deleting CO:", error);
-    res.status(500).json({ success: false, message: "Failed to delete CO" });
+    const data = await CourseOutcome.searchCourseOutcomes({ courseCode, coNumber, page, limit });
+    return res.json(data);
+  } catch (err) {
+    console.error("searchCourseOutcomes error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while searching course outcomes" });
   }
 };
