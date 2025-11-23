@@ -7,10 +7,10 @@ const InstructorSidebar = ({ activePage, onPageChange }) => {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'courses', label: 'courses', icon: '👥' },
+    { id: 'courses', label: 'Courses', icon: '👥' },
     { id: 'CO', label: 'CO Management', icon: '📚' },
     { id: 'Question Paper', label: 'Question Papers', icon: '🛡️' },
-    { id: 'Question', label: 'UQuestion Management', icon: '📈' },
+    { id: 'questions', label: 'Question Management', icon: '📈' }, // Fixed this line
     { id: 'Moderation', label: 'Moderation', icon: '⚙️' }
   ];
 

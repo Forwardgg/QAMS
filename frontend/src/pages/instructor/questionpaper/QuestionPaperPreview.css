@@ -1,0 +1,75 @@
+/* Document format styles */
+.document-format .paper-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.document-format .department-line {
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.document-format .university-info h1 {
+  margin: 5px 0;
+  font-size: 18px;
+}
+
+.document-format .university-info h2 {
+  margin: 3px 0;
+  font-size: 14px;
+  font-weight: normal;
+}
+
+.document-format .university-info h3 {
+  margin: 3px 0;
+  font-size: 14px;
+}
+
+.document-format .paper-details-simple {
+  margin-top: 10px;
+}
+
+.document-format .detail-item {
+  font-size: 14px;
+}
+
+/* Question formatting */
+.document-format .question-item {
+  margin-bottom: 15px;
+}
+
+.document-format .question-header {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 5px;
+}
+
+.document-format .question-number {
+  font-weight: bold;
+  margin-right: 5px;
+}
+
+.document-format .sub-questions {
+  margin-left: 20px;
+  margin-top: 10px;
+}
+
+.document-format .sub-question {
+  display: flex;
+  margin-bottom: 5px;
+  align-items: flex-start;
+}
+
+.document-format .sub-question-label {
+  font-weight: bold;
+  margin-right: 8px;
+  min-width: 20px;
+}
+
+.document-format .sub-question-text {
+  flex: 1;
+}
+
+.fallback-questions {
+  line-height: 1.4;
+}

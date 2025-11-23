@@ -11,9 +11,11 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
-    "@ckeditor/ckeditor5-build-classic": "^38.1.0",
-    "@ckeditor/ckeditor5-react": "^6.0.0",
+    "@ckeditor/ckeditor5-build-classic": "^38.1.1",
+    "@ckeditor/ckeditor5-react": "^6.3.0",
     "axios": "^1.13.2",
+    "dompurify": "^3.3.0",
+    "file-saver": "^2.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.9.6",

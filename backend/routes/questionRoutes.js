@@ -1,23 +1,29 @@
+// backend/routes/questionRoutes.js
 import express from "express";
-import {
-  addSubjectiveQuestion,
-  addMCQQuestion,
-  getQuestionsForPaper,
-  getQuestionsForCourse,
-  getQuestionsForCourseAndPaper,
-  updateQuestion,
-  deleteQuestion,
-} from "../controllers/QuestionController.js";
+import { QuestionController } from "../controllers/QuestionController.js";
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.post("/subjective/:courseId", authenticate, authorizeRoles("admin", "instructor"), addSubjectiveQuestion); // Add subjective question
-router.post("/mcq/:courseId", authenticate, authorizeRoles("admin", "instructor"), addMCQQuestion); // Add MCQ question
-router.get("/paper/:paperId", getQuestionsForPaper); // Get questions for paper
-router.get("/course/:courseId", getQuestionsForCourse); // Get questions for course
-router.get("/course/:courseId/paper/:paperId", getQuestionsForCourseAndPaper); // Get questions for course & paper
-router.put("/:questionId", authenticate, authorizeRoles("admin", "instructor"), updateQuestion); // Update question
-router.delete("/:questionId", authenticate, authorizeRoles("admin", "instructor"), deleteQuestion); // Delete question
+// Get all questions by course code (public)
+router.get("/course/:courseCode", QuestionController.getQuestionsByCourseCode);
+
+// Get all questions by course code and paper (public)  
+router.get("/course/:courseCode/paper/:paperId", QuestionController.getQuestionsByCourseAndPaper);
+
+// Get single question by ID (public)
+router.get("/:questionId", QuestionController.getQuestionById);
+
+// Create subjective question - instructor only
+router.post("/subjective", authenticate, authorizeRoles("instructor"), QuestionController.createSubjectiveQuestion);
+
+// Create objective question - instructor only
+router.post("/objective", authenticate, authorizeRoles("instructor"), QuestionController.createObjectiveQuestion);
+
+// Update question - instructor (own papers) or admin
+router.put("/:questionId", authenticate, authorizeRoles("admin", "instructor"), QuestionController.updateQuestion);
+
+// Delete question - instructor (own papers) or admin
+router.delete("/:questionId", authenticate, authorizeRoles("admin", "instructor"), QuestionController.deleteQuestion);
 
 export default router;

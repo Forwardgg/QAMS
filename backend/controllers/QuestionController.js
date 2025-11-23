@@ -1,313 +1,275 @@
-import { Question } from "../models/Question.js";
-import { Option } from "../models/Option.js";
-import { Course } from "../models/Course.js";
-import { QuestionMedia } from "../models/QuestionMedia.js";
-import { pool } from "../config/db.js";
+// backend/controllers/QuestionController.js
+import { Question } from '../models/Question.js';
+import { Course } from '../models/Course.js';
+import { QuestionPaper } from '../models/QuestionPaper.js';
+import { Option } from '../models/Option.js';
+import { QuestionMedia } from '../models/QuestionMedia.js';
 
-// Utility to attach options + media
-const attachExtras = async (questions) => {
-  if (!questions || !questions.length) return [];
+export class QuestionController {
 
-  const questionIds = questions.map((q) => q.question_id);
+  // 1. Get all questions by course code
+  static async getQuestionsByCourseCode(req, res) {
+    try {
+      const { courseCode } = req.params;
+      if (!courseCode || String(courseCode).trim() === "") {
+        return res.status(400).json({ success: false, message: 'Course code is required' });
+      }
 
-  // Batch fetch options for all MCQs
-  const { rows: allOptions } = await pool.query(
-    `SELECT option_id, question_id, option_text, is_correct
-     FROM options
-     WHERE question_id = ANY($1)
-     ORDER BY option_id;`,
-    [questionIds]
-  );
+      // Verify course exists
+      const course = await Course.getCourseByCode(courseCode);
+      if (!course) {
+        return res.status(404).json({ success: false, message: 'Course not found' });
+      }
 
-  // Batch fetch media for all questions
-  const { rows: allMedia } = await pool.query(
-    `SELECT id, question_id, media_url, caption
-     FROM question_media
-     WHERE question_id = ANY($1)
-     ORDER BY id;`,
-    [questionIds]
-  );
+      const questions = await Question.getByCourseCode(courseCode);
 
-  // Group
-  const optionsByQ = {};
-  allOptions.forEach((opt) => {
-    if (!optionsByQ[opt.question_id]) optionsByQ[opt.question_id] = [];
-    optionsByQ[opt.question_id].push(opt);
-  });
-
-  const mediaByQ = {};
-  allMedia.forEach((m) => {
-    if (!mediaByQ[m.question_id]) mediaByQ[m.question_id] = [];
-    mediaByQ[m.question_id].push(m);
-  });
-
-  // Attach
-  return questions.map((q) => ({
-    ...q,
-    options: q.question_type === "mcq" ? optionsByQ[q.question_id] || [] : [],
-    media: mediaByQ[q.question_id] || [],
-  }));
-};
-
-export const addSubjectiveQuestion = async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    const { content, coId, paperId = null, media = [] } = req.body;
-    const user = req.user;
-
-    if (!content || content.trim() === "") {
-      return res.status(400).json({ success: false, message: "Question content is required" });
-    }
-
-    const course = await Course.getById(courseId);
-    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
-
-    if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized to add questions to this course" });
-    }
-
-    const question = await Question.create({
-      courseId: parseInt(courseId),
-      paperId: paperId ? parseInt(paperId) : null,
-      questionType: "subjective",
-      content,
-      coId: coId ? parseInt(coId) : null,
-    });
-
-    const mediaResults = [];
-    for (const m of media) {
-      const savedMedia = await QuestionMedia.create({
-        questionId: question.question_id,
-        mediaUrl: m.mediaUrl,
-        caption: m.caption || "",
+      return res.status(200).json({
+        success: true,
+        data: { course, questions, count: Array.isArray(questions) ? questions.length : 0 }
       });
-      mediaResults.push(savedMedia);
+    } catch (error) {
+      console.error('Error getting questions by course code:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
     }
-
-    // Attach empty options array for subjective questions
-    question.options = [];
-    question.media = mediaResults;
-
-    res.status(201).json({ success: true, data: question });
-  } catch (error) {
-    console.error("Error adding subjective question:", error);
-    res.status(500).json({ success: false, message: "Failed to add question" });
   }
-};
 
-export const addMCQQuestion = async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    const { content, coId, paperId = null, options, media = [] } = req.body;
-    const user = req.user;
+  // 2. Get all questions by course code and question paper
+  static async getQuestionsByCourseAndPaper(req, res) {
+    try {
+      const { courseCode, paperId } = req.params;
+      if (!courseCode || String(courseCode).trim() === "" || !paperId) {
+        return res.status(400).json({ success: false, message: 'Course code and paper ID are required' });
+      }
 
-    const course = await Course.getById(courseId);
-    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+      const paperIdNum = Number.parseInt(paperId, 10);
+      if (Number.isNaN(paperIdNum)) {
+        return res.status(400).json({ success: false, message: 'Invalid paper ID' });
+      }
 
-    if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized to add questions to this course" });
-    }
+      // Verify course exists
+      const course = await Course.getCourseByCode(courseCode);
+      if (!course) {
+        return res.status(404).json({ success: false, message: 'Course not found' });
+      }
 
-    if (!Array.isArray(options) || options.length < 2) {
-      return res.status(400).json({ success: false, message: "MCQ must have at least 2 options" });
-    }
-    if (!options.some((o) => o.isCorrect)) {
-      return res.status(400).json({ success: false, message: "MCQ must have at least 1 correct option" });
-    }
+      const questions = await Question.getByCourseCodeAndPaper(courseCode, paperIdNum);
 
-    const question = await Question.create({
-      courseId: parseInt(courseId),
-      paperId: paperId ? parseInt(paperId) : null,
-      questionType: "mcq",
-      content,
-      coId: coId ? parseInt(coId) : null,
-    });
-
-    const optionResults = [];
-    for (const opt of options) {
-      const savedOption = await Option.create({
-        questionId: question.question_id,
-        optionText: opt.optionText,
-        isCorrect: opt.isCorrect,
+      return res.status(200).json({
+        success: true,
+        data: { course, paperId: paperIdNum, questions, count: Array.isArray(questions) ? questions.length : 0 }
       });
-      optionResults.push(savedOption);
+    } catch (error) {
+      console.error('Error getting questions by course and paper:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
     }
+  }
 
-    const mediaResults = [];
-    for (const m of media) {
-      const savedMedia = await QuestionMedia.create({
-        questionId: question.question_id,
-        mediaUrl: m.mediaUrl,
-        caption: m.caption || "",
+  // 3. Create subjective question - instructor only (for their own QuestionPaper)
+  static async createSubjectiveQuestion(req, res) {
+    try {
+      const courseIdRaw = req.body.courseId ?? req.body.course_id;
+      const paperIdRaw = req.body.paperId ?? req.body.paper_id;
+      const content = req.body.content;
+      const coIdRaw = req.body.coId ?? req.body.co_id ?? null;
+
+      const userId = req.user?.user_id; // middleware provides user_id
+      const userRole = req.user?.role;
+
+      // Check role (middleware authorizeRoles also enforces, but double-check)
+      if (userRole !== 'instructor') {
+        return res.status(403).json({ success: false, message: 'Only instructors can create questions' });
+      }
+
+      // Validate fields and parse integers
+      const courseId = Number.parseInt(courseIdRaw, 10);
+      const paperId = Number.parseInt(paperIdRaw, 10);
+      const coId = coIdRaw === null || coIdRaw === undefined ? null : Number.parseInt(coIdRaw, 10);
+
+      if (Number.isNaN(courseId) || Number.isNaN(paperId) || !content || String(content).trim() === "") {
+        return res.status(400).json({ success: false, message: 'courseId, paperId, and content are required and must be valid' });
+      }
+
+      // Verify paper ownership (ensure we pass integers)
+      const isOwner = await QuestionPaper.isOwner(paperId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ success: false, message: 'You can only create questions for your own question papers' });
+      }
+
+      const question = await Question.createSubjective({
+        courseId,
+        paperId,
+        content,
+        coId: coId ?? null,
+        createdBy: userId
       });
-      mediaResults.push(savedMedia);
+
+      return res.status(201).json({ success: true, message: 'Subjective question created successfully', data: question });
+    } catch (error) {
+      console.error('Error creating subjective question:', error);
+      return res.status(500).json({ success: false, message: 'Failed to create subjective question', error: error.message });
     }
-
-    question.options = optionResults;
-    question.media = mediaResults;
-
-    res.status(201).json({ success: true, data: question });
-  } catch (error) {
-    console.error("Error adding MCQ question:", error);
-    res.status(500).json({ success: false, message: "Failed to add MCQ question" });
   }
-};
 
-export const getQuestionsForPaper = async (req, res) => {
-  try {
-    const { paperId } = req.params;
-    
-    // Get all questions for the course first, then filter by paper
-    const { rows: allQuestions } = await pool.query(
-      `SELECT q.*, co.co_number
-       FROM questions q
-       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-       WHERE q.paper_id = $1 AND q.is_active = true
-       ORDER BY q.created_at DESC;`,
-      [paperId]
-    );
+  // 4. Create objective question - instructor only (for their own QuestionPaper)
+  static async createObjectiveQuestion(req, res) {
+    try {
+      const courseIdRaw = req.body.courseId ?? req.body.course_id;
+      const paperIdRaw = req.body.paperId ?? req.body.paper_id;
+      const content = req.body.content;
+      const coIdRaw = req.body.coId ?? req.body.co_id ?? null;
+      const options = req.body.options;
 
-    const questions = await attachExtras(allQuestions);
-    res.json({ success: true, total: questions.length, data: questions });
-  } catch (error) {
-    console.error("Error fetching paper questions:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch paper questions" });
-  }
-};
+      const userId = req.user?.user_id;
+      const userRole = req.user?.role;
 
-export const getQuestionsForCourse = async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    
-    // Use direct query since Question.getByCourse doesn't exist
-    const { rows: questions } = await pool.query(
-      `SELECT q.question_id, q.course_id, q.paper_id, q.question_type, q.content, q.co_id,
-              q.status, q.is_active, q.created_at,
-              co.co_number
-       FROM questions q
-       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-       WHERE q.course_id = $1 AND q.is_active = true
-       ORDER BY q.created_at DESC;`,
-      [courseId]
-    );
-
-    const withExtras = await attachExtras(questions);
-    res.json({ success: true, total: withExtras.length, data: withExtras });
-  } catch (error) {
-    console.error("Error fetching course questions:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch course questions" });
-  }
-};
-
-export const getQuestionsForCourseAndPaper = async (req, res) => {
-  try {
-    const { courseId, paperId } = req.params;
-    
-    const { rows: questions } = await pool.query(
-      `SELECT q.*, co.co_number
-       FROM questions q
-       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-       WHERE q.course_id = $1 AND q.paper_id = $2 AND q.is_active = true
-       ORDER BY q.created_at DESC;`,
-      [courseId, paperId]
-    );
-
-    const withExtras = await attachExtras(questions);
-    res.json({ success: true, total: withExtras.length, data: withExtras });
-  } catch (error) {
-    console.error("Error fetching course+paper questions:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch course+paper questions" });
-  }
-};
-
-export const updateQuestion = async (req, res) => {
-  try {
-    const { questionId } = req.params;
-    const { content, coId, options, media } = req.body;
-    const user = req.user;
-
-    const question = await Question.getById(questionId);
-    if (!question) return res.status(404).json({ success: false, message: "Question not found" });
-
-    // Check authorization via course ownership
-    const course = await Course.getById(question.course_id);
-    if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized to update this question" });
-    }
-
-    const updated = await Question.update(questionId, { 
-      content, 
-      coId: coId ? parseInt(coId) : null 
-    });
-
-    let updatedOptions = [];
-    if (question.question_type === "mcq" && Array.isArray(options)) {
-      if (options.length < 2) {
-        return res.status(400).json({ success: false, message: "MCQ must have at least 2 options" });
-      }
-      if (!options.some((o) => o.isCorrect)) {
-        return res.status(400).json({ success: false, message: "MCQ must have at least 1 correct option" });
+      if (userRole !== 'instructor') {
+        return res.status(403).json({ success: false, message: 'Only instructors can create questions' });
       }
 
-      await Option.deleteByQuestion(questionId);
-      for (const opt of options) {
-        const savedOpt = await Option.create({
-          questionId: parseInt(questionId),
-          optionText: opt.optionText,
-          isCorrect: opt.isCorrect,
-        });
-        updatedOptions.push(savedOpt);
+      const courseId = Number.parseInt(courseIdRaw, 10);
+      const paperId = Number.parseInt(paperIdRaw, 10);
+      const coId = coIdRaw === null || coIdRaw === undefined ? null : Number.parseInt(coIdRaw, 10);
+
+      if (Number.isNaN(courseId) || Number.isNaN(paperId) || !content || String(content).trim() === "") {
+        return res.status(400).json({ success: false, message: 'courseId, paperId, and content are required and must be valid' });
       }
-    }
 
-    let updatedMedia = [];
-    if (Array.isArray(media)) {
-      await QuestionMedia.deleteByQuestion(questionId);
-      for (const m of media) {
-        const savedMedia = await QuestionMedia.create({
-          questionId: parseInt(questionId),
-          mediaUrl: m.mediaUrl,
-          caption: m.caption || "",
-        });
-        updatedMedia.push(savedMedia);
+      if (!Array.isArray(options) || options.length < 2) {
+        return res.status(400).json({ success: false, message: 'At least 2 options are required for objective questions' });
       }
+
+      // Validate options minimal shape here (more validation occurs in model)
+      const hasCorrect = options.some(opt => {
+        const val = opt.is_correct ?? opt.isCorrect ?? opt.correct ?? false;
+        return Boolean(val) || String(val).toLowerCase() === 'true' || String(val) === '1';
+      });
+      if (!hasCorrect) {
+        return res.status(400).json({ success: false, message: 'At least one option must be marked correct' });
+      }
+
+      // Verify paper ownership
+      const isOwner = await QuestionPaper.isOwner(paperId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ success: false, message: 'You can only create questions for your own question papers' });
+      }
+
+      const question = await Question.createObjective({
+        courseId,
+        paperId,
+        content,
+        coId: coId ?? null,
+        options,
+        createdBy: userId
+      });
+
+      return res.status(201).json({ success: true, message: 'Objective question created successfully', data: question });
+    } catch (error) {
+      console.error('Error creating objective question:', error);
+      return res.status(500).json({ success: false, message: 'Failed to create objective question', error: error.message });
     }
-
-    updated.options = updatedOptions;
-    updated.media = updatedMedia;
-
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    console.error("Error updating question:", error);
-    res.status(500).json({ success: false, message: "Failed to update question" });
   }
-};
 
-export const deleteQuestion = async (req, res) => {
-  try {
-    const { questionId } = req.params;
-    const user = req.user;
+  // 5. Update question - instructor (for their own QuestionPaper) or admin
+  static async updateQuestion(req, res) {
+    try {
+      const questionIdRaw = req.params.questionId;
+      const updates = req.body ?? {};
+      const userId = req.user?.user_id;
+      const userRole = req.user?.role;
 
-    const question = await Question.getById(questionId);
-    if (!question) return res.status(404).json({ success: false, message: "Question not found" });
+      if (!questionIdRaw) {
+        return res.status(400).json({ success: false, message: 'Question ID is required' });
+      }
 
-    // Check authorization via course ownership
-    const course = await Course.getById(question.course_id);
-    if (user.role === "instructor" && course.created_by !== user.user_id) {
-      return res.status(403).json({ success: false, message: "Not authorized to delete this question" });
+      const questionId = Number.parseInt(questionIdRaw, 10);
+      if (Number.isNaN(questionId)) {
+        return res.status(400).json({ success: false, message: 'Invalid question ID' });
+      }
+
+      // Get existing question to check ownership
+      const existingQuestion = await Question.getById(questionId);
+      if (!existingQuestion) {
+        return res.status(404).json({ success: false, message: 'Question not found' });
+      }
+
+      // If user is not admin and question belongs to a paper, check that user owns that paper
+      if (userRole !== 'admin' && existingQuestion.paper_id) {
+        const isOwner = await QuestionPaper.isOwner(Number(existingQuestion.paper_id), userId);
+        if (!isOwner) {
+          return res.status(403).json({ success: false, message: 'You can only update questions in your own question papers' });
+        }
+      }
+
+      const updatedQuestion = await Question.update(questionId, updates, userId, userRole);
+
+      return res.status(200).json({ success: true, message: 'Question updated successfully', data: updatedQuestion });
+    } catch (error) {
+      console.error('Error updating question:', error);
+      return res.status(500).json({ success: false, message: 'Failed to update question', error: error.message });
     }
-
-    await Question.softDelete(questionId);
-
-    // Clean up children
-    await QuestionMedia.deleteByQuestion(questionId);
-    if (question.question_type === "mcq") {
-      await Option.deleteByQuestion(questionId);
-    }
-
-    res.json({ success: true, message: "Question deleted" });
-  } catch (error) {
-    console.error("Error deleting question:", error);
-    res.status(500).json({ success: false, message: "Failed to delete question" });
   }
-};
+
+  // 6. Delete question - instructor (for their own QuestionPaper) or admin
+  static async deleteQuestion(req, res) {
+    try {
+      const questionIdRaw = req.params.questionId;
+      const userId = req.user?.user_id;
+      const userRole = req.user?.role;
+
+      if (!questionIdRaw) {
+        return res.status(400).json({ success: false, message: 'Question ID is required' });
+      }
+
+      const questionId = Number.parseInt(questionIdRaw, 10);
+      if (Number.isNaN(questionId)) {
+        return res.status(400).json({ success: false, message: 'Invalid question ID' });
+      }
+
+      // Get existing question to check ownership
+      const existingQuestion = await Question.getById(questionId);
+      if (!existingQuestion) {
+        return res.status(404).json({ success: false, message: 'Question not found' });
+      }
+
+      // If user is not admin and question belongs to a paper, check ownership
+      if (userRole !== 'admin' && existingQuestion.paper_id) {
+        const isOwner = await QuestionPaper.isOwner(Number(existingQuestion.paper_id), userId);
+        if (!isOwner) {
+          return res.status(403).json({ success: false, message: 'You can only delete questions from your own question papers' });
+        }
+      }
+
+      const result = await Question.delete(questionId, userId, userRole);
+
+      return res.status(200).json({ success: true, message: 'Question deleted successfully', data: result });
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      return res.status(500).json({ success: false, message: 'Failed to delete question', error: error.message });
+    }
+  }
+
+  // Bonus: Get single question by ID with full details
+  static async getQuestionById(req, res) {
+    try {
+      const questionIdRaw = req.params.questionId;
+      if (!questionIdRaw) {
+        return res.status(400).json({ success: false, message: 'Question ID is required' });
+      }
+
+      const questionId = Number.parseInt(questionIdRaw, 10);
+      if (Number.isNaN(questionId)) {
+        return res.status(400).json({ success: false, message: 'Invalid question ID' });
+      }
+
+      const question = await Question.getById(questionId);
+      if (!question) {
+        return res.status(404).json({ success: false, message: 'Question not found' });
+      }
+
+      return res.status(200).json({ success: true, data: question });
+    } catch (error) {
+      console.error('Error getting question by ID:', error);
+      return res.status(500).json({ success: false, message: 'Failed to get question', error: error.message });
+    }
+  }
+}

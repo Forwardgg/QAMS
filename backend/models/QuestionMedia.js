@@ -13,18 +13,18 @@ export class QuestionMedia {
 
   // Create media entry for a question
   static async create({ questionId, mediaUrl, mediaType = null, caption = "" }) {
-    this._ensureInteger(questionId, "questionId");
-    this._ensureNonEmptyString(mediaUrl, "mediaUrl");
+  this._ensureInteger(questionId, "questionId");
+  this._ensureNonEmptyString(mediaUrl, "mediaUrl");
 
-    const query = `
-      INSERT INTO question_media (question_id, media_url, media_type, caption)
-      VALUES ($1, $2, $3, $4)
-      RETURNING media_id, question_id, media_url, media_type, caption;
-    `;
-    const values = [questionId, mediaUrl, mediaType, caption];
-    const { rows } = await pool.query(query, values);
-    return rows[0] || null;
-  }
+  // ensure question exists and is active
+  const q = await pool.query('SELECT 1 FROM questions WHERE question_id = $1 AND is_active = true', [questionId]);
+  if (q.rows.length === 0) throw new Error(`Question ${questionId} does not exist or is inactive`);
+
+  const query = `INSERT INTO question_media (question_id, media_url, media_type, caption) VALUES ($1, $2, $3, $4) RETURNING media_id, question_id, media_url, media_type, caption;`;
+  const values = [questionId, mediaUrl, mediaType, caption];
+  const { rows } = await pool.query(query, values);
+  return rows[0] || null;
+}
 
   // Get all media attached to a question
   static async getByQuestion(questionId) {

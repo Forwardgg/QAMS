@@ -6,6 +6,7 @@ import InstructorSidebar from '../../components/InstructorSidebar';
 import InstructorCourses from './Courses';
 import InstructorCO from './CO';
 import QuestionPapers from './QuestionPapers';
+import Questions from './Questions';
 import './Dashboard.css';
 
 const InstructorDashboard = () => {
@@ -100,8 +101,7 @@ const InstructorDashboard = () => {
       case 'questions':
         return (
           <div className="dashboard-content">
-            <h1>some</h1>
-            <p>some</p>
+            <Questions />
           </div>
         );
       case 'Question Paper':
@@ -132,7 +132,7 @@ const InstructorDashboard = () => {
       default:
         return (
           <div className="dashboard-content">
-            <h1>some</h1>
+            <h1>t</h1>
             <p>some</p>
           </div>
         );

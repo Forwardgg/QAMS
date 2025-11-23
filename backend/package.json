@@ -18,8 +18,12 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.1",
+    "nodemailer": "^7.0.10",
     "pdf-lib": "^1.17.1",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "puppeteer": "^24.31.0",
+    "sanitize-html": "^2.17.0"
   },
   "devDependencies": {
     "cross-env": "^10.0.0",

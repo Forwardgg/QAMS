@@ -1,62 +1,81 @@
 // src/api/question.api.js
 import api from "./axios";
 
+/**
+ * Helper to unwrap axios responses safely.
+ * Returns res.data on success.
+ * Throws a normalized Error(message) on failure for easier UI handling.
+ */
+async function handle(promise) {
+  try {
+    const res = await promise;
+    return res.data;
+  } catch (err) {
+    if (err.response && err.response.data) {
+      const data = err.response.data;
+      const msg = data.message ?? data.error ?? JSON.stringify(data);
+      throw new Error(msg);
+    }
+    throw err;
+  }
+}
+
 const questionAPI = {
   /**
-   * Add a subjective question to a course
-   * POST /api/questions/subjective/:courseId
+   * Get all questions by course code
+   * GET /api/questions/course/:courseCode
    */
-  addSubjective: (courseId, data) =>
-    api.post(`/questions/subjective/${courseId}`, data).then(res => res.data),
+  getByCourseCode: (courseCode) =>
+    handle(api.get(`/questions/course/${encodeURIComponent(courseCode)}`)),
 
   /**
-   * Add an MCQ question to a course
-   * POST /api/questions/mcq/:courseId
+   * Get all questions by course code and paper
+   * GET /api/questions/course/:courseCode/paper/:paperId
    */
-  addMCQ: (courseId, data) =>
-    api.post(`/questions/mcq/${courseId}`, data).then(res => res.data),
+  getByCourseAndPaper: (courseCode, paperId) =>
+    handle(
+      api.get(
+        `/questions/course/${encodeURIComponent(courseCode)}/paper/${encodeURIComponent(paperId)}`
+      )
+    ),
 
   /**
-   * Get questions for a paper
-   * GET /api/questions/paper/:paperId
-   */
-  getByPaper: (paperId) =>
-    api.get(`/questions/paper/${paperId}`).then(res => res.data),
-
-  /**
-   * Get all questions for a course
-   * GET /api/questions/course/:courseId
-   */
-  getByCourse: (courseId) =>
-    api.get(`/questions/course/${courseId}`).then(res => res.data),
-
-  /**
-   * Get questions for a specific paper AND course
-   * GET /api/questions/course/:courseId/paper/:paperId
-   */
-  getByCourseAndPaper: (courseId, paperId) =>
-    api.get(`/questions/course/${courseId}/paper/${paperId}`).then(res => res.data),
-
-  /**
-   * Update a question
-   * PUT /api/questions/:questionId
-   */
-  update: (questionId, data) =>
-    api.put(`/questions/${questionId}`, data).then(res => res.data),
-
-  /**
-   * Soft delete a question
-   * DELETE /api/questions/:questionId
-   */
-  delete: (questionId) =>
-    api.delete(`/questions/${questionId}`).then(res => res.data),
-
-  /**
-   * Get question by ID - ONLY IF BACKEND SUPPORTS IT
+   * Get single question by ID with full details
    * GET /api/questions/:questionId
    */
   getById: (questionId) =>
-    api.get(`/questions/${questionId}`).then(res => res.data),
+    handle(api.get(`/questions/${encodeURIComponent(questionId)}`)),
+
+  /**
+   * Create subjective question (instructor only)
+   * POST /api/questions/subjective
+   * Body: { courseId, paperId, content, coId? }
+   */
+  createSubjective: (data) =>
+    handle(api.post("/questions/subjective", data)),
+
+  /**
+   * Create objective question (instructor only)
+   * POST /api/questions/objective
+   * Body: { courseId, paperId, content, coId?, options: [{ optionText, isCorrect }] }
+   */
+  createObjective: (data) =>
+    handle(api.post("/questions/objective", data)),
+
+  /**
+   * Update question (instructor for own papers or admin)
+   * PUT /api/questions/:questionId
+   * Body: { content?, coId?, question_type?, options? }
+   */
+  update: (questionId, data) =>
+    handle(api.put(`/questions/${encodeURIComponent(questionId)}`, data)),
+
+  /**
+   * Delete question (instructor for own papers or admin)
+   * DELETE /api/questions/:questionId
+   */
+  delete: (questionId) =>
+    handle(api.delete(`/questions/${encodeURIComponent(questionId)}`)),
 };
 
 export default questionAPI;
