@@ -82,7 +82,7 @@ app.use("/api/papers", questionPaperRoutes);
 app.use("/api/moderation", ModerationRoutes);
 app.use("/api/paper", paperCompilationRoutes);
 app.use("/api/uploads", uploadRoutes);
-app.use("/api/pdf", uploadRoutes);
+app.use("/api/pdf", pdfRoutes);
 
 // REMOVE THIS DUPLICATE UPLOAD ROUTE - it's already in uploadRoutes.js
 // const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: UploadService.maxFileSize } });

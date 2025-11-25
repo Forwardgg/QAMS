@@ -4,7 +4,7 @@ import questionAPI from '../../../api/question.api';
 import questionPaperAPI from '../../../api/questionPaper.api';
 import QuestionEditModal from './QuestionEditModal';
 import './PaperQuestionsManager.css';
-
+import authService from '../../../services/authService';
 /**
  * PaperQuestionsManager
  * - Replaces window.print() with server-side PDF export
@@ -204,73 +204,100 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
    * - if false, build client-side HTML and send to server as `html` (useful if you have unsaved changes)
    */
   const exportPdf = async ({ useServerPaper = true, filename = null } = {}) => {
-    setMessage({ type: '', text: '' });
-    setIsGeneratingPdf(true);
+  setMessage({ type: '', text: '' });
+  setIsGeneratingPdf(true);
 
-    try {
-      const token = localStorage.getItem('jwt'); // adjust if you store token under different key
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      };
+  try {
+    // Use authService to read token (matches your login flow)
+    const token = authService.getToken(); // <-- reads localStorage "token"
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
 
-      let body;
-      if (useServerPaper) {
-        body = { paperId };
-      } else {
-        // build HTML from the current preview state
-        const html = buildPrintHtml(paper, questions);
-        body = { html };
-      }
-
-      // include baseUrl so server can resolve relative image URLs like /uploads/...
-      const baseUrl = process.env.REACT_APP_BASE_URL || window.location.origin;
-      body.baseUrl = baseUrl;
-
-      // optional postOptions (example: add page numbers & no watermark)
-      const postOptions = {
-        addPageNumbers: true,
-        pageNumberOptions: { fontSize: 10, marginBottom: 18 },
-        // watermark: { text: 'DRAFT', opacity: 0.06, size: 80, rotateDeg: -45 }
-      };
-
-      const resp = await fetch('/api/generate-pdf', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ ...body, postOptions }),
-      });
-
-      if (!resp.ok) {
-        const json = await resp.json().catch(() => null);
-        const errMsg = json?.error || `PDF generation failed (${resp.status})`;
-        throw new Error(errMsg);
-      }
-
-      const blob = await resp.blob();
-      const url = window.URL.createObjectURL(blob);
-
-      // sanitize filename default
-      const safeFilename = filename
-        ? String(filename).slice(0, 200).replace(/[^a-zA-Z0-9._-]/g, '_')
-        : `paper-${paperId || 'export'}.pdf`;
-
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = safeFilename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-      setMessage({ type: 'success', text: 'PDF generated and downloaded.' });
-    } catch (err) {
-      console.error('exportPdf error:', err);
-      setMessage({ type: 'error', text: err.message || 'Failed to generate PDF' });
-    } finally {
-      setIsGeneratingPdf(false);
+    let body;
+    if (useServerPaper) {
+      body = { paperId };
+    } else {
+      const html = buildPrintHtml(paper, questions);
+      body = { html };
     }
-  };
 
+    // ensure server can resolve relative image URLs
+    body.baseUrl = process.env.REACT_APP_BASE_URL || window.location.origin;
+
+    const postOptions = {
+      addPageNumbers: true,
+      pageNumberOptions: { fontSize: 10, marginBottom: 18 },
+    };
+
+    const resp = await fetch('/api/pdf/generate-pdf', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...body, postOptions }),
+    });
+
+    if (!resp.ok) {
+      let errJson = null;
+      try { errJson = await resp.json(); } catch (e) {}
+
+      if (resp.status === 401) {
+        setMessage({ type: 'error', text: 'Unauthorized — please log in.' });
+        // optionally redirect to login:
+        // navigate('/auth/login');
+        setIsGeneratingPdf(false);
+        return;
+      }
+      if (resp.status === 403) {
+        setMessage({ type: 'error', text: errJson?.error || 'Access denied for PDF export.' });
+        setIsGeneratingPdf(false);
+        return;
+      }
+      if (resp.status === 404) {
+        setMessage({ type: 'error', text: errJson?.error || 'Paper not found.' });
+        setIsGeneratingPdf(false);
+        return;
+      }
+      setMessage({ type: 'error', text: errJson?.error || `PDF generation failed (${resp.status})` });
+      setIsGeneratingPdf(false);
+      return;
+    }
+
+    const blob = await resp.blob();
+
+    // parse filename if server provided it
+    const contentDisp = resp.headers.get('Content-Disposition') || '';
+    const headerFilename = (() => {
+      const match = /filename\*?=(?:UTF-8'')?["']?([^;"']+)["']?/i.exec(contentDisp);
+      if (match && match[1]) {
+        try { return decodeURIComponent(match[1]); } catch (e) { return match[1]; }
+      }
+      return null;
+    })();
+
+    const safeFilename = headerFilename
+      ? headerFilename
+      : filename
+      ? String(filename).slice(0, 200).replace(/[^a-zA-Z0-9._-]/g, '_')
+      : `paper-${paperId || 'export'}.pdf`;
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = safeFilename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    setMessage({ type: 'success', text: 'PDF generated and downloaded.' });
+  } catch (err) {
+    console.error('exportPdf error:', err);
+    setMessage({ type: 'error', text: err?.message || 'Failed to generate PDF' });
+  } finally {
+    setIsGeneratingPdf(false);
+  }
+};
   if (isLoading) {
     return (
       <div className="paper-questions-manager">

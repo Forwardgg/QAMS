@@ -5,13 +5,9 @@ import { authenticate, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
 
-/**
- * POST /api/generate-pdf
- * Protected: admin / instructor / moderator (adjust roles as needed)
- * Body: { html?, paperId?, baseUrl?, pdfOptions?, postOptions?, filename? }
- */
+// FINAL ENDPOINT: /api/pdf/generate-pdf
 router.post(
-  '/api/generate-pdf',
+  '/generate-pdf',
   authenticate,
   authorizeRoles('admin', 'instructor', 'moderator'),
   generatePdf
