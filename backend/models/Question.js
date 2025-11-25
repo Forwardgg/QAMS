@@ -25,24 +25,46 @@ export class Question {
    * Update an existing question
    */
   static async update(questionId, questionData) {
-  const { paper_id, content_html, co_id, status, sequence_number } = questionData;
-  
-  const query = `
-    UPDATE questions 
-    SET paper_id = $1, content_html = $2, co_id = $3, status = $4, sequence_number = $5, updated_at = CURRENT_TIMESTAMP
-    WHERE question_id = $6
-    RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
-  `;
-  
-  const values = [paper_id || null, content_html, co_id || null, status, sequence_number, questionId];
-  const result = await pool.query(query, values);
-  
-  if (result.rows.length === 0) {
-    throw new Error('Question not found');
+    if (!questionId) throw new Error('Invalid questionId');
+
+    // Allowed updatable fields
+    const allowed = ['paper_id', 'content_html', 'co_id', 'status', 'sequence_number'];
+
+    const setClauses = [];
+    const values = [];
+    let idx = 1;
+
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(questionData, key) && questionData[key] !== undefined) {
+        setClauses.push(`${key} = $${idx++}`);
+        // push null explicitly for empty strings for co_id/paper if you want to allow null
+        values.push(questionData[key] === '' ? null : questionData[key]);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      // nothing to update, return current row
+      const existing = await pool.query('SELECT * FROM questions WHERE question_id = $1', [questionId]);
+      if (!existing.rows.length) throw new Error('Question not found');
+      return existing.rows[0];
+    }
+
+    // add updated_at and where param
+    setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+    const query = `
+      UPDATE questions
+      SET ${setClauses.join(', ')}
+      WHERE question_id = $${idx}
+      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+    `;
+    values.push(questionId);
+
+    const result = await pool.query(query, values);
+    if (result.rows.length === 0) {
+      throw new Error('Question not found');
+    }
+    return result.rows[0];
   }
-  
-  return result.rows[0];
-}
 
   /**
    * Find question by ID

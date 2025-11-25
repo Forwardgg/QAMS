@@ -3,13 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import questionAPI from '../../../api/question.api';
 import questionPaperAPI from '../../../api/questionPaper.api';
 import QuestionEditModal from './QuestionEditModal';
-import './PaperQuestionsManager.css';
 import authService from '../../../services/authService';
-/**
- * PaperQuestionsManager
- * - Replaces window.print() with server-side PDF export
- * - Shows loading states and downloads PDF blob
- */
+import './PaperQuestionsManager.css';
+
 const PaperQuestionsManager = ({ paperId, onBack }) => {
   const navigate = useNavigate();
 
@@ -20,8 +16,10 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
+  // Load paper and questions
   useEffect(() => {
     loadPaperAndQuestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
   const loadPaperAndQuestions = async () => {
@@ -29,10 +27,13 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       setIsLoading(true);
       setMessage({ type: '', text: '' });
 
+      console.log('Loading paper ID:', paperId);
+
       // Load paper details
       let papersResponse;
       try {
         papersResponse = await questionPaperAPI.getAll();
+        console.log('Papers API response:', papersResponse);
       } catch (error) {
         console.error('Error loading papers:', error);
         setMessage({ type: 'error', text: 'Failed to load paper details' });
@@ -40,14 +41,14 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         return;
       }
 
-      // Find the current paper - multiple API shapes handled
-      let currentPaper = null;
+      // Find the current paper - handle different response structures
+      let currentPaper;
       if (Array.isArray(papersResponse)) {
-        currentPaper = papersResponse.find(p => p.paper_id == paperId);
+        currentPaper = papersResponse.find((p) => p.paper_id == paperId);
       } else if (papersResponse.rows) {
-        currentPaper = papersResponse.rows.find(p => p.paper_id == paperId);
+        currentPaper = papersResponse.rows.find((p) => p.paper_id == paperId);
       } else if (papersResponse.data) {
-        currentPaper = papersResponse.data.find(p => p.paper_id == paperId);
+        currentPaper = papersResponse.data.find((p) => p.paper_id == paperId);
       }
 
       if (!currentPaper) {
@@ -55,12 +56,14 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         setIsLoading(false);
         return;
       }
+
       setPaper(currentPaper);
 
-      // Load questions
+      // Load questions for this paper
       let questionsResponse;
       try {
         questionsResponse = await questionAPI.getByPaper(paperId);
+        console.log('Questions API response:', questionsResponse);
       } catch (error) {
         console.error('Error loading questions:', error);
         setMessage({ type: 'error', text: 'Failed to load questions' });
@@ -68,6 +71,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         return;
       }
 
+      // Handle different question response structures
       let questionsData;
       if (Array.isArray(questionsResponse)) {
         questionsData = questionsResponse;
@@ -95,12 +99,15 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       await questionAPI.update(updatedQuestion.question_id, {
         content_html: updatedQuestion.content_html,
         paper_id: updatedQuestion.paper_id,
-        co_id: updatedQuestion.co_id
+        co_id: updatedQuestion.co_id,
       });
 
-      setQuestions(prev => prev.map(q =>
-        q.question_id === updatedQuestion.question_id ? updatedQuestion : q
-      ));
+      // Update local state
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.question_id === updatedQuestion.question_id ? updatedQuestion : q
+        )
+      );
 
       setEditingQuestion(null);
       setMessage({ type: 'success', text: 'Question updated successfully!' });
@@ -117,7 +124,9 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
 
     try {
       await questionAPI.delete(questionId);
-      setQuestions(prev => prev.filter(q => q.question_id !== questionId));
+
+      // Remove from local state
+      setQuestions((prev) => prev.filter((q) => q.question_id !== questionId));
       setMessage({ type: 'success', text: 'Question deleted successfully!' });
     } catch (error) {
       console.error('Error deleting question:', error);
@@ -131,173 +140,127 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
 
   const handleBackToPapers = () => {
     if (onBack) {
-      onBack();
+      onBack(); // Use the prop callback
     } else {
-      navigate('/instructor/papers');
+      navigate('/instructor/papers'); // Fallback
     }
   };
 
   /**
-   * Build a print-optimized HTML string from paper + questions.
-   * Use when you want the server to render exactly what is in the editor preview.
+   * Export PDF:
+   * - Uses server-side paper (paperId) so the backend builds the HTML and PDF.
+   * - Uses authService token for Authorization header.
    */
-  const buildPrintHtml = (paperObj, questionsArr) => {
-    const title = escapeHtml(paperObj.title || 'Question Paper');
-    const course = escapeHtml(paperObj.course_title || paperObj.course_code || '');
-    const metadata = paperObj || {};
-    const institution = escapeHtml(process.env.REACT_APP_INSTITUTION_NAME || '');
+  const exportPdf = async () => {
+    if (!paperId) return;
 
-    const questionsHtml = (questionsArr || []).map((q, idx) => {
-      const seq = q.sequence_number || (idx + 1);
-      // content_html is assumed safe (created by CKEditor). We keep it as-is to preserve formatting and images.
-      return `<div class="question" data-qid="${q.question_id || ''}">
-        <div class="qnum"><strong>Q${seq}.</strong></div>
-        <div class="qcontent">${q.content_html || ''}</div>
-      </div>`;
-    }).join('\n');
+    setMessage({ type: '', text: '' });
+    setIsGeneratingPdf(true);
 
-    const css = `
-      @page { size: A4; margin: 18mm; }
-      html,body { font-family: "Times New Roman", serif; color:#111; }
-      body { margin:0; padding:6mm 8mm; font-size:12pt; line-height:1.45; }
-      .header { text-align:center; margin-bottom:8mm; }
-      .title { font-size:18pt; font-weight:700; }
-      .meta { font-size:10pt; color:#333; margin-bottom:6mm; }
-      .question { margin-bottom:8mm; page-break-inside:avoid; }
-      img { max-width:100%; height:auto; display:block; margin:6px 0; }
-      .footer { position: fixed; bottom: 6mm; right: 8mm; font-size:9pt; color:#666; }
-    `;
+    try {
+      const token = authService.getToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
 
-    const generatedAt = new Date().toLocaleString('en-IN');
+      const body = {
+        paperId,
+        baseUrl: process.env.REACT_APP_BASE_URL || window.location.origin,
+        postOptions: {
+          addPageNumbers: true,
+          pageNumberOptions: { fontSize: 10, marginBottom: 18 },
+        },
+      };
 
-    return `<!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <style>${css}</style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">${title}</div>
-          <div class="meta">${course} ${institution ? '— ' + institution : ''}</div>
-        </div>
-        <main>
-          ${questionsHtml}
-        </main>
-        <div class="footer">Generated: ${generatedAt}</div>
-      </body>
-      </html>`;
-  };
+      const resp = await fetch('/api/pdf/generate-pdf', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
 
-  // simple HTML escape for metadata strings
-  const escapeHtml = (s = '') => {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  };
+      if (!resp.ok) {
+        let errJson = null;
+        try {
+          errJson = await resp.json();
+        } catch (_) {
+          // ignore
+        }
 
-  /**
-   * Export PDF flow
-   * - useServerPaper: if true (default) send { paperId } and server will fetch DB
-   * - if false, build client-side HTML and send to server as `html` (useful if you have unsaved changes)
-   */
-  const exportPdf = async ({ useServerPaper = true, filename = null } = {}) => {
-  setMessage({ type: '', text: '' });
-  setIsGeneratingPdf(true);
+        if (resp.status === 401) {
+          setMessage({
+            type: 'error',
+            text: 'Unauthorized — please log in again.',
+          });
+          setIsGeneratingPdf(false);
+          return;
+        }
+        if (resp.status === 403) {
+          setMessage({
+            type: 'error',
+            text: errJson?.error || 'Access denied for PDF export.',
+          });
+          setIsGeneratingPdf(false);
+          return;
+        }
+        if (resp.status === 404) {
+          setMessage({
+            type: 'error',
+            text: errJson?.error || 'Paper not found.',
+          });
+          setIsGeneratingPdf(false);
+          return;
+        }
 
-  try {
-    // Use authService to read token (matches your login flow)
-    const token = authService.getToken(); // <-- reads localStorage "token"
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-
-    let body;
-    if (useServerPaper) {
-      body = { paperId };
-    } else {
-      const html = buildPrintHtml(paper, questions);
-      body = { html };
-    }
-
-    // ensure server can resolve relative image URLs
-    body.baseUrl = process.env.REACT_APP_BASE_URL || window.location.origin;
-
-    const postOptions = {
-      addPageNumbers: true,
-      pageNumberOptions: { fontSize: 10, marginBottom: 18 },
-    };
-
-    const resp = await fetch('/api/pdf/generate-pdf', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ ...body, postOptions }),
-    });
-
-    if (!resp.ok) {
-      let errJson = null;
-      try { errJson = await resp.json(); } catch (e) {}
-
-      if (resp.status === 401) {
-        setMessage({ type: 'error', text: 'Unauthorized — please log in.' });
-        // optionally redirect to login:
-        // navigate('/auth/login');
+        setMessage({
+          type: 'error',
+          text: errJson?.error || `PDF generation failed (${resp.status})`,
+        });
         setIsGeneratingPdf(false);
         return;
       }
-      if (resp.status === 403) {
-        setMessage({ type: 'error', text: errJson?.error || 'Access denied for PDF export.' });
-        setIsGeneratingPdf(false);
-        return;
-      }
-      if (resp.status === 404) {
-        setMessage({ type: 'error', text: errJson?.error || 'Paper not found.' });
-        setIsGeneratingPdf(false);
-        return;
-      }
-      setMessage({ type: 'error', text: errJson?.error || `PDF generation failed (${resp.status})` });
+
+      const blob = await resp.blob();
+
+      const contentDisp = resp.headers.get('Content-Disposition') || '';
+      const headerFilename = (() => {
+        const match =
+          /filename\*?=(?:UTF-8'')?["']?([^;"']+)["']?/i.exec(contentDisp);
+        if (match && match[1]) {
+          try {
+            return decodeURIComponent(match[1]);
+          } catch (e) {
+            return match[1];
+          }
+        }
+        return null;
+      })();
+
+      const safeFilename =
+        headerFilename ||
+        `paper-${paperId || 'export'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = safeFilename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setMessage({ type: 'success', text: 'PDF generated and downloaded.' });
+    } catch (err) {
+      console.error('exportPdf error:', err);
+      setMessage({
+        type: 'error',
+        text: err?.message || 'Failed to generate PDF',
+      });
+    } finally {
       setIsGeneratingPdf(false);
-      return;
     }
+  };
 
-    const blob = await resp.blob();
-
-    // parse filename if server provided it
-    const contentDisp = resp.headers.get('Content-Disposition') || '';
-    const headerFilename = (() => {
-      const match = /filename\*?=(?:UTF-8'')?["']?([^;"']+)["']?/i.exec(contentDisp);
-      if (match && match[1]) {
-        try { return decodeURIComponent(match[1]); } catch (e) { return match[1]; }
-      }
-      return null;
-    })();
-
-    const safeFilename = headerFilename
-      ? headerFilename
-      : filename
-      ? String(filename).slice(0, 200).replace(/[^a-zA-Z0-9._-]/g, '_')
-      : `paper-${paperId || 'export'}.pdf`;
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = safeFilename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-
-    setMessage({ type: 'success', text: 'PDF generated and downloaded.' });
-  } catch (err) {
-    console.error('exportPdf error:', err);
-    setMessage({ type: 'error', text: err?.message || 'Failed to generate PDF' });
-  } finally {
-    setIsGeneratingPdf(false);
-  }
-};
   if (isLoading) {
     return (
       <div className="paper-questions-manager">
@@ -324,93 +287,125 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
           </button>
           <h1>{paper.title} - Questions</h1>
           <p className="paper-info">
-            Course: {paper.course_code} | Status: {paper.status} |
-            Questions: {questions.length}
+            Course: {paper.course_code} | Status: {paper.status} | Questions:{' '}
+            {questions.length}
           </p>
         </div>
         <div className="header-actions">
           <button onClick={handleAddNewQuestion} className="btn-primary">
             + Add New Question
           </button>
-
-          <div style={{ display: 'inline-flex', gap: 8 }}>
-            <button
-              onClick={() => exportPdf({ useServerPaper: true })}
-              className="btn-secondary"
-              disabled={isGeneratingPdf}
-            >
-              {isGeneratingPdf ? 'Generating PDF…' : '📄 Export PDF'}
-            </button>
-
-            {/* If you want an explicit "export current preview" (client HTML) option */}
-            <button
-              onClick={() => exportPdf({ useServerPaper: false })}
-              className="btn-secondary"
-              disabled={isGeneratingPdf}
-            >
-              {isGeneratingPdf ? 'Generating PDF…' : '📄 Export Preview (exact)'}
-            </button>
-          </div>
+          <button
+            onClick={exportPdf}
+            className="btn-secondary"
+            disabled={isGeneratingPdf}
+          >
+            {isGeneratingPdf ? 'Generating PDF…' : '📄 Export PDF'}
+          </button>
         </div>
       </div>
 
       {/* Messages */}
       {message.text && (
-        <div className={`message ${message.type}`}>
-          {message.text}
-        </div>
+        <div className={`message ${message.type}`}>{message.text}</div>
       )}
 
-      {/* PDF Preview Section */}
+      {/* PREVIEW SECTION */}
       <div className="preview-section">
         <div className="section-header">
-          <h2>Paper Preview (How it will print)</h2>
-          <p>This shows exactly how the questions will appear in the final paper</p>
+          <h2>Paper Preview (Print Layout)</h2>
+          <p>This approximates how the paper will appear on A4 when exported.</p>
         </div>
 
-        <div className="print-layout">
-          {questions.length === 0 ? (
-            <div className="no-questions">
-              <p>No questions added to this paper yet.</p>
-              <button onClick={handleAddNewQuestion} className="btn-primary">
-                Create First Question
-              </button>
-            </div>
-          ) : (
-            questions.map((question, index) => (
-              <div key={question.question_id} className="print-question">
-                <div className="question-header">
-                  <strong className="question-number">
-                    Q{question.sequence_number || index + 1}.
-                  </strong>
-                  <div className="question-actions">
-                    <button
-                      onClick={() => setEditingQuestion(question)}
-                      className="btn-edit"
-                    >
-                      ✏️ Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteQuestion(question.question_id)}
-                      className="btn-delete"
-                    >
-                      🗑️ Delete
-                    </button>
-                  </div>
+        {questions.length === 0 ? (
+          <div className="no-questions">
+            <p>No questions added to this paper yet.</p>
+            <button onClick={handleAddNewQuestion} className="btn-primary">
+              Create First Question
+            </button>
+          </div>
+        ) : (
+          <div className="print-preview-wrapper">
+            {/* A4-style page container */}
+            <div className="print-preview-page">
+              {/* Header similar to PDF header */}
+              <header className="print-preview-header">
+                <div className="print-preview-title">{paper.title}</div>
+                <div className="print-preview-meta">
+                  <span>{paper.course_code}</span>
+                  {paper.exam_type && (
+                    <span> | {paper.exam_type}</span>
+                  )}
+                  {paper.academic_year && (
+                    <span> | AY: {paper.academic_year}</span>
+                  )}
+                  {paper.full_marks != null && (
+                    <span> | Marks: {paper.full_marks}</span>
+                  )}
+                  {paper.duration != null && (
+                    <span> | Duration: {paper.duration} mins</span>
+                  )}
                 </div>
-                <div
-                  className="question-content"
-                  dangerouslySetInnerHTML={{ __html: question.content_html }}
-                />
-                {question.co_id && (
-                  <div className="question-meta">
-                    <small>CO: {question.co_number}</small>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+              </header>
+
+              {/* Questions laid out as they will print */}
+              <main className="print-preview-body">
+                {questions
+                  .slice()
+                  .sort((a, b) => {
+                    const an =
+                      a.sequence_number == null
+                        ? Number.MAX_SAFE_INTEGER
+                        : a.sequence_number;
+                    const bn =
+                      b.sequence_number == null
+                        ? Number.MAX_SAFE_INTEGER
+                        : b.sequence_number;
+                    return an - bn;
+                  })
+                  .map((question, index) => (
+                    <div
+                      key={question.question_id}
+                      className="print-preview-question"
+                    >
+                      <div className="question-header">
+                        <strong className="question-number">
+                          Q{question.sequence_number || index + 1}.
+                        </strong>
+                        <div className="question-actions">
+                          <button
+                            onClick={() => setEditingQuestion(question)}
+                            className="btn-edit"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleDeleteQuestion(question.question_id)
+                            }
+                            className="btn-delete"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        className="question-content"
+                        dangerouslySetInnerHTML={{
+                          __html: question.content_html,
+                        }}
+                      />
+                      {question.co_id && (
+                        <div className="question-meta">
+                          <small>CO: {question.co_number}</small>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </main>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit Modal */}

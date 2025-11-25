@@ -1,4 +1,5 @@
 import { Question } from "../models/Question.js";
+import { pool } from "../config/db.js";
 
 const logRequest = (req) => {
   console.log('Questions request:', {
@@ -69,56 +70,110 @@ export const createQuestion = async (req, res) => {
  */
 export const updateQuestion = async (req, res) => {
   logRequest(req);
+  const client = await pool.connect();
   try {
-    const questionId = parseInt(req.params.id);
-    const { content_html, paper_id, co_id, status, sequence_number = null } = req.body; // FIX: Add sequence_number
-
-    if (isNaN(questionId)) {
+    const questionId = parseInt(req.params.id, 10);
+    if (Number.isNaN(questionId)) {
       return res.status(400).json({ error: "Invalid question ID" });
     }
+
+    const {
+      content_html,
+      paper_id: incomingPaperId,
+      co_id: incomingCoId,
+      status: incomingStatus,
+      sequence_number: incomingSequenceNumber
+    } = req.body;
 
     if (!content_html) {
       return res.status(400).json({ error: "content_html is required" });
     }
 
-    // Extract media URLs before update
-    const mediaUrls = Question.extractMediaUrls(content_html);
+    // Load existing question
+    const existingRes = await Question.findById(questionId);
+    if (!existingRes) {
+      return res.status(404).json({ error: "Question not found" });
+    }
 
-    // Update question
-    const question = await Question.update(questionId, {
-      paper_id,
+    await client.query('BEGIN');
+
+    // Validate paper_id if provided
+    let paperIdToUse = existingRes.paper_id;
+    if (incomingPaperId !== undefined && incomingPaperId !== null) {
+      const pid = parseInt(incomingPaperId, 10);
+      if (Number.isNaN(pid)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: "Invalid paper_id" });
+      }
+      const hasAccess = await Question.validatePaperAccess(pid, req.user.user_id);
+      if (!hasAccess) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: "Invalid paper or access denied" });
+      }
+      paperIdToUse = pid;
+    }
+
+    // Validate co_id if provided
+    if (incomingCoId !== undefined && incomingCoId !== null && incomingCoId !== '') {
+      const coid = parseInt(incomingCoId, 10);
+      if (Number.isNaN(coid)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: "Invalid co_id" });
+      }
+      const isValid = await Question.validateCOForPaper(coid, paperIdToUse);
+      if (!isValid) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: "Invalid CO for this paper's course" });
+      }
+    }
+
+    // Determine sequence number
+    let seqToUse = (incomingSequenceNumber !== undefined) ? incomingSequenceNumber : existingRes.sequence_number;
+    if ((incomingSequenceNumber === undefined || incomingSequenceNumber === null) && incomingPaperId && incomingPaperId !== existingRes.paper_id) {
+      seqToUse = await Question.getNextSequenceNumber(paperIdToUse);
+    }
+
+    // Build update payload with only provided fields
+    const updatePayload = {
       content_html,
-      co_id,
-      status,
-      sequence_number // FIX: Include sequence_number
-    });
+      ...(incomingPaperId !== undefined ? { paper_id: paperIdToUse } : {}),
+      ...(incomingCoId !== undefined ? { co_id: incomingCoId === '' ? null : incomingCoId } : {}),
+      ...(incomingStatus !== undefined ? { status: incomingStatus } : {}),
+      ...(incomingSequenceNumber !== undefined ? { sequence_number: incomingSequenceNumber } : (seqToUse !== undefined ? { sequence_number: seqToUse } : {}))
+    };
 
-    // Link new media and unlink removed media
+    const updatedQuestion = await Question.update(questionId, updatePayload);
+
+    // Reconcile media
+    const mediaUrls = Question.extractMediaUrls(content_html || '');
     await Question.linkMedia(questionId, mediaUrls);
     await Question.unlinkUnusedMedia(questionId, mediaUrls);
 
+    await client.query('COMMIT');
+
     console.log('Question updated:', {
-      questionId: question.question_id,
+      questionId: updatedQuestion.question_id,
       mediaUrlsCount: mediaUrls.length,
       userId: req.user.user_id
     });
 
     return res.json({
       success: true,
-      question: question,
+      question: updatedQuestion,
       message: "Question updated successfully"
     });
-
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (e) {}
     console.error("updateQuestion error:", err?.stack ?? err?.message ?? err);
-    
     if (err.message === 'Question not found') {
       return res.status(404).json({ error: "Question not found" });
     }
-    
     return res.status(500).json({ error: "Server error while updating question" });
+  } finally {
+    client.release();
   }
 };
+
 
 /**
  * Get question by ID
