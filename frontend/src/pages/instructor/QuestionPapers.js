@@ -4,7 +4,7 @@ import questionPaperAPI from '../../api/questionPaper.api';
 import courseAPI from '../../api/course.api';
 import QuestionPaperList from './questionpaper/QuestionPapersList';
 import QuestionPaperForm from './questionpaper/QuestionPaperForm';
-import QuestionPaperPreview from './questionpaper/QuestionPaperPreview';
+import PaperQuestionsManager from './questionpaper/PaperQuestionsManager';
 import './QuestionPaper.css';
 
 const QuestionPapers = () => {
@@ -16,8 +16,8 @@ const QuestionPapers = () => {
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState(null);
+  const [showPreviewManager, setShowPreviewManager] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -145,20 +145,36 @@ const QuestionPapers = () => {
     }
   };
 
-  // Preview Functions
+  // Preview Functions - UPDATED: Show PaperQuestionsManager directly
   const handlePreviewClick = (paper) => {
     setSelectedPaper(paper);
-    setShowPreviewModal(true);
+    setShowPreviewManager(true);
+  };
+
+  // Back from preview
+  const handleBackFromPreview = () => {
+    setShowPreviewManager(false);
+    setSelectedPaper(null);
+    fetchQuestionPapers(); // Refresh to get any changes
   };
 
   // Modal close functions
   const closeModals = () => {
     setShowCreateModal(false);
     setShowEditModal(false);
-    setShowPreviewModal(false);
     setSelectedPaper(null);
     setFormError('');
   };
+
+  // Render PaperQuestionsManager when preview is active
+  if (showPreviewManager && selectedPaper) {
+    return (
+      <PaperQuestionsManager 
+        paperId={selectedPaper.paper_id}
+        onBack={handleBackFromPreview}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -214,14 +230,6 @@ const QuestionPapers = () => {
           onClose={closeModals}
           paper={selectedPaper}
           onDelete={() => handleDeleteClick(selectedPaper)}
-        />
-      )}
-
-      {/* Preview Modal - Using the actual QuestionPaperPreview component */}
-      {showPreviewModal && selectedPaper && (
-        <QuestionPaperPreview 
-          paper={selectedPaper}
-          onClose={closeModals}
         />
       )}
     </div>

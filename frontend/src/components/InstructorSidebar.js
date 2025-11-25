@@ -10,7 +10,7 @@ const InstructorSidebar = ({ activePage, onPageChange }) => {
     { id: 'courses', label: 'Courses', icon: '👥' },
     { id: 'CO', label: 'CO Management', icon: '📚' },
     { id: 'Question Paper', label: 'Question Papers', icon: '🛡️' },
-    { id: 'questions', label: 'Question Management', icon: '📈' }, // Fixed this line
+    { id: 'questions', label: 'Question Management', icon: '📈' },
     { id: 'Moderation', label: 'Moderation', icon: '⚙️' }
   ];
 

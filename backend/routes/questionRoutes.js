@@ -1,29 +1,25 @@
-// backend/routes/questionRoutes.js
+// routes/questionRoutes.js
 import express from "express";
-import { QuestionController } from "../controllers/QuestionController.js";
+import {
+  createQuestion,
+  updateQuestion,
+  getQuestion,
+  getQuestionsByPaper,
+  deleteQuestion,
+  searchQuestions,
+  updateQuestionSequence
+} from "../controllers/QuestionController.js"; // FIX: Use correct filename
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Get all questions by course code (public)
-router.get("/course/:courseCode", QuestionController.getQuestionsByCourseCode);
-
-// Get all questions by course code and paper (public)  
-router.get("/course/:courseCode/paper/:paperId", QuestionController.getQuestionsByCourseAndPaper);
-
-// Get single question by ID (public)
-router.get("/:questionId", QuestionController.getQuestionById);
-
-// Create subjective question - instructor only
-router.post("/subjective", authenticate, authorizeRoles("instructor"), QuestionController.createSubjectiveQuestion);
-
-// Create objective question - instructor only
-router.post("/objective", authenticate, authorizeRoles("instructor"), QuestionController.createObjectiveQuestion);
-
-// Update question - instructor (own papers) or admin
-router.put("/:questionId", authenticate, authorizeRoles("admin", "instructor"), QuestionController.updateQuestion);
-
-// Delete question - instructor (own papers) or admin
-router.delete("/:questionId", authenticate, authorizeRoles("admin", "instructor"), QuestionController.deleteQuestion);
+// Protected routes
+router.post("/", authenticate, authorizeRoles("instructor", "admin"), createQuestion);
+router.get("/search", authenticate, searchQuestions);
+router.get("/paper/:paperId", authenticate, getQuestionsByPaper);
+router.get("/:id", authenticate, getQuestion);
+router.put("/:id", authenticate, authorizeRoles("instructor", "admin"), updateQuestion);
+router.delete("/:id", authenticate, authorizeRoles("instructor", "admin"), deleteQuestion);
+router.patch("/paper/:paperId/sequence", authenticate, authorizeRoles("instructor", "admin"), updateQuestionSequence);
 
 export default router;

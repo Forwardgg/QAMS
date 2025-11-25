@@ -37,7 +37,6 @@ export class QPModeration {
     }
   }
 
-
   // Get moderation by paper
   static async getByPaper(paperId) {
     const query = `

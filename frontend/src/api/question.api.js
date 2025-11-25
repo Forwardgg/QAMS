@@ -22,60 +22,86 @@ async function handle(promise) {
 
 const questionAPI = {
   /**
-   * Get all questions by course code
-   * GET /api/questions/course/:courseCode
+   * Create a new question
+   * POST /api/questions
+   * Body: { content_html, paper_id, co_id?, status?, sequence_number? }
    */
-  getByCourseCode: (courseCode) =>
-    handle(api.get(`/questions/course/${encodeURIComponent(courseCode)}`)),
+  create: (data) =>
+    handle(api.post("/questions", data)),
 
   /**
-   * Get all questions by course code and paper
-   * GET /api/questions/course/:courseCode/paper/:paperId
-   */
-  getByCourseAndPaper: (courseCode, paperId) =>
-    handle(
-      api.get(
-        `/questions/course/${encodeURIComponent(courseCode)}/paper/${encodeURIComponent(paperId)}`
-      )
-    ),
-
-  /**
-   * Get single question by ID with full details
-   * GET /api/questions/:questionId
+   * Get question by ID with full details and media
+   * GET /api/questions/:id
    */
   getById: (questionId) =>
     handle(api.get(`/questions/${encodeURIComponent(questionId)}`)),
 
   /**
-   * Create subjective question (instructor only)
-   * POST /api/questions/subjective
-   * Body: { courseId, paperId, content, coId? }
-   */
-  createSubjective: (data) =>
-    handle(api.post("/questions/subjective", data)),
-
-  /**
-   * Create objective question (instructor only)
-   * POST /api/questions/objective
-   * Body: { courseId, paperId, content, coId?, options: [{ optionText, isCorrect }] }
-   */
-  createObjective: (data) =>
-    handle(api.post("/questions/objective", data)),
-
-  /**
-   * Update question (instructor for own papers or admin)
-   * PUT /api/questions/:questionId
-   * Body: { content?, coId?, question_type?, options? }
+   * Update an existing question
+   * PUT /api/questions/:id
+   * Body: { content_html, paper_id, co_id?, status?, sequence_number? }
    */
   update: (questionId, data) =>
     handle(api.put(`/questions/${encodeURIComponent(questionId)}`, data)),
 
   /**
-   * Delete question (instructor for own papers or admin)
-   * DELETE /api/questions/:questionId
+   * Delete a question
+   * DELETE /api/questions/:id
    */
   delete: (questionId) =>
     handle(api.delete(`/questions/${encodeURIComponent(questionId)}`)),
+
+  /**
+   * Get all questions by paper ID
+   * GET /api/questions/paper/:paperId
+   */
+  getByPaper: (paperId) =>
+    handle(api.get(`/questions/paper/${encodeURIComponent(paperId)}`)),
+
+  /**
+   * Search questions with filters
+   * GET /api/questions/search?paper_id=&co_id=&status=&course_id=&page=&limit=
+   */
+  search: (filters = {}) => {
+    const params = new URLSearchParams();
+    
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+
+    return handle(api.get(`/questions/search?${params.toString()}`));
+  },
+
+  /**
+   * Update question sequence numbers for a paper
+   * PATCH /api/questions/paper/:paperId/sequence
+   * Body: { sequence_updates: [{ question_id, sequence_number }] }
+   */
+  updateSequence: (paperId, sequenceUpdates) =>
+    handle(api.patch(`/questions/paper/${encodeURIComponent(paperId)}/sequence`, {
+      sequence_updates: sequenceUpdates
+    })),
+
+  /**
+   * Get upload configuration
+   * GET /api/uploads/config
+   */
+  getUploadConfig: () =>
+    handle(api.get("/uploads/config")),
+
+  /**
+   * Upload a file for questions
+   * POST /api/uploads
+   * FormData: { file, question_id?, paper_id? }
+   */
+  uploadFile: (formData) =>
+    handle(api.post("/uploads", formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }))
 };
 
 export default questionAPI;

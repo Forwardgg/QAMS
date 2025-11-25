@@ -6,3 +6,4 @@
 .env.production
 node_modules
 seedAdmin.js
+uploads/

@@ -1,105 +1,331 @@
-// backend/models/QuestionMedia.js
+// models/QuestionMedia.js
 import { pool } from "../config/db.js";
+import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
 
 export class QuestionMedia {
   static _ensureInteger(val, name) {
     if (!Number.isInteger(val)) throw new Error(`${name} must be an integer.`);
   }
+  
   static _ensureNonEmptyString(val, name) {
     if (val === undefined || val === null || String(val).trim() === "") {
       throw new Error(`${name} is required and cannot be empty.`);
     }
   }
-
-  // Create media entry for a question
-  static async create({ questionId, mediaUrl, mediaType = null, caption = "" }) {
-  this._ensureInteger(questionId, "questionId");
-  this._ensureNonEmptyString(mediaUrl, "mediaUrl");
-
-  // ensure question exists and is active
-  const q = await pool.query('SELECT 1 FROM questions WHERE question_id = $1 AND is_active = true', [questionId]);
-  if (q.rows.length === 0) throw new Error(`Question ${questionId} does not exist or is inactive`);
-
-  const query = `INSERT INTO question_media (question_id, media_url, media_type, caption) VALUES ($1, $2, $3, $4) RETURNING media_id, question_id, media_url, media_type, caption;`;
-  const values = [questionId, mediaUrl, mediaType, caption];
-  const { rows } = await pool.query(query, values);
-  return rows[0] || null;
-}
-
-  // Get all media attached to a question
-  static async getByQuestion(questionId) {
-    this._ensureInteger(questionId, "questionId");
-    const query = `
-      SELECT media_id, question_id, media_url, media_type, caption
-      FROM question_media
-      WHERE question_id = $1
-      ORDER BY media_id;
-    `;
-    const { rows } = await pool.query(query, [questionId]);
-    return rows;
+  
+  static _ensureBuffer(val, name) {
+    if (!Buffer.isBuffer(val)) throw new Error(`${name} must be a Buffer.`);
   }
 
-  // Get single media by ID
-  static async getById(mediaId) {
-    this._ensureInteger(mediaId, "mediaId");
-    const query = `
-      SELECT media_id, question_id, media_url, media_type, caption
-      FROM question_media
-      WHERE media_id = $1;
-    `;
-    const { rows } = await pool.query(query, [mediaId]);
-    return rows[0] || null;
-  }
+  static allowedMimeTypes = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif'
+  };
 
-  // Update media (treat empty-string as "no change" for text fields)
-  static async update(mediaId, { mediaUrl, mediaType, caption } = {}) {
-    this._ensureInteger(mediaId, "mediaId");
+  static maxFileSize = 5 * 1024 * 1024; // 5MB
 
-    // Nothing to update — return current row
-    if (mediaUrl === undefined && mediaType === undefined && caption === undefined) {
-      const existing = await this.getById(mediaId);
-      return existing;
+  /**
+   * Validate file object
+   */
+  static validateFile(file) {
+    this._ensureNonEmptyString(file?.originalname, 'File name');
+    this._ensureNonEmptyString(file?.mimetype, 'File MIME type');
+    this._ensureBuffer(file?.buffer, 'File buffer');
+
+    if (file.size > this.maxFileSize) {
+      throw new Error(`File size too large. Max: ${this.maxFileSize / 1024 / 1024}MB`);
     }
 
-    const query = `
-      UPDATE question_media
-      SET media_url = COALESCE(NULLIF($1, ''), media_url),
-          media_type = COALESCE(NULLIF($2, ''), media_type),
-          caption = COALESCE(NULLIF($3, ''), caption)
-      WHERE media_id = $4
-      RETURNING media_id, question_id, media_url, media_type, caption;
-    `;
-    const values = [
-      mediaUrl ?? null,
-      mediaType ?? null,
-      caption ?? null,
-      mediaId
-    ];
-    const { rows } = await pool.query(query, values);
-    return rows[0] || null;
+    if (!this.allowedMimeTypes[file.mimetype]) {
+      throw new Error(`Invalid file type. Allowed: ${Object.keys(this.allowedMimeTypes).join(', ')}`);
+    }
+
+    return true;
   }
 
-  // Delete a media record
-  static async delete(mediaId) {
-    this._ensureInteger(mediaId, "mediaId");
+  /**
+   * Validate file signature (magic bytes)
+   */
+  static isBufferSignatureValid(buffer, mimetype) {
+    this._ensureBuffer(buffer, 'File buffer');
+    this._ensureNonEmptyString(mimetype, 'MIME type');
+
+    if (buffer.length < 4) return false;
+
+    try {
+      if (mimetype === 'image/png') {
+        return buffer.slice(0, 8).equals(Buffer.from([0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A]));
+      }
+      if (mimetype === 'image/jpeg') {
+        return buffer[0] === 0xFF && buffer[1] === 0xD8;
+      }
+      if (mimetype === 'image/gif') {
+        const signature = buffer.slice(0,6).toString('ascii');
+        return signature === 'GIF89a' || signature === 'GIF87a';
+      }
+      if (mimetype === 'image/webp') {
+        return buffer.slice(0,4).toString('ascii') === 'RIFF' && buffer.slice(8,12).toString('ascii') === 'WEBP';
+      }
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /**
+   * Generate safe filename
+   */
+  static generateFilename(originalName, mimetype) {
+    this._ensureNonEmptyString(originalName, 'Original file name');
+    this._ensureNonEmptyString(mimetype, 'MIME type');
+
+    const ext = this.allowedMimeTypes[mimetype] || 'bin';
+    const random = crypto.randomBytes(10).toString('hex');
+    return `${Date.now()}-${random}.${ext}`;
+  }
+
+  /**
+   * Save file to disk
+   */
+  static async saveFileToDisk(buffer, filename, subfolder = 'images/questions') {
+    this._ensureBuffer(buffer, 'File buffer');
+    this._ensureNonEmptyString(filename, 'Filename');
+    this._ensureNonEmptyString(subfolder, 'Subfolder');
+
+    const uploadDir = path.join(process.cwd(), 'uploads', subfolder);
+    await fs.promises.mkdir(uploadDir, { recursive: true });
+
+    const filePath = path.join(uploadDir, filename);
+    await fs.promises.writeFile(filePath, buffer);
+
+    return filePath;
+  }
+
+  /**
+   * Delete file if exists
+   */
+  static async deleteFileIfExists(filename, subfolder = 'images/questions') {
+    this._ensureNonEmptyString(filename, 'Filename');
+
+    try {
+      const fullPath = path.join(process.cwd(), 'uploads', subfolder, filename);
+      if (fs.existsSync(fullPath)) {
+        await fs.promises.unlink(fullPath);
+      }
+    } catch (err) {
+      console.warn('Failed to delete file during cleanup', err);
+    }
+  }
+
+  /**
+   * Create media record
+   */
+  static async create({ filename, mimetype, question_id = null, paper_id = null }) {
+    this._ensureNonEmptyString(filename, 'Filename');
+    this._ensureNonEmptyString(mimetype, 'MIME type');
+
+    const mediaUrl = `/uploads/images/questions/${filename}`;
+
     const query = `
-      DELETE FROM question_media
+      INSERT INTO question_media (
+        question_id,
+        paper_id,
+        media_url,
+        media_type,
+        caption,
+        is_used,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, '', false, NOW())
+      RETURNING media_id, question_id, paper_id, media_url, media_type, created_at
+    `;
+
+    const values = [question_id, paper_id, mediaUrl, mimetype];
+
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  }
+
+  /**
+   * Find by media_id
+   */
+  static async findById(mediaId) {
+    this._ensureInteger(mediaId, 'Media ID');
+
+    const query = `
+      SELECT * FROM question_media 
       WHERE media_id = $1
-      RETURNING media_id;
     `;
-    const { rows } = await pool.query(query, [mediaId]);
-    return rows[0] || null;
+    
+    const result = await pool.query(query, [mediaId]);
+    return result.rows[0];
   }
 
-  // Delete all media for a given question
-  static async deleteByQuestion(questionId) {
-    this._ensureInteger(questionId, "questionId");
+  /**
+   * Find by question_id
+   */
+  static async findByQuestionId(questionId) {
+    this._ensureInteger(questionId, 'Question ID');
+
     const query = `
-      DELETE FROM question_media
+      SELECT * FROM question_media 
       WHERE question_id = $1
-      RETURNING media_id;
+      ORDER BY created_at
     `;
-    const { rows } = await pool.query(query, [questionId]);
-    return rows;
+    
+    const result = await pool.query(query, [questionId]);
+    return result.rows;
+  }
+
+  /**
+   * Find by paper_id
+   */
+  static async findByPaperId(paperId) {
+    this._ensureInteger(paperId, 'Paper ID');
+
+    const query = `
+      SELECT * FROM question_media 
+      WHERE paper_id = $1
+      ORDER BY created_at
+    `;
+    
+    const result = await pool.query(query, [paperId]);
+    return result.rows;
+  }
+
+  /**
+   * Update media record
+   */
+  static async update(mediaId, updates) {
+    this._ensureInteger(mediaId, 'Media ID');
+
+    const allowedFields = ['question_id', 'paper_id', 'caption', 'is_used'];
+    const setClauses = [];
+    const values = [];
+    let paramCount = 0;
+
+    for (const [field, value] of Object.entries(updates)) {
+      if (allowedFields.includes(field)) {
+        paramCount++;
+        setClauses.push(`${field} = $${paramCount}`);
+        values.push(value);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No valid fields to update');
+    }
+
+    paramCount++;
+    setClauses.push(`updated_at = NOW()`);
+    values.push(mediaId);
+
+    const query = `
+      UPDATE question_media 
+      SET ${setClauses.join(', ')}
+      WHERE media_id = $${paramCount}
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  }
+
+  /**
+   * Link media to question
+   */
+  static async linkToQuestion(mediaId, questionId) {
+    this._ensureInteger(mediaId, 'Media ID');
+    this._ensureInteger(questionId, 'Question ID');
+
+    const query = `
+      UPDATE question_media 
+      SET question_id = $1, is_used = true, updated_at = NOW()
+      WHERE media_id = $2
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [questionId, mediaId]);
+    return result.rows[0];
+  }
+
+  /**
+   * Unlink media from question
+   */
+  static async unlinkFromQuestion(mediaId) {
+    this._ensureInteger(mediaId, 'Media ID');
+
+    const query = `
+      UPDATE question_media 
+      SET question_id = NULL, is_used = false, updated_at = NOW()
+      WHERE media_id = $1
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [mediaId]);
+    return result.rows[0];
+  }
+
+  /**
+   * Delete media record
+   */
+  static async delete(mediaId) {
+    this._ensureInteger(mediaId, 'Media ID');
+
+    const query = `
+      DELETE FROM question_media 
+      WHERE media_id = $1
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [mediaId]);
+    return result.rows[0];
+  }
+
+  /**
+   * Get public URL for filename
+   */
+  static getPublicUrl(filename) {
+    this._ensureNonEmptyString(filename, 'Filename');
+    return `/uploads/images/questions/${filename}`;
+  }
+
+  /**
+   * Extract media URLs from HTML content
+   */
+  static extractMediaUrls(htmlContent) {
+    if (!htmlContent) return [];
+
+    const mediaUrls = [];
+    const imgRegex = /<img[^>]+src="(\/uploads\/[^"]+)"[^>]*>/gi;
+    let match;
+
+    while ((match = imgRegex.exec(htmlContent)) !== null) {
+      if (match[1]) {
+        mediaUrls.push(match[1]);
+      }
+    }
+
+    return mediaUrls;
+  }
+
+  /**
+   * Find media records by URLs
+   */
+  static async findByUrls(urls) {
+    if (!Array.isArray(urls) || urls.length === 0) return [];
+
+    const placeholders = urls.map((_, i) => `$${i + 1}`).join(',');
+    const query = `
+      SELECT * FROM question_media 
+      WHERE media_url IN (${placeholders})
+    `;
+
+    const result = await pool.query(query, urls);
+    return result.rows;
   }
 }
