@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import './Sidebar.css';
 
-const AdminSidebar = ({ activePage, onPageChange }) => {
+const ModeratorSidebar = ({ activePage, onPageChange }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { id: 'moderation', label: 'Moderation', icon: '🧰' },
-  { id: 'courses', label: 'Course Management', icon: '📘' },
-  { id: 'CO', label: 'CO Management', icon: '🎯' },
-  { id: 'questionPaper', label: 'Question Papers', icon: '📝' }
-];
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'courses', label: 'Courses', icon: '👥' },
+    { id: 'COs', label: 'COs', icon: '📚' },
+    { id: 'question_paper', label: 'Question Paper', icon: '🛡️' },
+    { id: 'reports', label: 'Reports', icon: '📈' }
+  ];
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -47,4 +47,4 @@ const AdminSidebar = ({ activePage, onPageChange }) => {
   );
 };
 
-export default AdminSidebar;
+export default ModeratorSidebar;

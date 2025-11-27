@@ -1,0 +1,69 @@
+=== AUTH CONTROLLER ===
+registerUser() - Register new user (excludes admin role)
+loginUser() - User login with JWT token
+forgotPassword() - Generate password reset token and link
+resetPassword() - Reset password using token
+deleteUser() - Soft delete user (deactivate)
+forceDeleteUser() - Hard delete user with cascade
+
+=== COURSE OUTCOME CONTROLLER ===
+getAllCourseOutcomes() - Get paginated course outcomes
+getCourseOutcomesByCourseCode() - Get COs by course code
+getCourseOutcomeByNumber() - Get specific CO by course ID and CO number
+getCourseOutcomeById() - Get CO by ID
+createCourseOutcome() - Create new course outcome
+updateCourseOutcome() - Update course outcome
+deleteCourseOutcome() - Delete course outcome
+searchCourseOutcomes() - Search COs by course code and CO number
+
+=== COURSE CONTROLLER ===
+getAllCourses() - Get paginated courses with search/filter
+getCourseById() - Get course by ID
+getCourseByCode() - Get course by code
+createCourse() - Create new course
+updateCourse() - Update course with partial updates
+deleteCourse() - Delete course
+searchCourses() - Search courses
+
+=== MODERATOR CONTROLLER ===
+getPapersForModeration() - Get papers available for moderation with filters
+getPaperDetails() - Get paper details with questions for moderation
+startModeration() - Start moderating a paper (changes status to under_review)
+updateQuestionStatus() - Update individual question status (approved/change_requested)
+bulkUpdateQuestionStatus() - Bulk update multiple question statuses
+submitModerationReport() - Submit final moderation report with criteria and decision
+getModerationHistory() - Get moderation history for current moderator
+getCOBreakdown() - Get questions grouped by CO for moderation report
+
+=== PDF CONTROLLER ===
+generatePdf() - Generate PDF from HTML or paper ID with access control
+
+=== QUESTION CONTROLLER ===
+createQuestion() - Create new question with sequence number and media linking
+updateQuestion() - Update question with validation and media reconciliation
+getQuestion() - Get question by ID with media
+getQuestionsByPaper() - Get all questions for a paper
+deleteQuestion() - Delete question
+searchQuestions() - Search questions with filters
+updateQuestionSequence() - Update question sequence numbers for a paper
+
+=== QUESTION CONTROLLER ===
+createQuestion() - Create new question with sequence number and media linking
+updateQuestion() - Update question with validation and media reconciliation
+getQuestion() - Get question by ID with media
+getQuestionsByPaper() - Get all questions for a paper
+deleteQuestion() - Delete question
+searchQuestions() - Search questions with filters
+updateQuestionSequence() - Update question sequence numbers for a paper
+
+=== QUESTION PAPER CONTROLLER ===
+createQuestionPaper() - Create new question paper
+getAllPapers() - Get all papers with pagination
+getPapersByCourse() - Get papers by course code
+getPapersByCourseAndCO() - Get papers by course and CO (to be enhanced)
+updatePaper() - Update paper with ownership check
+deletePaper() - Delete paper with ownership check
+
+=== UPLOAD CONTROLLER ===
+uploadFile() - Upload file with validation and media record creation
+getUploadConfig() - Get upload configuration (allowed types, max size)

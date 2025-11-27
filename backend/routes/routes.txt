@@ -1,0 +1,181 @@
+app.use("/api/auth", authRoutes);
+app.use("/api/courses", courseRoutes);
+app.use("/api/cos", coRoutes);
+app.use("/api/questions", questionRoutes);
+app.use("/api/papers", questionPaperRoutes);
+app.use("/api/moderation", ModerationRoutes);
+app.use("/api/uploads", uploadRoutes);
+app.use("/api/pdf", pdfRoutes);
+
+authRoutes.js
+router.post("/register", validateRegister, registerUser); // register
+router.post("/login", validateLogin, loginUser); // login
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
+router.delete("/users/:id", authenticate, authorizeRoles("admin"), deleteUser); // soft delete
+router.delete("/users/:id/force", authenticate, authorizeRoles("admin"), forceDeleteUser); // force delete
+
+coRoutes.js
+router.get("/", getAllCourseOutcomes);
+// Search COs
+router.get("/search", searchCourseOutcomes);
+// Get COs by course code
+router.get("/course/:code", getCourseOutcomesByCourseCode);
+// Get specific CO by course ID and CO number
+router.get("/course/:courseId/co/:coNumber", getCourseOutcomeByNumber);
+// Get CO by ID
+router.get("/:id", getCourseOutcomeById);
+// Create CO (admin only)
+router.post("/", authenticate, authorizeRoles("admin"), createCourseOutcome);
+// Update CO (admin only)
+router.put("/:id", authenticate, authorizeRoles("admin"), updateCourseOutcome);
+// Delete CO (admin only)
+router.delete("/:id", authenticate, authorizeRoles("admin"), deleteCourseOutcome);
+
+courseRoutes.js
+router.get("/", getAllCourses);
+router.get("/search", searchCourses);
+router.get("/code/:code", getCourseByCode);
+router.get("/:id", getCourseById);
+// Admin-protected
+router.post(
+  "/",
+  authenticate,
+  authorizeRoles("admin"),
+  createCourse
+);
+router.put(
+  "/:id",
+  authenticate,
+  authorizeRoles("admin"),
+  updateCourse
+);
+router.delete(
+  "/:id",
+  authenticate,
+  authorizeRoles("admin"),
+  deleteCourse
+);
+
+ModerationRoutes.js
+// Get papers available for moderation (filter by course)
+router.get("/papers", 
+  authenticate, 
+  authorizeRoles("moderator"), 
+  getPapersForModeration
+);
+// Get paper details with questions for moderation
+router.get("/papers/:id", 
+  authenticate, 
+  authorizeRoles("moderator"), 
+  getPaperDetails
+);
+// Start moderating a paper (changes status to under_review)
+router.post("/papers/:id/start", 
+  authenticate, 
+  authorizeRoles("moderator"), 
+  startModeration
+);
+// Update individual question status (approve/change_requested)
+router.patch("/questions/:id", 
+  authenticate, 
+  authorizeRoles("moderator"), 
+  updateQuestionStatus
+);
+// Bulk update question statuses
+router.patch("/questions/bulk-status", 
+  authenticate, 
+  authorizeRoles("moderator"), 
+  bulkUpdateQuestionStatus
+);
+// Submit final moderation report
+router.post("/moderations", 
+  authenticate, 
+  authorizeRoles("moderator"), 
+  submitModerationReport
+);
+// Get moderation history for current moderator
+router.get("/moderations", 
+  authenticate, 
+  authorizeRoles("moderator"), 
+  getModerationHistory
+);
+// Get questions grouped by CO for moderation report
+router.get("/papers/:id/co-breakdown", 
+  authenticate, 
+  authorizeRoles("moderator"), 
+  getCOBreakdown
+);
+
+pdfRoutes.js
+router.post(
+  '/generate-pdf',
+  authenticate,
+  authorizeRoles('admin', 'instructor', 'moderator'),
+  generatePdf
+);
+
+questionPaperRoutes.js
+// Create question paper (instructor only)
+router.post("/", authenticate, authorizeRoles("instructor"), createQuestionPaper);
+// Get all papers (all authenticated users)
+router.get("/", authenticate, getAllPapers);
+// Get papers by course code (all authenticated users)
+router.get("/course/:courseCode", authenticate, getPapersByCourse);
+// Get papers by course code and CO number (all authenticated users)
+router.get("/course/:courseCode/co/:coNumber", authenticate, getPapersByCourseAndCO);
+// Update paper (admin, instructor - their own paper)
+router.put("/:paperId", authenticate, authorizeRoles("admin", "instructor"), updatePaper);
+// Delete paper (admin, instructor - their own paper)
+router.delete("/:paperId", authenticate, authorizeRoles("admin", "instructor"), deletePaper);
+
+questionRoutes.js
+router.post("/", authenticate, authorizeRoles("instructor", "admin"), createQuestion);
+router.get("/search", authenticate, searchQuestions);
+router.get("/paper/:paperId", authenticate, getQuestionsByPaper);
+router.get("/:id", authenticate, getQuestion);
+router.put("/:id", authenticate, authorizeRoles("instructor", "admin"), updateQuestion);
+router.delete("/:id", authenticate, authorizeRoles("instructor", "admin"), deleteQuestion);
+router.patch("/paper/:paperId/sequence", authenticate, authorizeRoles("instructor", "admin"), updateQuestionSequence);
+
+uploadRoutes.js
+// Multer memory storage
+const storage = multer.memoryStorage();
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  }
+});
+
+// --- Upload route with Multer error handling ---
+router.post(
+  "/",
+  authenticate,
+  authorizeRoles("instructor", "admin"),
+  (req, res, next) => {
+    upload.single("file")(req, res, function (err) {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: err.message });
+      }
+      next(err);
+    });
+  },
+  uploadFile
+);
+
+// --- Get Upload Config ---
+router.get("/config", authenticate, getUploadConfig);
+
+userRoutes.js
+router.post("/", authenticate, authorizeRoles("admin"), createUser); // Create user
+router.get("/", authenticate, authorizeRoles("admin"), getAllUsers); // Get all users
+router.get("/stats/total", authenticate, authorizeRoles("admin"), getTotalUsers); // Get total users count
+router.get("/stats/roles", authenticate, authorizeRoles("admin"), getUserCountsByRole); // Get user counts by role
+router.get("/stats/instructors", authenticate, authorizeRoles("admin"), getTotalInstructors); // Get total instructors
+router.patch("/:userId/deactivate", authenticate, authorizeRoles("admin"), deactivateUser); // Deactivate user
+router.patch("/:userId/activate", authenticate, authorizeRoles("admin"), activateUser); // Activate user
+router.put("/:userId", authenticate, authorizeRoles("admin"), updateUser); // Update user
+router.patch("/:userId/password", authenticate, authorizeRoles("admin"), updateUserPassword); // Update user password
+router.patch("/me/password", authenticate, updateUserPassword); // Update own password

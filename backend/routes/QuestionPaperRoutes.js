@@ -5,8 +5,9 @@ import {
   getPapersByCourse,
   getPapersByCourseAndCO,
   updatePaper,
-  deletePaper
-} from "../controllers/questionPaperController.js";
+  deletePaper,
+  submitForModeration
+} from "../controllers/QuestionPaperController.js";
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -22,6 +23,9 @@ router.get("/course/:courseCode", authenticate, getPapersByCourse);
 
 // Get papers by course code and CO number (all authenticated users)
 router.get("/course/:courseCode/co/:coNumber", authenticate, getPapersByCourseAndCO);
+
+// Submit paper for moderation (instructor only - their own paper)
+router.post("/:paperId/submit-for-moderation", authenticate, authorizeRoles("instructor"), submitForModeration);
 
 // Update paper (admin, instructor - their own paper)
 router.put("/:paperId", authenticate, authorizeRoles("admin", "instructor"), updatePaper);

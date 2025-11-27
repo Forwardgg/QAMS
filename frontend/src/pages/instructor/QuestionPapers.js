@@ -16,7 +16,9 @@ const QuestionPapers = () => {
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState(null);
+  const [paperToDelete, setPaperToDelete] = useState(null);
   const [showPreviewManager, setShowPreviewManager] = useState(false);
 
   // Form states
@@ -31,6 +33,7 @@ const QuestionPapers = () => {
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [deleteError, setDeleteError] = useState(''); // New state for delete errors
 
   useEffect(() => {
     fetchQuestionPapers();
@@ -128,21 +131,36 @@ const QuestionPapers = () => {
 
   // Delete Paper Functions
   const handleDeleteClick = (paper) => {
-    if (window.confirm(`Are you sure you want to delete "${paper.title}"?`)) {
-      handleDeleteConfirm(paper);
-    }
+    setPaperToDelete(paper);
+    setDeleteError(''); // Clear any previous delete errors
+    setShowDeleteModal(true);
   };
 
-  const handleDeleteConfirm = async (paper) => {
+  const handleDeleteConfirm = async () => {
+    if (!paperToDelete) return;
+    
     setFormLoading(true);
+    setDeleteError(''); // Clear error before trying
     try {
-      await questionPaperAPI.delete(paper.paper_id);
+      await questionPaperAPI.delete(paperToDelete.paper_id);
+      setShowDeleteModal(false);
+      setPaperToDelete(null);
       fetchQuestionPapers(); // Refresh the list
     } catch (err) {
-      setFormError(err.response?.data?.message || 'Failed to delete question paper');
+      if (err.response?.status === 403) {
+        setDeleteError('Access denied: You can only delete your own question papers');
+      } else {
+        setDeleteError(err.response?.data?.message || 'Failed to delete question paper');
+      }
     } finally {
       setFormLoading(false);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setPaperToDelete(null);
+    setDeleteError(''); // Clear error when canceling
   };
 
   // Preview Functions - UPDATED: Show PaperQuestionsManager directly
@@ -231,6 +249,47 @@ const QuestionPapers = () => {
           paper={selectedPaper}
           onDelete={() => handleDeleteClick(selectedPaper)}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && paperToDelete && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h2>Confirm Delete</h2>
+              <button className="modal-close" onClick={handleDeleteCancel}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete "<strong>{paperToDelete.title}</strong>"?</p>
+              <p style={{color: '#e74c3c', fontStyle: 'italic', marginTop: '10px'}}>
+                This action cannot be undone.
+              </p>
+              
+              {/* Show delete error right in the modal */}
+              {deleteError && (
+                <div className="form-error" style={{marginTop: '15px'}}>
+                  {deleteError}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                onClick={handleDeleteCancel}
+                disabled={formLoading}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-danger"
+                onClick={handleDeleteConfirm}
+                disabled={formLoading}
+              >
+                {formLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

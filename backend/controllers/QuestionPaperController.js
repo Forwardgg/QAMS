@@ -145,6 +145,70 @@ export const updatePaper = async (req, res) => {
   }
 };
 
+export const submitForModeration = async (req, res) => {
+  const { id: paperId } = req.params;
+  const userId = req.user.user_id;
+  const userRole = req.user.role;
+
+  try {
+    // Check if user is instructor and owns the paper
+    if (userRole !== 'instructor') {
+      return res.status(403).json({ error: 'Only instructors can submit papers for moderation' });
+    }
+
+    const isOwner = await QuestionPaper.isOwner(paperId, userId);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'You are not the owner of this question paper' });
+    }
+
+    // Get current paper to check if it's in draft
+    const paper = await QuestionPaper.findById(paperId);
+    if (paper.status !== 'draft') {
+      return res.status(400).json({ error: 'Only draft papers can be submitted for moderation' });
+    }
+
+    // Start transaction
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Update paper status to 'submitted'
+      const updatedPaper = await QuestionPaper.updateStatus(paperId, 'submitted');
+
+      // Get all questions for this paper to update their status
+      const questions = await Question.findByPaperId(paperId);
+      
+      if (questions.length > 0) {
+        const questionUpdates = questions.map(q => ({
+          question_id: q.question_id,
+          status: 'submitted'
+        }));
+        
+        await Question.bulkUpdateStatus(questionUpdates);
+      }
+
+      await client.query('COMMIT');
+
+      res.json({
+        message: 'Question paper submitted for moderation successfully',
+        paper: updatedPaper,
+        questionsUpdated: questions.length
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('Submit for moderation error:', error);
+    res.status(500).json({ error: 'Failed to submit paper for moderation' });
+  }
+};
+
 export const deletePaper = async (req, res) => {
   try {
     const { paperId } = req.params;

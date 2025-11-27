@@ -1,3 +1,4 @@
+// src/backend/models/Course.js
 import { pool } from "../config/db.js";
 
 export class Course {

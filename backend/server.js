@@ -9,13 +9,11 @@ import { fileURLToPath } from 'url';
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
-import userRoutes from "./routes/userRoutes.js";
 import courseRoutes from "./routes/courseRoutes.js";
 import coRoutes from "./routes/coRoutes.js";
 import questionRoutes from "./routes/questionRoutes.js";
 import questionPaperRoutes from "./routes/QuestionPaperRoutes.js";
 import ModerationRoutes from "./routes/ModerationRoutes.js";
-import paperCompilationRoutes from "./routes/PaperCompilationRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import pdfRoutes from "./routes/pdfRoutes.js";
 
@@ -74,19 +72,13 @@ ensureUploadsDir();
 
 // -------------------- App routes --------------------
 app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/cos", coRoutes);
 app.use("/api/questions", questionRoutes);
 app.use("/api/papers", questionPaperRoutes);
 app.use("/api/moderation", ModerationRoutes);
-app.use("/api/paper", paperCompilationRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/pdf", pdfRoutes);
-
-// REMOVE THIS DUPLICATE UPLOAD ROUTE - it's already in uploadRoutes.js
-// const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: UploadService.maxFileSize } });
-// app.post('/api/upload/questions', upload.single('file'), async (req, res, next) => { ... });
 
 // Health & DB test
 app.get("/api/health", (req, res) => {

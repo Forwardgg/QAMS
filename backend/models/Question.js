@@ -355,4 +355,122 @@ static async validateCOForPaper(coId, paperId) {
   const result = await pool.query(query, [coId, paperId]);
   return result.rows.length > 0;
 }
+/**
+ * Update individual question status for moderation
+ */
+static async updateQuestionStatus(questionId, status) {
+  const allowedStatuses = ['draft', 'submitted', 'under_review', 'change_requested', 'approved'];
+  
+  if (!allowedStatuses.includes(status)) {
+    throw new Error(`Invalid status. Allowed: ${allowedStatuses.join(', ')}`);
+  }
+
+  const query = `
+    UPDATE questions
+    SET status = $1, updated_at = CURRENT_TIMESTAMP
+    WHERE question_id = $2
+    RETURNING question_id, paper_id, status, updated_at
+  `;
+
+  const { rows } = await pool.query(query, [status, questionId]);
+  if (!rows.length) throw new Error('Question not found');
+  return rows[0];
+}
+
+/**
+ * Get all questions for a paper with CO details for moderation
+ */
+static async getQuestionsForModeration(paperId) {
+  const query = `
+    SELECT 
+      q.question_id, q.paper_id, q.content_html, q.status, q.sequence_number,
+      q.created_at, q.updated_at,
+      co.co_id, co.co_number, co.description as co_description,
+      c.course_id, c.code as course_code, c.title as course_title
+    FROM questions q
+    LEFT JOIN course_outcomes co ON q.co_id = co.co_id
+    LEFT JOIN question_papers qp ON q.paper_id = qp.paper_id
+    LEFT JOIN courses c ON qp.course_id = c.course_id
+    WHERE q.paper_id = $1
+    ORDER BY q.sequence_number, q.question_id
+  `;
+
+  const { rows } = await pool.query(query, [paperId]);
+  return rows;
+}
+
+/**
+ * Bulk update question statuses
+ */
+static async bulkUpdateStatus(questionUpdates) {
+  if (!Array.isArray(questionUpdates) || questionUpdates.length === 0) {
+    throw new Error('Question updates array is required');
+  }
+
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    const results = [];
+    for (const update of questionUpdates) {
+      const { question_id, status } = update;
+      
+      if (!question_id || !status) {
+        throw new Error('Each update must have question_id and status');
+      }
+
+      const query = `
+        UPDATE questions
+        SET status = $1, updated_at = CURRENT_TIMESTAMP
+        WHERE question_id = $2
+        RETURNING question_id, status, updated_at
+      `;
+
+      const result = await client.query(query, [status, question_id]);
+      results.push(result.rows[0]);
+    }
+
+    await client.query('COMMIT');
+    return results;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get questions grouped by CO for moderation report
+ */
+static async getQuestionsByCO(paperId) {
+  const query = `
+    SELECT 
+      co.co_id,
+      co.co_number,
+      co.description as co_description,
+      COUNT(q.question_id) as total_questions,
+      COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_questions,
+      COUNT(CASE WHEN q.status = 'change_requested' THEN 1 END) as change_requested_questions,
+      json_agg(
+        jsonb_build_object(
+          'question_id', q.question_id,
+          'sequence_number', q.sequence_number,
+          'content_preview', SUBSTRING(q.content_html FROM 1 FOR 100),
+          'status', q.status,
+          'created_at', q.created_at
+        )
+      ) as questions
+    FROM course_outcomes co
+    LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
+    LEFT JOIN question_papers qp ON co.course_id = qp.course_id
+    WHERE qp.paper_id = $1 OR qp.paper_id IS NULL
+    GROUP BY co.co_id, co.co_number, co.description
+    ORDER BY co.co_number
+  `;
+
+  const { rows } = await pool.query(query, [paperId]);
+  return rows;
+}
 }
