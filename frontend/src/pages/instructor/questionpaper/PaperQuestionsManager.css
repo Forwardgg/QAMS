@@ -103,6 +103,29 @@
   border: 1px solid #f5c6cb;
 }
 
+/* Drag and Drop Instructions */
+.drag-instructions {
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+.drag-instructions p {
+  margin: 0;
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.reordering-indicator {
+  color: #ff9800;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
 /* Preview Section */
 .preview-section {
   margin-top: 32px;
@@ -182,55 +205,122 @@
   font-family: "Times New Roman", serif;
   font-size: 12pt;
   line-height: 1.5;
+  min-height: 100px;
 }
 
+/* Question Styles with Improved Drag & Drop */
 .print-preview-question {
   margin-bottom: 8mm;
   page-break-inside: avoid;
   position: relative;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  background: white;
+  transition: all 0.2s ease;
 }
 
+.print-preview-question:hover {
+  border-color: #007bff;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+}
+
+.print-preview-question.dragging {
+  border-color: #007bff;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+  background: #f8fbff;
+  opacity: 0.8;
+  transform: rotate(2deg);
+}
+
+/* Improved Question Header Layout */
 .question-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  border-radius: 6px 6px 0 0;
+  min-height: 60px;
 }
 
+/* Enhanced Drag Handle */
+.question-drag-handle {
+  cursor: grab;
+  padding: 8px 6px;
+  color: #6c757d;
+  font-size: 18px;
+  font-weight: bold;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  background: #e9ecef;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.question-drag-handle:hover {
+  background: #007bff;
+  color: white;
+  transform: scale(1.1);
+}
+
+.question-drag-handle:active {
+  cursor: grabbing;
+  background: #0056b3;
+  transform: scale(1.05);
+}
+
+/* Question Number - Now on the left */
 .question-number {
-  font-size: 12pt;
+  font-size: 14pt;
+  font-weight: bold;
   color: #2c3e50;
+  min-width: 60px;
+  margin: 0;
+  font-family: "Times New Roman", serif;
 }
 
+/* Question Actions */
 .question-actions {
   display: flex;
   gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .btn-edit, .btn-delete {
-  background: none;
-  border: 1px solid #ddd;
-  padding: 4px 8px;
+  background: white;
+  border: 1px solid #dee2e6;
+  padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   transition: all 0.2s;
+  font-weight: 500;
 }
 
 .btn-edit:hover {
   background: #007bff;
   color: white;
   border-color: #007bff;
+  transform: translateY(-1px);
 }
 
 .btn-delete:hover {
   background: #dc3545;
   color: white;
   border-color: #dc3545;
+  transform: translateY(-1px);
 }
 
+/* Question Content */
 .question-content {
-  margin-left: 8px;
+  padding: 16px;
+  margin: 0;
 }
 
 .question-content img {
@@ -239,14 +329,17 @@
   display: block;
   margin: 8px 0;
   border: 1px solid #eee;
+  border-radius: 4px;
 }
 
 .question-meta {
-  margin-top: 8px;
+  margin-top: 12px;
+  padding: 8px 16px;
   font-size: 10pt;
   color: #7f8c8d;
-  border-top: 1px solid #eee;
-  padding-top: 4px;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  border-radius: 0 0 6px 6px;
 }
 
 /* Loading and Error States */
@@ -303,12 +396,25 @@
   }
   
   .question-header {
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 8px;
   }
   
   .question-actions {
-    align-self: flex-end;
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .question-drag-handle {
+    padding: 6px 4px;
+    font-size: 16px;
+    min-width: 20px;
+  }
+  
+  .drag-instructions {
+    font-size: 12px;
+    padding: 10px;
   }
 }
 
@@ -323,7 +429,9 @@
   .question-actions,
   .message,
   .btn-back,
-  .header-actions {
+  .header-actions,
+  .drag-instructions,
+  .question-drag-handle {
     display: none !important;
   }
   
@@ -338,5 +446,20 @@
     padding: 0;
     width: 100%;
     min-height: auto;
+  }
+  
+  .print-preview-question {
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
+  
+  .question-header {
+    background: none !important;
+    border-bottom: 1px solid #000 !important;
+  }
+  
+  .question-content {
+    padding: 8px 0;
   }
 }

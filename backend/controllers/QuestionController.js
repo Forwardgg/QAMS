@@ -75,14 +75,13 @@ export const createQuestion = async (req, res) => {
         await client.query('BEGIN');
 
         for (const mediaUrl of mediaUrls) {
-          await client.query(
-            `UPDATE question_media
-             SET question_id = $1, is_used = TRUE, updated_at = CURRENT_TIMESTAMP
-             WHERE media_url = $2 AND (question_id IS NULL OR question_id = $1)`,
-            [question.question_id, mediaUrl]
-          );
-        }
-
+  await client.query(
+    `UPDATE question_media
+     SET question_id = $1, is_used = TRUE
+     WHERE media_url = $2 AND (question_id IS NULL OR question_id = $1)`,
+    [question.question_id, mediaUrl]
+  );
+}
         await client.query('COMMIT');
       } catch (err) {
         await client.query('ROLLBACK');
@@ -241,14 +240,14 @@ export const updateQuestion = async (req, res) => {
     }
     const updatedQuestion = updateResult.rows[0];
 
-    // Reconcile media
+    // Reconcile media - FIXED: Removed updated_at from question_media queries
     const mediaUrls = Question.extractMediaUrls(content_html || '');
 
     if (mediaUrls.length > 0) {
       for (const mediaUrl of mediaUrls) {
         await client.query(
           `UPDATE question_media
-           SET question_id = $1, is_used = TRUE, updated_at = CURRENT_TIMESTAMP
+           SET question_id = $1, is_used = TRUE
            WHERE media_url = $2 AND (question_id IS NULL OR question_id = $1)`,
           [questionId, mediaUrl]
         );
@@ -259,14 +258,14 @@ export const updateQuestion = async (req, res) => {
       const placeholders = mediaUrls.map((_, i) => `$${i + 2}`).join(',');
       const unlinkSql = `
         UPDATE question_media
-        SET question_id = NULL, is_used = FALSE, updated_at = CURRENT_TIMESTAMP
+        SET question_id = NULL, is_used = FALSE
         WHERE question_id = $1 AND media_url NOT IN (${placeholders})
       `;
       await client.query(unlinkSql, [questionId, ...mediaUrls]);
     } else {
       await client.query(
         `UPDATE question_media
-         SET question_id = NULL, is_used = FALSE, updated_at = CURRENT_TIMESTAMP
+         SET question_id = NULL, is_used = FALSE
          WHERE question_id = $1`,
         [questionId]
       );

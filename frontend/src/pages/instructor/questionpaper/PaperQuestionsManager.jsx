@@ -1,10 +1,70 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import questionAPI from '../../../api/question.api';
 import questionPaperAPI from '../../../api/questionPaper.api';
 import QuestionEditModal from './QuestionEditModal';
 import authService from '../../../services/authService';
 import './PaperQuestionsManager.css';
+
+// Sortable Question Item Component
+const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: question.question_id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`print-preview-question ${isDragging ? 'dragging' : ''}`}
+    >
+      <div className="question-header">
+        <div className="question-drag-handle" {...attributes} {...listeners}>
+          ⋮⋮
+        </div>
+        <strong className="question-number">Q{question.sequence_number || index + 1}.</strong>
+        <div className="question-actions">
+          <button type="button" onClick={() => onEdit(question)} className="btn-edit">✏️ Edit</button>
+          <button type="button" onClick={() => onDelete(question.question_id)} className="btn-delete">🗑️ Delete</button>
+        </div>
+      </div>
+      <div className="question-content" dangerouslySetInnerHTML={{ __html: question.content_html }} />
+      {question.co_id && (
+        <div className="question-meta">
+          <small>CO: {question.co_number || question.co_id}</small>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const PaperQuestionsManager = ({ paperId, onBack }) => {
   const navigate = useNavigate();
@@ -14,12 +74,22 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [activeId, setActiveId] = useState(null);
 
   // keep a ref for mounted state & abort controllers
   const mountedRef = useRef(true);
   const loadAbortRef = useRef(null);
   const pdfAbortRef = useRef(null);
+
+  // Configure sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -110,6 +180,64 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     }
   };
 
+  // Handle drag start
+  const handleDragStart = (event) => {
+    setActiveId(event.active.id);
+  };
+
+  // Handle drag end and reorder
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = questions.findIndex(q => q.question_id === active.id);
+    const newIndex = questions.findIndex(q => q.question_id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
+
+    // Optimistically update UI
+    const reorderedQuestions = arrayMove(questions, oldIndex, newIndex);
+    setQuestions(reorderedQuestions);
+
+    // Update sequence numbers in backend
+    await updateQuestionSequence(reorderedQuestions);
+  };
+
+  // Update sequence numbers in backend
+  const updateQuestionSequence = async (reorderedQuestions) => {
+    setIsReordering(true);
+    try {
+      const sequenceUpdates = reorderedQuestions.map((question, index) => ({
+        question_id: question.question_id,
+        sequence_number: index + 1
+      }));
+
+      await questionAPI.updateSequence(paperId, sequenceUpdates);
+
+      // Update local questions with new sequence numbers
+      const updatedQuestions = reorderedQuestions.map((question, index) => ({
+        ...question,
+        sequence_number: index + 1
+      }));
+
+      setQuestions(updatedQuestions);
+      setMessage({ type: 'success', text: 'Question order updated successfully!' });
+    } catch (error) {
+      console.error('Error updating question sequence:', error);
+      setMessage({ type: 'error', text: error?.message || 'Failed to update question order' });
+      // Revert to original order on error
+      loadPaperAndQuestions();
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
   const handleUpdateQuestion = async (updatedQuestion) => {
     try {
       const qid = updatedQuestion.question_id ?? updatedQuestion.id ?? updatedQuestion.questionId;
@@ -145,6 +273,11 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
 
       setQuestions(prev => prev.filter(q => q.question_id !== questionId));
       setMessage({ type: 'success', text: 'Question deleted successfully!' });
+      
+      // Reload to get proper sequence numbers after deletion
+      setTimeout(() => {
+        loadPaperAndQuestions();
+      }, 500);
     } catch (error) {
       console.error('Error deleting question:', error);
       setMessage({ type: 'error', text: error?.message || 'Failed to delete question' });
@@ -299,6 +432,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
           <h1>{paper.title} - Questions</h1>
           <p className="paper-info">
             Course: {paper.course_code} | Status: {paper.status} | Questions: {questions.length}
+            {isReordering && <span className="reordering-indicator"> • Updating order...</span>}
           </p>
         </div>
         <div className="header-actions">
@@ -326,11 +460,18 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         <div className={`message ${message.type}`}>{message.text}</div>
       )}
 
+      {/* Drag & Drop Instructions */}
+      {questions.length > 0 && (
+        <div className="drag-instructions">
+          <p>💡 Drag and drop questions to reorder them. Changes are saved automatically.</p>
+        </div>
+      )}
+
       {/* PREVIEW SECTION */}
       <div className="preview-section">
         <div className="section-header">
           <h2>Paper Preview (Print Layout)</h2>
-          <p>This approximates how the paper will appear on A4 when exported.</p>
+          <p>Drag and drop questions to reorder. This approximates how the paper will appear on A4 when exported.</p>
         </div>
 
         {questions.length === 0 ? (
@@ -356,32 +497,30 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
                 </div>
               </header>
 
-              {/* Questions laid out as they will print */}
+              {/* Questions with drag and drop */}
               <main className="print-preview-body">
-                {questions
-                  .slice()
-                  .sort((a, b) => {
-                    const an = a.sequence_number == null ? Number.MAX_SAFE_INTEGER : Number(a.sequence_number);
-                    const bn = b.sequence_number == null ? Number.MAX_SAFE_INTEGER : Number(b.sequence_number);
-                    return an - bn;
-                  })
-                  .map((question, index) => (
-                    <div key={question.question_id} className="print-preview-question">
-                      <div className="question-header">
-                        <strong className="question-number">Q{question.sequence_number || index + 1}.</strong>
-                        <div className="question-actions">
-                          <button type="button" onClick={() => setEditingQuestion(question)} className="btn-edit">✏️ Edit</button>
-                          <button type="button" onClick={() => handleDeleteQuestion(question.question_id)} className="btn-delete">🗑️ Delete</button>
-                        </div>
-                      </div>
-                      <div className="question-content" dangerouslySetInnerHTML={{ __html: question.content_html }} />
-                      {question.co_id && (
-                        <div className="question-meta">
-                          <small>CO: {question.co_number || question.co_id}</small>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext 
+                    items={questions.map(q => q.question_id)} 
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {questions.map((question, index) => (
+                      <SortableQuestionItem
+                        key={question.question_id}
+                        question={question}
+                        index={index}
+                        onEdit={setEditingQuestion}
+                        onDelete={handleDeleteQuestion}
+                        isDragging={activeId === question.question_id}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </main>
             </div>
           </div>
