@@ -1,4 +1,4 @@
-// models/QuestionMedia.js
+// backend/models/QuestionMedia.js
 import { pool } from "../config/db.js";
 import path from 'path';
 import fs from 'fs';
@@ -6,7 +6,9 @@ import crypto from 'crypto';
 
 export class QuestionMedia {
   static _ensureInteger(val, name) {
-    if (!Number.isInteger(val)) throw new Error(`${name} must be an integer.`);
+    const n = Number(val);
+    if (!Number.isInteger(n)) throw new Error(`${name} must be an integer.`);
+    return n;
   }
   
   static _ensureNonEmptyString(val, name) {
@@ -89,6 +91,17 @@ export class QuestionMedia {
   }
 
   /**
+   * Basic filename sanitizer - ensure no path traversal
+   */
+  static sanitizeFilename(filename) {
+    if (!filename) throw new Error('Filename is required');
+    const base = path.basename(filename);
+    if (base !== filename) throw new Error('Invalid filename');
+    if (filename.includes('..')) throw new Error('Invalid filename');
+    return base;
+  }
+
+  /**
    * Save file to disk
    */
   static async saveFileToDisk(buffer, filename, subfolder = 'images/questions') {
@@ -96,10 +109,12 @@ export class QuestionMedia {
     this._ensureNonEmptyString(filename, 'Filename');
     this._ensureNonEmptyString(subfolder, 'Subfolder');
 
+    const safeFilename = this.sanitizeFilename(filename);
+
     const uploadDir = path.join(process.cwd(), 'uploads', subfolder);
     await fs.promises.mkdir(uploadDir, { recursive: true });
 
-    const filePath = path.join(uploadDir, filename);
+    const filePath = path.join(uploadDir, safeFilename);
     await fs.promises.writeFile(filePath, buffer);
 
     return filePath;
@@ -110,9 +125,10 @@ export class QuestionMedia {
    */
   static async deleteFileIfExists(filename, subfolder = 'images/questions') {
     this._ensureNonEmptyString(filename, 'Filename');
+    const safeFilename = this.sanitizeFilename(filename);
 
     try {
-      const fullPath = path.join(process.cwd(), 'uploads', subfolder, filename);
+      const fullPath = path.join(process.cwd(), 'uploads', subfolder, safeFilename);
       if (fs.existsSync(fullPath)) {
         await fs.promises.unlink(fullPath);
       }
@@ -128,7 +144,8 @@ export class QuestionMedia {
     this._ensureNonEmptyString(filename, 'Filename');
     this._ensureNonEmptyString(mimetype, 'MIME type');
 
-    const mediaUrl = `/uploads/images/questions/${filename}`;
+    const safeFilename = this.sanitizeFilename(filename);
+    const mediaUrl = `/uploads/images/questions/${safeFilename}`;
 
     const query = `
       INSERT INTO question_media (
@@ -158,7 +175,7 @@ export class QuestionMedia {
 
     const query = `
       SELECT * FROM question_media 
-      WHERE media_id = $1
+      WHERE media_id = $1 AND deleted_at IS NULL
     `;
     
     const result = await pool.query(query, [mediaId]);
@@ -173,7 +190,7 @@ export class QuestionMedia {
 
     const query = `
       SELECT * FROM question_media 
-      WHERE question_id = $1
+      WHERE question_id = $1 AND deleted_at IS NULL
       ORDER BY created_at
     `;
     
@@ -189,7 +206,7 @@ export class QuestionMedia {
 
     const query = `
       SELECT * FROM question_media 
-      WHERE paper_id = $1
+      WHERE paper_id = $1 AND deleted_at IS NULL
       ORDER BY created_at
     `;
     
@@ -261,7 +278,7 @@ export class QuestionMedia {
 
     const query = `
       UPDATE question_media 
-      SET question_id = NULL, is_used = false, updated_at = NOW()
+      SET question_id = NULL, is_used = FALSE, updated_at = NOW()
       WHERE media_id = $1
       RETURNING *
     `;
@@ -271,7 +288,7 @@ export class QuestionMedia {
   }
 
   /**
-   * Delete media record
+   * Delete media record (hard delete)
    */
   static async delete(mediaId) {
     this._ensureInteger(mediaId, 'Media ID');
@@ -291,17 +308,18 @@ export class QuestionMedia {
    */
   static getPublicUrl(filename) {
     this._ensureNonEmptyString(filename, 'Filename');
-    return `/uploads/images/questions/${filename}`;
+    const safeFilename = path.basename(filename);
+    return `/uploads/images/questions/${safeFilename}`;
   }
 
   /**
-   * Extract media URLs from HTML content
+   * Extract media URLs from HTML content (same regex as Question)
    */
   static extractMediaUrls(htmlContent) {
     if (!htmlContent) return [];
 
     const mediaUrls = [];
-    const imgRegex = /<img[^>]+src="(\/uploads\/[^"]+)"[^>]*>/gi;
+    const imgRegex = /<img[^>]+src=["']((?:https?:\/\/|\/)[^"']+)["'][^>]*>/gi;
     let match;
 
     while ((match = imgRegex.exec(htmlContent)) !== null) {
@@ -322,7 +340,7 @@ export class QuestionMedia {
     const placeholders = urls.map((_, i) => `$${i + 1}`).join(',');
     const query = `
       SELECT * FROM question_media 
-      WHERE media_url IN (${placeholders})
+      WHERE media_url IN (${placeholders}) AND deleted_at IS NULL
     `;
 
     const result = await pool.query(query, urls);

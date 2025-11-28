@@ -297,4 +297,24 @@
     font-size: 0.7rem;
     padding: 0.25rem 0.5rem;
   }
+  .btn-submit {
+  background: #27ae60;
+  color: white;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+  margin-right: 4px;
+}
+
+.btn-submit:hover {
+  background: #219653;
+}
+
+.btn-submit:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+}
 }

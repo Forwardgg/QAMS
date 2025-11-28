@@ -1,65 +1,91 @@
-import React, { useState, useEffect } from 'react';
+// frontend/src/pages/instructor/questionpaper/QuestionPapersList.js
+import React, { useState, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import './QuestionPapersList.css';
 
-const QuestionPaperList = ({ questionPapers, onEditClick, onDeleteClick, onPreviewClick}) => {
-  const [filteredPapers, setFilteredPapers] = useState([]);
+const QuestionPaperList = ({ 
+  questionPapers = [], 
+  onEditClick = () => {}, 
+  onDeleteClick = () => {}, 
+  onPreviewClick = () => {},
+  onSubmitForModeration = () => {}
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [courseFilter, setCourseFilter] = useState('all');
   const [sortField, setSortField] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
 
-  useEffect(() => {
-    applyFiltersAndSort();
-  }, [questionPapers, searchTerm, statusFilter, courseFilter, sortField, sortOrder]);
+  // Utility: safely stringify a field for search/comparison
+  const asStr = (v) => (v === undefined || v === null) ? '' : String(v);
 
-  const applyFiltersAndSort = () => {
-    let filtered = [...questionPapers];
+  // derive unique courses (memoized)
+  const availableCourses = useMemo(() => {
+    const courseMap = {};
+    (questionPapers || []).forEach(paper => {
+      if (paper.course_code && paper.course_title) {
+        courseMap[paper.course_code] = paper.course_title;
+      }
+    });
+    return Object.entries(courseMap).map(([code, title]) => ({ code, title }));
+  }, [questionPapers]);
 
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(paper =>
-        paper.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        paper.course_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        paper.course_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        paper.exam_type?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  // compute filtered & sorted papers (memoized)
+  const filteredPapers = useMemo(() => {
+    let filtered = Array.isArray(questionPapers) ? [...questionPapers] : [];
+
+    const q = asStr(searchTerm).toLowerCase().trim();
+
+    if (q) {
+      filtered = filtered.filter(paper => {
+        const checks = [
+          asStr(paper.title).toLowerCase(),
+          asStr(paper.course_code).toLowerCase(),
+          asStr(paper.course_title).toLowerCase(),
+          asStr(paper.exam_type).toLowerCase()
+        ];
+        return checks.some(str => str.includes(q));
+      });
     }
 
-    // Apply status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(paper => paper.status === statusFilter);
     }
 
-    // Apply course filter
     if (courseFilter !== 'all') {
       filtered = filtered.filter(paper => paper.course_code === courseFilter);
     }
 
-    // Apply sorting
+    // Sorting: numeric fields sorted numerically, dates parsed, otherwise string
+    const numericFields = new Set(['full_marks', 'duration']);
+    const dateFields = new Set(['created_at', 'updated_at']);
+
     filtered.sort((a, b) => {
-      let aValue = a[sortField];
-      let bValue = b[sortField];
+      let aVal = a[sortField];
+      let bVal = b[sortField];
 
-      if (aValue === null || aValue === undefined) aValue = '';
-      if (bValue === null || bValue === undefined) bValue = '';
-
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue.toLowerCase();
+      if (numericFields.has(sortField)) {
+        aVal = Number(aVal ?? 0);
+        bVal = Number(bVal ?? 0);
+      } else if (dateFields.has(sortField)) {
+        aVal = aVal ? new Date(aVal).getTime() : 0;
+        bVal = bVal ? new Date(bVal).getTime() : 0;
+      } else {
+        aVal = asStr(aVal).toLowerCase();
+        bVal = asStr(bVal).toLowerCase();
       }
 
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
 
-    setFilteredPapers(filtered);
-  };
+    return filtered;
+  }, [questionPapers, searchTerm, statusFilter, courseFilter, sortField, sortOrder]);
 
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortOrder('asc');
@@ -103,21 +129,6 @@ const QuestionPaperList = ({ questionPapers, onEditClick, onDeleteClick, onPrevi
     setSortOrder('desc');
   };
 
-  const getUniqueCoursesFromPapers = () => {
-    const courseMap = {};
-    questionPapers.forEach(paper => {
-      if (paper.course_code && paper.course_title) {
-        courseMap[paper.course_code] = paper.course_title;
-      }
-    });
-    return Object.entries(courseMap).map(([code, title]) => ({
-      code,
-      title
-    }));
-  };
-
-  const availableCourses = getUniqueCoursesFromPapers();
-
   return (
     <div className="question-paper-list">
       {/* Filters Section */}
@@ -130,6 +141,7 @@ const QuestionPaperList = ({ questionPapers, onEditClick, onDeleteClick, onPrevi
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
+              aria-label="Search question papers"
             />
           </div>
 
@@ -165,7 +177,7 @@ const QuestionPaperList = ({ questionPapers, onEditClick, onDeleteClick, onPrevi
             </select>
           </div>
 
-          <button onClick={clearFilters} className="btn-clear">
+          <button onClick={clearFilters} className="btn-clear" type="button">
             Clear Filters
           </button>
         </div>
@@ -180,16 +192,16 @@ const QuestionPaperList = ({ questionPapers, onEditClick, onDeleteClick, onPrevi
         <table className="papers-table">
           <thead>
             <tr>
-              <th onClick={() => handleSort('title')} className="sortable">
+              <th onClick={() => handleSort('title')} className="sortable" role="button" tabIndex={0}>
                 Title {getSortIcon('title')}
               </th>
-              <th onClick={() => handleSort('course_code')} className="sortable">
+              <th onClick={() => handleSort('course_code')} className="sortable" role="button" tabIndex={0}>
                 Course {getSortIcon('course_code')}
               </th>
-              <th onClick={() => handleSort('exam_type')} className="sortable">
+              <th onClick={() => handleSort('exam_type')} className="sortable" role="button" tabIndex={0}>
                 Exam Type {getSortIcon('exam_type')}
               </th>
-              <th onClick={() => handleSort('academic_year')} className="sortable">
+              <th onClick={() => handleSort('academic_year')} className="sortable" role="button" tabIndex={0}>
                 Year/Semester {getSortIcon('academic_year')}
               </th>
               <th onClick={() => handleSort('full_marks')} className="sortable">
@@ -229,29 +241,49 @@ const QuestionPaperList = ({ questionPapers, onEditClick, onDeleteClick, onPrevi
                       : paper.academic_year || paper.semester || '-'
                     }
                   </td>
-                  <td className="text-center">{paper.full_marks || '-'}</td>
+                  <td className="text-center">{paper.full_marks ?? '-'}</td>
                   <td className="text-center">{paper.duration ? `${paper.duration} mins` : '-'}</td>
                   <td>{getStatusBadge(paper.status)}</td>
                   <td>
                     <div className="action-buttons">
                       <button 
+                        type="button"
                         className="btn-preview"
                         onClick={() => onPreviewClick(paper)}
                         title="Preview"
+                        aria-label={`Preview ${paper.title}`}
                       >
                         👁️
                       </button>
                       <button 
+                        type="button"
                         className="btn-edit"
                         onClick={() => onEditClick(paper)}
                         title="Edit"
+                        aria-label={`Edit ${paper.title}`}
                       >
                         ✏️
                       </button>
+                      
+                      {/* Submit for Moderation Button */}
+                      {paper.status === 'draft' && (
+                        <button 
+                          type="button"
+                          className="btn-submit"
+                          onClick={() => onSubmitForModeration(paper)}
+                          title="Submit for Moderation"
+                          aria-label={`Submit ${paper.title} for moderation`}
+                        >
+                          📤
+                        </button>
+                      )}
+                      
                       <button 
+                        type="button"
                         className="btn-delete"
                         onClick={() => onDeleteClick(paper)}
                         title="Delete"
+                        aria-label={`Delete ${paper.title}`}
                       >
                         🗑️
                       </button>
@@ -265,6 +297,14 @@ const QuestionPaperList = ({ questionPapers, onEditClick, onDeleteClick, onPrevi
       </div>
     </div>
   );
+};
+
+QuestionPaperList.propTypes = {
+  questionPapers: PropTypes.array,
+  onEditClick: PropTypes.func,
+  onDeleteClick: PropTypes.func,
+  onPreviewClick: PropTypes.func,
+  onSubmitForModeration: PropTypes.func
 };
 
 export default QuestionPaperList;

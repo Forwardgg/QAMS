@@ -21,87 +21,44 @@ async function handle(promise) {
 }
 
 const questionAPI = {
-  /**
-   * Create a new question
-   * POST /api/questions
-   * Body: { content_html, paper_id, co_id?, status?, sequence_number? }
-   */
-  create: (data) =>
-    handle(api.post("/questions", data)),
+  create: (data, config = {}) =>
+    handle(api.post("/questions", data, config)),
+
+  getById: (questionId, config = {}) =>
+    handle(api.get(`/questions/${encodeURIComponent(questionId)}`, config)),
+
+  update: (questionId, data, config = {}) =>
+    handle(api.put(`/questions/${encodeURIComponent(questionId)}`, data, config)),
+
+  delete: (questionId, config = {}) =>
+    handle(api.delete(`/questions/${encodeURIComponent(questionId)}`, config)),
+
+  getByPaper: (paperId, config = {}) =>
+    handle(api.get(`/questions/paper/${encodeURIComponent(paperId)}`, config)),
 
   /**
-   * Get question by ID with full details and media
-   * GET /api/questions/:id
+   * Search questions. `filters` is an object (paper_id, co_id, status, course_id, page, limit)
+   * We pass through only non-empty values using axios `params`.
    */
-  getById: (questionId) =>
-    handle(api.get(`/questions/${encodeURIComponent(questionId)}`)),
-
-  /**
-   * Update an existing question
-   * PUT /api/questions/:id
-   * Body: { content_html, paper_id, co_id?, status?, sequence_number? }
-   */
-  update: (questionId, data) =>
-    handle(api.put(`/questions/${encodeURIComponent(questionId)}`, data)),
-
-  /**
-   * Delete a question
-   * DELETE /api/questions/:id
-   */
-  delete: (questionId) =>
-    handle(api.delete(`/questions/${encodeURIComponent(questionId)}`)),
-
-  /**
-   * Get all questions by paper ID
-   * GET /api/questions/paper/:paperId
-   */
-  getByPaper: (paperId) =>
-    handle(api.get(`/questions/paper/${encodeURIComponent(paperId)}`)),
-
-  /**
-   * Search questions with filters
-   * GET /api/questions/search?paper_id=&co_id=&status=&course_id=&page=&limit=
-   */
-  search: (filters = {}) => {
-    const params = new URLSearchParams();
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value);
-      }
+  search: (filters = {}, config = {}) => {
+    const params = {};
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "") params[k] = v;
     });
-
-    return handle(api.get(`/questions/search?${params.toString()}`));
+    return handle(api.get("/questions/search", { params, ...config }));
   },
 
-  /**
-   * Update question sequence numbers for a paper
-   * PATCH /api/questions/paper/:paperId/sequence
-   * Body: { sequence_updates: [{ question_id, sequence_number }] }
-   */
-  updateSequence: (paperId, sequenceUpdates) =>
+  updateSequence: (paperId, sequenceUpdates, config = {}) =>
     handle(api.patch(`/questions/paper/${encodeURIComponent(paperId)}/sequence`, {
       sequence_updates: sequenceUpdates
-    })),
+    }, config)),
 
-  /**
-   * Get upload configuration
-   * GET /api/uploads/config
-   */
-  getUploadConfig: () =>
-    handle(api.get("/uploads/config")),
+  getUploadConfig: (config = {}) =>
+    handle(api.get("/uploads/config", config)),
 
-  /**
-   * Upload a file for questions
-   * POST /api/uploads
-   * FormData: { file, question_id?, paper_id? }
-   */
-  uploadFile: (formData) =>
-    handle(api.post("/uploads", formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    }))
+  uploadFile: (formData, config = {}) =>
+    // DO NOT set Content-Type manually; axios/browser will set the boundary.
+    handle(api.post("/uploads", formData, { ...config }))
 };
 
 export default questionAPI;

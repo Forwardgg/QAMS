@@ -1,6 +1,10 @@
-import { Question } from "../models/Question.js";
+// backend/controllers/QuestionController.js
 import { pool } from "../config/db.js";
+import { Question } from "../models/Question.js";
 
+/**
+ * Lightweight request logger for questions endpoints
+ */
 const logRequest = (req) => {
   console.log('Questions request:', {
     method: req.method,
@@ -14,44 +18,79 @@ const logRequest = (req) => {
  * Create a new question
  */
 export const createQuestion = async (req, res) => {
+  logRequest(req);
   try {
-    const { content_html, paper_id, co_id } = req.body;
-    const userId = req.user.user_id;
+    const { content_html, paper_id: paperIdRaw, co_id: coIdRaw } = req.body;
+    const userId = req.user?.user_id;
 
-    // Validate required fields
-    if (!content_html || !paper_id) {
+    if (!content_html || !paperIdRaw) {
       return res.status(400).json({ error: "content_html and paper_id are required" });
     }
 
-    // Validate paper access
-    const hasPaperAccess = await Question.validatePaperAccess(paper_id, userId);
+    const paperId = Number.isInteger(Number(paperIdRaw)) ? parseInt(paperIdRaw, 10) : NaN;
+    if (Number.isNaN(paperId)) {
+      return res.status(400).json({ error: "Invalid paper_id" });
+    }
+
+    // Validate paper access (model helper uses pool)
+    const hasPaperAccess = await Question.validatePaperAccess(paperId, userId);
     if (!hasPaperAccess) {
       return res.status(403).json({ error: "Invalid paper or access denied" });
     }
 
     // Validate CO if provided
-    if (co_id) {
-      const isValidCO = await Question.validateCOForPaper(co_id, paper_id);
+    let coId = null;
+    if (coIdRaw !== undefined && coIdRaw !== null && coIdRaw !== '') {
+      const coIdParsed = Number.isInteger(Number(coIdRaw)) ? parseInt(coIdRaw, 10) : NaN;
+      if (Number.isNaN(coIdParsed)) {
+        return res.status(400).json({ error: "Invalid co_id" });
+      }
+      const isValidCO = await Question.validateCOForPaper(coIdParsed, paperId);
       if (!isValidCO) {
         return res.status(400).json({ error: "Invalid CO for this paper's course" });
       }
+      coId = coIdParsed;
     }
 
-    // Get next sequence number
-    const sequence_number = await Question.getNextSequenceNumber(paper_id);
+    // Get next sequence number (model helper)
+    const sequence_number = await Question.getNextSequenceNumber(paperId);
 
-    // Create question (always set status to 'draft')
-    const question = await Question.create({
-      paper_id,
-      content_html,
-      co_id: co_id || null,
-      sequence_number,
-      status: 'draft' // Always draft, ignore user input
-    });
+    // Insert question in DB
+    const insertQuery = `
+      INSERT INTO questions (paper_id, content_html, co_id, status, sequence_number, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+    `;
+    const insertValues = [paperId, content_html, coId, 'draft', sequence_number];
 
-    // Extract and link media
-    const mediaUrls = Question.extractMediaUrls(content_html);
-    await Question.linkMedia(question.question_id, mediaUrls);
+    const insertResult = await pool.query(insertQuery, insertValues);
+    const question = insertResult.rows[0];
+
+    // Extract and link media (best-effort). Use model helper to detect URLs.
+    const mediaUrls = Question.extractMediaUrls(content_html || '');
+    if (mediaUrls.length > 0) {
+      // Update media rows to link them to this question
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        for (const mediaUrl of mediaUrls) {
+          await client.query(
+            `UPDATE question_media
+             SET question_id = $1, is_used = TRUE, updated_at = CURRENT_TIMESTAMP
+             WHERE media_url = $2 AND (question_id IS NULL OR question_id = $1)`,
+            [question.question_id, mediaUrl]
+          );
+        }
+
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Failed to link media during createQuestion:', err);
+      } finally {
+        client.release();
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -60,29 +99,31 @@ export const createQuestion = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("createQuestion error:", err);
-    res.status(500).json({ error: "Server error while creating question" });
+    console.error("createQuestion error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while creating question" });
   }
 };
 
 /**
- * Update an existing question
+ * Update an existing question (transactional)
  */
 export const updateQuestion = async (req, res) => {
   logRequest(req);
+
   const client = await pool.connect();
   try {
-    const questionId = parseInt(req.params.id, 10);
+    const questionIdRaw = req.params.id;
+    const questionId = Number.isInteger(Number(questionIdRaw)) ? parseInt(questionIdRaw, 10) : NaN;
     if (Number.isNaN(questionId)) {
       return res.status(400).json({ error: "Invalid question ID" });
     }
 
     const {
       content_html,
-      paper_id: incomingPaperId,
-      co_id: incomingCoId,
+      paper_id: incomingPaperIdRaw,
+      co_id: incomingCoIdRaw,
       status: incomingStatus,
-      sequence_number: incomingSequenceNumber
+      sequence_number: incomingSequenceNumberRaw
     } = req.body;
 
     if (!content_html) {
@@ -97,14 +138,15 @@ export const updateQuestion = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Validate paper_id if provided
+    // Validate and determine paper_id to use
     let paperIdToUse = existingRes.paper_id;
-    if (incomingPaperId !== undefined && incomingPaperId !== null) {
-      const pid = parseInt(incomingPaperId, 10);
+    if (incomingPaperIdRaw !== undefined && incomingPaperIdRaw !== null && incomingPaperIdRaw !== '') {
+      const pid = Number.isInteger(Number(incomingPaperIdRaw)) ? parseInt(incomingPaperIdRaw, 10) : NaN;
       if (Number.isNaN(pid)) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: "Invalid paper_id" });
       }
+      // Validate access using model helper
       const hasAccess = await Question.validatePaperAccess(pid, req.user.user_id);
       if (!hasAccess) {
         await client.query('ROLLBACK');
@@ -114,40 +156,121 @@ export const updateQuestion = async (req, res) => {
     }
 
     // Validate co_id if provided
-    if (incomingCoId !== undefined && incomingCoId !== null && incomingCoId !== '') {
-      const coid = parseInt(incomingCoId, 10);
-      if (Number.isNaN(coid)) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: "Invalid co_id" });
-      }
-      const isValid = await Question.validateCOForPaper(coid, paperIdToUse);
-      if (!isValid) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: "Invalid CO for this paper's course" });
+    let coIdToUse = existingRes.co_id;
+    if (incomingCoIdRaw !== undefined) {
+      if (incomingCoIdRaw === '' || incomingCoIdRaw === null) {
+        coIdToUse = null;
+      } else {
+        const coid = Number.isInteger(Number(incomingCoIdRaw)) ? parseInt(incomingCoIdRaw, 10) : NaN;
+        if (Number.isNaN(coid)) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: "Invalid co_id" });
+        }
+        const isValid = await Question.validateCOForPaper(coid, paperIdToUse);
+        if (!isValid) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: "Invalid CO for this paper's course" });
+        }
+        coIdToUse = coid;
       }
     }
 
     // Determine sequence number
-    let seqToUse = (incomingSequenceNumber !== undefined) ? incomingSequenceNumber : existingRes.sequence_number;
-    if ((incomingSequenceNumber === undefined || incomingSequenceNumber === null) && incomingPaperId && incomingPaperId !== existingRes.paper_id) {
-      seqToUse = await Question.getNextSequenceNumber(paperIdToUse);
+    let seqToUse = existingRes.sequence_number;
+    const incomingSeqIsProvided = incomingSequenceNumberRaw !== undefined && incomingSequenceNumberRaw !== null && incomingSequenceNumberRaw !== '';
+    if (incomingSeqIsProvided) {
+      const seqParsed = Number.isInteger(Number(incomingSequenceNumberRaw)) ? parseInt(incomingSequenceNumberRaw, 10) : NaN;
+      if (Number.isNaN(seqParsed) || seqParsed < 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: "Invalid sequence_number" });
+      }
+      seqToUse = seqParsed;
+    } else {
+      if (paperIdToUse !== existingRes.paper_id) {
+        seqToUse = await Question.getNextSequenceNumber(paperIdToUse);
+      }
     }
 
-    // Build update payload with only provided fields
-    const updatePayload = {
-      content_html,
-      ...(incomingPaperId !== undefined ? { paper_id: paperIdToUse } : {}),
-      ...(incomingCoId !== undefined ? { co_id: incomingCoId === '' ? null : incomingCoId } : {}),
-      ...(incomingStatus !== undefined ? { status: incomingStatus } : {}),
-      ...(incomingSequenceNumber !== undefined ? { sequence_number: incomingSequenceNumber } : (seqToUse !== undefined ? { sequence_number: seqToUse } : {}))
-    };
+    // Validate status if provided
+    const allowedQuestionStatuses = ['draft', 'submitted', 'under_review', 'change_requested', 'approved'];
+    let statusToUse = existingRes.status;
+    if (incomingStatus !== undefined && incomingStatus !== null && incomingStatus !== '') {
+      if (!allowedQuestionStatuses.includes(incomingStatus)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: `Invalid status. Allowed: ${allowedQuestionStatuses.join(', ')}` });
+      }
+      statusToUse = incomingStatus;
+    }
 
-    const updatedQuestion = await Question.update(questionId, updatePayload);
+    // Build update query (use client)
+    const setClauses = [];
+    const values = [];
+    let idx = 1;
+
+    setClauses.push(`content_html = $${idx++}`);
+    values.push(content_html);
+
+    if (paperIdToUse !== undefined) {
+      setClauses.push(`paper_id = $${idx++}`);
+      values.push(paperIdToUse);
+    }
+
+    setClauses.push(`co_id = $${idx++}`);
+    values.push(coIdToUse);
+
+    setClauses.push(`status = $${idx++}`);
+    values.push(statusToUse);
+
+    setClauses.push(`sequence_number = $${idx++}`);
+    values.push(seqToUse);
+
+    setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    const updateSql = `
+      UPDATE questions
+      SET ${setClauses.join(', ')}
+      WHERE question_id = $${idx}
+      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+    `;
+    values.push(questionId);
+
+    const updateResult = await client.query(updateSql, values);
+    if (!updateResult.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Question not found when updating" });
+    }
+    const updatedQuestion = updateResult.rows[0];
 
     // Reconcile media
     const mediaUrls = Question.extractMediaUrls(content_html || '');
-    await Question.linkMedia(questionId, mediaUrls);
-    await Question.unlinkUnusedMedia(questionId, mediaUrls);
+
+    if (mediaUrls.length > 0) {
+      for (const mediaUrl of mediaUrls) {
+        await client.query(
+          `UPDATE question_media
+           SET question_id = $1, is_used = TRUE, updated_at = CURRENT_TIMESTAMP
+           WHERE media_url = $2 AND (question_id IS NULL OR question_id = $1)`,
+          [questionId, mediaUrl]
+        );
+      }
+    }
+
+    if (mediaUrls.length > 0) {
+      const placeholders = mediaUrls.map((_, i) => `$${i + 2}`).join(',');
+      const unlinkSql = `
+        UPDATE question_media
+        SET question_id = NULL, is_used = FALSE, updated_at = CURRENT_TIMESTAMP
+        WHERE question_id = $1 AND media_url NOT IN (${placeholders})
+      `;
+      await client.query(unlinkSql, [questionId, ...mediaUrls]);
+    } else {
+      await client.query(
+        `UPDATE question_media
+         SET question_id = NULL, is_used = FALSE, updated_at = CURRENT_TIMESTAMP
+         WHERE question_id = $1`,
+        [questionId]
+      );
+    }
 
     await client.query('COMMIT');
 
@@ -162,6 +285,7 @@ export const updateQuestion = async (req, res) => {
       question: updatedQuestion,
       message: "Question updated successfully"
     });
+
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (e) {}
     console.error("updateQuestion error:", err?.stack ?? err?.message ?? err);
@@ -174,26 +298,23 @@ export const updateQuestion = async (req, res) => {
   }
 };
 
-
 /**
  * Get question by ID
  */
 export const getQuestion = async (req, res) => {
   logRequest(req);
   try {
-    const questionId = parseInt(req.params.id);
-
-    if (isNaN(questionId)) {
+    const questionIdRaw = req.params.id;
+    const questionId = Number.isInteger(Number(questionIdRaw)) ? parseInt(questionIdRaw, 10) : NaN;
+    if (Number.isNaN(questionId)) {
       return res.status(400).json({ error: "Invalid question ID" });
     }
 
     const question = await Question.findById(questionId);
-
     if (!question) {
       return res.status(404).json({ error: "Question not found" });
     }
 
-    // Get associated media
     const media = await Question.getQuestionMedia(questionId);
 
     return res.json({
@@ -216,9 +337,10 @@ export const getQuestion = async (req, res) => {
 export const getQuestionsByPaper = async (req, res) => {
   logRequest(req);
   try {
-    const paperId = parseInt(req.params.paperId);
+    const paperIdRaw = req.params.paperId;
+    const paperId = Number.isInteger(Number(paperIdRaw)) ? parseInt(paperIdRaw, 10) : NaN;
 
-    if (isNaN(paperId)) {
+    if (Number.isNaN(paperId)) {
       return res.status(400).json({ error: "Invalid paper ID" });
     }
 
@@ -226,7 +348,7 @@ export const getQuestionsByPaper = async (req, res) => {
 
     return res.json({
       success: true,
-      questions: questions,
+      questions,
       count: questions.length
     });
 
@@ -242,9 +364,10 @@ export const getQuestionsByPaper = async (req, res) => {
 export const deleteQuestion = async (req, res) => {
   logRequest(req);
   try {
-    const questionId = parseInt(req.params.id);
+    const questionIdRaw = req.params.id;
+    const questionId = Number.isInteger(Number(questionIdRaw)) ? parseInt(questionIdRaw, 10) : NaN;
 
-    if (isNaN(questionId)) {
+    if (Number.isNaN(questionId)) {
       return res.status(400).json({ error: "Invalid question ID" });
     }
 
@@ -255,7 +378,7 @@ export const deleteQuestion = async (req, res) => {
     }
 
     console.log('Question deleted:', {
-      questionId: questionId,
+      questionId,
       userId: req.user.user_id
     });
 
@@ -286,12 +409,12 @@ export const searchQuestions = async (req, res) => {
     } = req.query;
 
     const filters = {
-      paper_id: paper_id ? parseInt(paper_id) : undefined,
-      co_id: co_id ? parseInt(co_id) : undefined,
+      paper_id: paper_id ? parseInt(paper_id, 10) : undefined,
+      co_id: co_id ? parseInt(co_id, 10) : undefined,
       status,
-      course_id: course_id ? parseInt(course_id) : undefined,
-      page: parseInt(page),
-      limit: parseInt(limit)
+      course_id: course_id ? parseInt(course_id, 10) : undefined,
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10)
     };
 
     const result = await Question.search(filters);
@@ -313,10 +436,11 @@ export const searchQuestions = async (req, res) => {
 export const updateQuestionSequence = async (req, res) => {
   logRequest(req);
   try {
-    const paperId = parseInt(req.params.paperId);
+    const paperIdRaw = req.params.paperId;
+    const paperId = Number.isInteger(Number(paperIdRaw)) ? parseInt(paperIdRaw, 10) : NaN;
     const { sequence_updates } = req.body;
 
-    if (isNaN(paperId)) {
+    if (Number.isNaN(paperId)) {
       return res.status(400).json({ error: "Invalid paper ID" });
     }
 
@@ -326,15 +450,17 @@ export const updateQuestionSequence = async (req, res) => {
 
     // Validate each update
     for (const update of sequence_updates) {
-      if (!update.question_id || typeof update.sequence_number !== 'number') {
-        return res.status(400).json({ error: "Each update must have question_id and sequence_number" });
+      const qid = update.question_id;
+      const sn = update.sequence_number;
+      if (!Number.isInteger(Number(qid)) || !Number.isInteger(Number(sn))) {
+        return res.status(400).json({ error: "Each update must have integer question_id and sequence_number" });
       }
     }
 
     const result = await Question.updateSequenceNumbers(paperId, sequence_updates);
 
     console.log('Question sequence updated:', {
-      paperId: paperId,
+      paperId,
       updatedCount: result.updated,
       userId: req.user.user_id
     });

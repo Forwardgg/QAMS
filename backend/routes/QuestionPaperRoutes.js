@@ -24,13 +24,11 @@ router.get("/course/:courseCode", authenticate, getPapersByCourse);
 // Get papers by course code and CO number (all authenticated users)
 router.get("/course/:courseCode/co/:coNumber", authenticate, getPapersByCourseAndCO);
 
-// Submit paper for moderation (instructor only - their own paper)
+// Submit for moderation — use :paperId to match controllers
 router.post("/:paperId/submit-for-moderation", authenticate, authorizeRoles("instructor"), submitForModeration);
 
-// Update paper (admin, instructor - their own paper)
+// Update & delete — admin or instructor (use same param name)
 router.put("/:paperId", authenticate, authorizeRoles("admin", "instructor"), updatePaper);
-
-// Delete paper (admin, instructor - their own paper)
 router.delete("/:paperId", authenticate, authorizeRoles("admin", "instructor"), deletePaper);
 
 export default router;

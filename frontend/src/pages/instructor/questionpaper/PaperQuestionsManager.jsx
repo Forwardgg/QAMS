@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import questionAPI from '../../../api/question.api';
 import questionPaperAPI from '../../../api/questionPaper.api';
@@ -16,40 +16,67 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  // Load paper and questions
+  // keep a ref for mounted state & abort controllers
+  const mountedRef = useRef(true);
+  const loadAbortRef = useRef(null);
+  const pdfAbortRef = useRef(null);
+
   useEffect(() => {
+    mountedRef.current = true;
     loadPaperAndQuestions();
+
+    return () => {
+      mountedRef.current = false;
+      if (loadAbortRef.current) {
+        try { loadAbortRef.current.abort(); } catch (_) {}
+        loadAbortRef.current = null;
+      }
+      if (pdfAbortRef.current) {
+        try { pdfAbortRef.current.abort(); } catch (_) {}
+        pdfAbortRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
+  // helpers to normalize various API response shapes
+  const normalizeArrayResponse = (resp) => {
+    if (!resp) return [];
+    if (Array.isArray(resp)) return resp;
+    if (Array.isArray(resp.data)) return resp.data;
+    if (Array.isArray(resp.rows)) return resp.rows;
+    if (Array.isArray(resp.questions)) return resp.questions;
+    // try to find first array value
+    const arr = Object.values(resp).find(v => Array.isArray(v));
+    return arr || [];
+  };
+
+  const findPaperInResponse = (resp, pid) => {
+    const arr = normalizeArrayResponse(resp);
+    return arr.find(p => String(p.paper_id) === String(pid));
+  };
+
   const loadPaperAndQuestions = async () => {
+    setIsLoading(true);
+    setMessage({ type: '', text: '' });
+
+    // create an AbortController for this load, so we can cancel if unmounted
+    const ac = new AbortController();
+    loadAbortRef.current = ac;
+
     try {
-      setIsLoading(true);
-      setMessage({ type: '', text: '' });
-
-      console.log('Loading paper ID:', paperId);
-
-      // Load paper details
+      // Load papers list (some wrappers return array, some return object)
       let papersResponse;
       try {
         papersResponse = await questionPaperAPI.getAll();
-        console.log('Papers API response:', papersResponse);
-      } catch (error) {
-        console.error('Error loading papers:', error);
+      } catch (err) {
+        console.error('Error loading papers:', err);
         setMessage({ type: 'error', text: 'Failed to load paper details' });
         setIsLoading(false);
         return;
       }
 
-      // Find the current paper - handle different response structures
-      let currentPaper;
-      if (Array.isArray(papersResponse)) {
-        currentPaper = papersResponse.find((p) => p.paper_id == paperId);
-      } else if (papersResponse.rows) {
-        currentPaper = papersResponse.rows.find((p) => p.paper_id == paperId);
-      } else if (papersResponse.data) {
-        currentPaper = papersResponse.data.find((p) => p.paper_id == paperId);
-      }
+      const currentPaper = findPaperInResponse(papersResponse, paperId);
 
       if (!currentPaper) {
         setMessage({ type: 'error', text: 'Paper not found' });
@@ -57,99 +84,90 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         return;
       }
 
+      if (!mountedRef.current) return;
       setPaper(currentPaper);
 
       // Load questions for this paper
       let questionsResponse;
       try {
         questionsResponse = await questionAPI.getByPaper(paperId);
-        console.log('Questions API response:', questionsResponse);
-      } catch (error) {
-        console.error('Error loading questions:', error);
+      } catch (err) {
+        console.error('Error loading questions:', err);
         setMessage({ type: 'error', text: 'Failed to load questions' });
         setIsLoading(false);
         return;
       }
 
-      // Handle different question response structures
-      let questionsData;
-      if (Array.isArray(questionsResponse)) {
-        questionsData = questionsResponse;
-      } else if (questionsResponse.questions) {
-        questionsData = questionsResponse.questions;
-      } else if (questionsResponse.rows) {
-        questionsData = questionsResponse.rows;
-      } else if (questionsResponse.data) {
-        questionsData = questionsResponse.data;
-      } else {
-        questionsData = [];
-      }
-
+      if (!mountedRef.current) return;
+      const questionsData = normalizeArrayResponse(questionsResponse);
       setQuestions(questionsData);
-    } catch (error) {
-      console.error('Error loading paper and questions:', error);
+    } catch (err) {
+      console.error('Error in loadPaperAndQuestions:', err);
       setMessage({ type: 'error', text: 'Failed to load paper questions' });
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) setIsLoading(false);
+      loadAbortRef.current = null;
     }
   };
 
   const handleUpdateQuestion = async (updatedQuestion) => {
     try {
-      await questionAPI.update(updatedQuestion.question_id, {
+      const qid = updatedQuestion.question_id ?? updatedQuestion.id ?? updatedQuestion.questionId;
+      if (!qid) throw new Error('Missing question id');
+
+      // payload normalization
+      const payload = {
         content_html: updatedQuestion.content_html,
         paper_id: updatedQuestion.paper_id,
-        co_id: updatedQuestion.co_id,
-      });
+        co_id: updatedQuestion.co_id ?? null
+      };
 
-      // Update local state
-      setQuestions((prev) =>
-        prev.map((q) =>
-          q.question_id === updatedQuestion.question_id ? updatedQuestion : q
-        )
+      await questionAPI.update(qid, payload);
+
+      // Update local state (merge server fields if available)
+      setQuestions(prev =>
+        prev.map(q => (q.question_id === qid ? { ...q, ...updatedQuestion } : q))
       );
 
       setEditingQuestion(null);
       setMessage({ type: 'success', text: 'Question updated successfully!' });
     } catch (error) {
       console.error('Error updating question:', error);
-      setMessage({ type: 'error', text: 'Failed to update question' });
+      setMessage({ type: 'error', text: error?.message || 'Failed to update question' });
     }
   };
 
   const handleDeleteQuestion = async (questionId) => {
-    if (!window.confirm('Are you sure you want to delete this question?')) {
-      return;
-    }
+    if (!window.confirm('Are you sure you want to delete this question?')) return;
 
     try {
       await questionAPI.delete(questionId);
 
-      // Remove from local state
-      setQuestions((prev) => prev.filter((q) => q.question_id !== questionId));
+      setQuestions(prev => prev.filter(q => q.question_id !== questionId));
       setMessage({ type: 'success', text: 'Question deleted successfully!' });
     } catch (error) {
       console.error('Error deleting question:', error);
-      setMessage({ type: 'error', text: 'Failed to delete question' });
+      setMessage({ type: 'error', text: error?.message || 'Failed to delete question' });
     }
   };
 
   const handleAddNewQuestion = () => {
-    navigate(`/instructor/questions/create?paperId=${paperId}`);
+    // navigate to create question page — encode paperId
+    const encoded = encodeURIComponent(paperId);
+    navigate(`/instructor/questions/create?paperId=${encoded}`);
   };
 
   const handleBackToPapers = () => {
-    if (onBack) {
-      onBack(); // Use the prop callback
+    if (typeof onBack === 'function') {
+      onBack();
     } else {
-      navigate('/instructor/papers'); // Fallback
+      navigate('/instructor/papers');
     }
   };
 
   /**
    * Export PDF:
    * - Uses server-side paper (paperId) so the backend builds the HTML and PDF.
-   * - Uses authService token for Authorization header.
    */
   const exportPdf = async () => {
     if (!paperId) return;
@@ -157,8 +175,16 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     setMessage({ type: '', text: '' });
     setIsGeneratingPdf(true);
 
+    // Abort previous pdf request if any
+    if (pdfAbortRef.current) {
+      try { pdfAbortRef.current.abort(); } catch (_) {}
+      pdfAbortRef.current = null;
+    }
+    const ac = new AbortController();
+    pdfAbortRef.current = ac;
+
     try {
-      const token = authService.getToken();
+      const token = typeof authService.getToken === 'function' ? authService.getToken() : null;
       const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -177,68 +203,50 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
+        signal: ac.signal
       });
 
       if (!resp.ok) {
         let errJson = null;
         try {
           errJson = await resp.json();
-        } catch (_) {
-          // ignore
-        }
+        } catch (_) {}
 
         if (resp.status === 401) {
-          setMessage({
-            type: 'error',
-            text: 'Unauthorized — please log in again.',
-          });
-          setIsGeneratingPdf(false);
+          setMessage({ type: 'error', text: 'Unauthorized — please log in again.' });
           return;
         }
         if (resp.status === 403) {
-          setMessage({
-            type: 'error',
-            text: errJson?.error || 'Access denied for PDF export.',
-          });
-          setIsGeneratingPdf(false);
+          setMessage({ type: 'error', text: errJson?.error || 'Access denied for PDF export.' });
           return;
         }
         if (resp.status === 404) {
-          setMessage({
-            type: 'error',
-            text: errJson?.error || 'Paper not found.',
-          });
-          setIsGeneratingPdf(false);
+          setMessage({ type: 'error', text: errJson?.error || 'Paper not found.' });
           return;
         }
 
-        setMessage({
-          type: 'error',
-          text: errJson?.error || `PDF generation failed (${resp.status})`,
-        });
-        setIsGeneratingPdf(false);
+        setMessage({ type: 'error', text: errJson?.error || `PDF generation failed (${resp.status})` });
         return;
       }
 
       const blob = await resp.blob();
 
+      // Protect against empty blob
+      if (!blob || blob.size === 0) {
+        setMessage({ type: 'error', text: 'PDF generation returned an empty file.' });
+        return;
+      }
+
       const contentDisp = resp.headers.get('Content-Disposition') || '';
       const headerFilename = (() => {
-        const match =
-          /filename\*?=(?:UTF-8'')?["']?([^;"']+)["']?/i.exec(contentDisp);
+        const match = /filename\*?=(?:UTF-8'')?["']?([^;"']+)["']?/i.exec(contentDisp);
         if (match && match[1]) {
-          try {
-            return decodeURIComponent(match[1]);
-          } catch (e) {
-            return match[1];
-          }
+          try { return decodeURIComponent(match[1]); } catch (e) { return match[1]; }
         }
         return null;
       })();
 
-      const safeFilename =
-        headerFilename ||
-        `paper-${paperId || 'export'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const safeFilename = headerFilename || `paper-${paperId || 'export'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
 
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -251,13 +259,16 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
 
       setMessage({ type: 'success', text: 'PDF generated and downloaded.' });
     } catch (err) {
-      console.error('exportPdf error:', err);
-      setMessage({
-        type: 'error',
-        text: err?.message || 'Failed to generate PDF',
-      });
+      if (err.name === 'AbortError') {
+        console.debug('PDF request aborted');
+        setMessage({ type: '', text: '' });
+      } else {
+        console.error('exportPdf error:', err);
+        setMessage({ type: 'error', text: err?.message || 'Failed to generate PDF' });
+      }
     } finally {
       setIsGeneratingPdf(false);
+      pdfAbortRef.current = null;
     }
   };
 
@@ -282,20 +293,25 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       {/* Header */}
       <div className="manager-header">
         <div className="header-left">
-          <button onClick={handleBackToPapers} className="btn-back">
+          <button type="button" onClick={handleBackToPapers} className="btn-back">
             ← Back to Papers
           </button>
           <h1>{paper.title} - Questions</h1>
           <p className="paper-info">
-            Course: {paper.course_code} | Status: {paper.status} | Questions:{' '}
-            {questions.length}
+            Course: {paper.course_code} | Status: {paper.status} | Questions: {questions.length}
           </p>
         </div>
         <div className="header-actions">
-          <button onClick={handleAddNewQuestion} className="btn-primary">
+          <button
+            type="button"
+            onClick={handleAddNewQuestion}
+            className="btn-primary"
+            disabled={isLoading}
+          >
             + Add New Question
           </button>
           <button
+            type="button"
             onClick={exportPdf}
             className="btn-secondary"
             disabled={isGeneratingPdf}
@@ -320,7 +336,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         {questions.length === 0 ? (
           <div className="no-questions">
             <p>No questions added to this paper yet.</p>
-            <button onClick={handleAddNewQuestion} className="btn-primary">
+            <button type="button" onClick={handleAddNewQuestion} className="btn-primary" disabled={isLoading}>
               Create First Question
             </button>
           </div>
@@ -333,18 +349,10 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
                 <div className="print-preview-title">{paper.title}</div>
                 <div className="print-preview-meta">
                   <span>{paper.course_code}</span>
-                  {paper.exam_type && (
-                    <span> | {paper.exam_type}</span>
-                  )}
-                  {paper.academic_year && (
-                    <span> | AY: {paper.academic_year}</span>
-                  )}
-                  {paper.full_marks != null && (
-                    <span> | Marks: {paper.full_marks}</span>
-                  )}
-                  {paper.duration != null && (
-                    <span> | Duration: {paper.duration} mins</span>
-                  )}
+                  {paper.exam_type && <span> | {paper.exam_type}</span>}
+                  {paper.academic_year && <span> | AY: {paper.academic_year}</span>}
+                  {paper.full_marks != null && <span> | Marks: {paper.full_marks}</span>}
+                  {paper.duration != null && <span> | Duration: {paper.duration} mins</span>}
                 </div>
               </header>
 
@@ -353,51 +361,23 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
                 {questions
                   .slice()
                   .sort((a, b) => {
-                    const an =
-                      a.sequence_number == null
-                        ? Number.MAX_SAFE_INTEGER
-                        : a.sequence_number;
-                    const bn =
-                      b.sequence_number == null
-                        ? Number.MAX_SAFE_INTEGER
-                        : b.sequence_number;
+                    const an = a.sequence_number == null ? Number.MAX_SAFE_INTEGER : Number(a.sequence_number);
+                    const bn = b.sequence_number == null ? Number.MAX_SAFE_INTEGER : Number(b.sequence_number);
                     return an - bn;
                   })
                   .map((question, index) => (
-                    <div
-                      key={question.question_id}
-                      className="print-preview-question"
-                    >
+                    <div key={question.question_id} className="print-preview-question">
                       <div className="question-header">
-                        <strong className="question-number">
-                          Q{question.sequence_number || index + 1}.
-                        </strong>
+                        <strong className="question-number">Q{question.sequence_number || index + 1}.</strong>
                         <div className="question-actions">
-                          <button
-                            onClick={() => setEditingQuestion(question)}
-                            className="btn-edit"
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDeleteQuestion(question.question_id)
-                            }
-                            className="btn-delete"
-                          >
-                            🗑️ Delete
-                          </button>
+                          <button type="button" onClick={() => setEditingQuestion(question)} className="btn-edit">✏️ Edit</button>
+                          <button type="button" onClick={() => handleDeleteQuestion(question.question_id)} className="btn-delete">🗑️ Delete</button>
                         </div>
                       </div>
-                      <div
-                        className="question-content"
-                        dangerouslySetInnerHTML={{
-                          __html: question.content_html,
-                        }}
-                      />
+                      <div className="question-content" dangerouslySetInnerHTML={{ __html: question.content_html }} />
                       {question.co_id && (
                         <div className="question-meta">
-                          <small>CO: {question.co_number}</small>
+                          <small>CO: {question.co_number || question.co_id}</small>
                         </div>
                       )}
                     </div>
