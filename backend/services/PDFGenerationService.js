@@ -276,70 +276,156 @@ class PDFGenerationService {
   // Build HTML from DB paper object
   // -------------------------
   buildHtmlFromPaper(paper = {}) {
-    const title = this.escapeHtml(paper.title || 'Question Paper');
-    const course = this.escapeHtml(paper.course || '');
-    const metadata = paper.metadata || {};
-    const institution = this.escapeHtml(metadata.institution || '');
-    const academicYear = this.escapeHtml(metadata.academic_year || '');
-    const examType = this.escapeHtml(metadata.exam_type || '');
-    const duration = metadata.duration ? `${metadata.duration} minutes` : '';
-    const fullMarks = metadata.full_marks ? `${metadata.full_marks} marks` : '';
+  const title = this.escapeHtml(paper.title || 'Question Paper');
+  const course = this.escapeHtml(paper.course || '');
+  const metadata = paper.metadata || {};
+  
+  // Extract data for the specific format
+  const institution = 'TEZPUR UNIVERSITY';
+  const semester = this.escapeHtml(metadata.semester || '');
+  const examType = this.escapeHtml(metadata.exam_type || 'End Term Examination');
+  const academicYear = this.escapeHtml(metadata.academic_year || '');
+  // REMOVED the duplicate 'course' declaration
+  const duration = metadata.duration ? `${metadata.duration} mins` : '';
+  const fullMarks = metadata.full_marks ? `${metadata.full_marks}` : '';
 
-    const questions = (paper.questions || []).sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0));
-    const questionsHtml = questions
-      .map((q, idx) => {
-        return `<div class="question" data-qid="${q.question_id || ''}">
-          <div class="qnum"><strong>Q${q.sequence_number || idx + 1}.</strong></div>
-          <div class="qcontent">${q.content_html || ''}</div>
-        </div>`;
-      })
-      .join('\n');
+  // Build the header lines in your exact format
+  const headerLine1 = institution;
+  const headerLine2 = `${semester} Semester ${examType}, ${academicYear}`;
+  const headerLine3 = `${course}`; // This should be "CS343: COMPUTER NETWORKS"
+  
+  const questions = (paper.questions || []).sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0));
+  const questionsHtml = questions
+    .map((q, idx) => {
+      return `<div class="question" data-qid="${q.question_id || ''}">
+        <div class="qnum"><strong>${q.sequence_number || idx + 1}.</strong></div>
+        <div class="qcontent">${q.content_html || ''}</div>
+      </div>`;
+    })
+    .join('\n');
 
-    const css = `
-      @page { size: A4; margin: ${this.config.margins.top} ${this.config.margins.right} ${this.config.margins.bottom} ${this.config.margins.left}; }
-      html,body { font-family: "Times New Roman", "Georgia", serif; color:#111; }
-      body { margin:0; padding:0; font-size:12pt; line-height:1.45; }
-      .container { padding: 6mm 8mm; box-sizing: border-box; }
-      .header { text-align:center; margin-bottom: 6mm; }
-      .title { font-size: 18pt; font-weight: bold; margin-bottom: 4px; }
-      .meta { font-size: 10pt; color: #333; margin-bottom: 8px; }
-      .paper-info { display:flex; justify-content:space-between; font-size: 10pt; margin-bottom: 6mm; }
-      .question { margin-bottom: 8mm; page-break-inside: avoid; }
-      .qnum { margin-bottom: 4px; }
-      img { max-width: 100%; height: auto; display:block; margin:6px 0; }
-      .footer { position: fixed; bottom: 6mm; width: 100%; text-align: right; font-size: 9pt; color: #666; padding-right: 8mm;}
-      nav, .no-print, .sidebar { display:none !important; }
-    `;
+  const css = `
+    @page { 
+      size: A4; 
+      margin: 10mm 15mm 10mm 15mm;
+    }
+    html,body { 
+      font-family: "Times New Roman", "Georgia", serif; 
+      color:#111; 
+    }
+    body { 
+      margin:0; 
+      padding:0; 
+      font-size:12pt; 
+      line-height:1.2;
+    }
+    .container { 
+      padding: 2mm 4mm;
+      box-sizing: border-box; 
+    }
+    .header { 
+      text-align:center; 
+      margin-bottom: 3mm;
+    }
+    .header-line1 {
+      font-size: 14pt;
+      font-weight: bold;
+      margin-bottom: 1px;
+    }
+    .header-line2 {
+      font-size: 12pt;
+      margin-bottom: 1px;
+    }
+    .header-line3 {
+      font-size: 12pt;
+      font-weight: bold;
+      margin-bottom: 2mm;
+    }
+    .marks-time-line {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11pt;
+      margin-bottom: 2mm;
+      padding-bottom: 1mm;
+      border-bottom: 1px solid #000;
+    }
+    .marks-time-line .full-marks {
+      text-align: left;
+    }
+    .marks-time-line .time {
+      text-align: right;
+    }
+    
+    /* Question layout */
+    .question { 
+      margin-bottom: 2mm;
+      page-break-inside: avoid;
+      display: flex;
+      align-items: baseline;
+      gap: 3px;
+    }
+    .qnum { 
+      font-weight: bold;
+      flex-shrink: 0;
+      margin: 0;
+      padding: 0;
+      line-height: 1.2;
+    }
+    .qcontent { 
+      flex: 1;
+      margin: 0;
+      padding: 0;
+      line-height: 1.2;
+    }
+    
+    .qcontent p {
+      margin: 0 0 1mm 0;
+      line-height: 1.2;
+    }
+    
+    strong, b { font-weight: bold !important; }
+    em, i { font-style: italic !important; }
+    
+    img { 
+      max-width: 100%; 
+      height: auto; 
+      display:block; 
+      margin:2px 0;
+    }
+    
+    .footer { 
+      display: none !important;
+    }
+    nav, .no-print, .sidebar { display:none !important; }
+  `;
 
-    const generatedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  return `<!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>${css}</style>
+    </head>
+    <body>
+      <div class="container">
+        <header class="header">
+          <div class="header-line1">${headerLine1}</div>
+          <div class="header-line2">${headerLine2}</div>
+          <div class="header-line3">${headerLine3}</div>
+          
+          <div class="marks-time-line">
+            <div class="full-marks">Full mark : ${fullMarks}</div>
+            <div class="time">Time: ${duration}</div>
+          </div>
+        </header>
 
-    return `<!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <style>${css}</style>
-      </head>
-      <body>
-        <div class="container">
-          <header class="header">
-            <div class="title">${title}</div>
-            <div class="meta">${course} ${institution ? '— ' + institution : ''}</div>
-            <div class="paper-info">
-              <div>${examType} ${academicYear ? '— ' + academicYear : ''}</div>
-              <div>${fullMarks} ${duration ? ' — ' + duration : ''}</div>
-            </div>
-          </header>
-
-          <main>
-            ${questionsHtml}
-          </main>
-
-          <div class="footer">Generated: ${generatedAt}</div>
-        </div>
-      </body>
-      </html>`;
-  }
+        <main>
+          ${questionsHtml}
+        </main>
+      </div>
+    </body>
+    </html>`;
+}
 
   escapeHtml(s = '') {
     return String(s)

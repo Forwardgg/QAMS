@@ -1,5 +1,6 @@
 // src/api/moderatorAPI.js - UPDATED VERSION
 import api from "./axios";
+import pdfAPI from "./pdf.api";
 
 const moderatorAPI = {
   getPapers: async (filters = {}) => {
@@ -83,6 +84,23 @@ const moderatorAPI = {
       console.error('API Error in getCOBreakdown:', error);
       throw error;
     }
+  },
+
+  generatePdf: async (params = {}) => {
+    try {
+      // Use the existing pdfAPI that we know works
+      return await pdfAPI.generatePdf(params);
+    } catch (error) {
+      console.error('API Error in generatePdf:', error);
+      throw error;
+    }
+  },
+  downloadPdf: (pdfBlob, filename = 'paper.pdf') => {
+    pdfAPI.downloadPdf(pdfBlob, filename);
+  },
+
+  openPdfInNewTab: (pdfBlob) => {
+    pdfAPI.openPdfInNewTab(pdfBlob);
   },
 
   // === Report endpoints ===

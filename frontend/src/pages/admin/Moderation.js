@@ -4,6 +4,7 @@ import ModerationList from './moderation/ModerationList';
 import ModReport from './moderation/ModReport';
 import QuestionList from './moderation/QuestionList';
 import moderatorAPI from '../../api/moderator.api';
+import pdfAPI from '../../api/pdf.api'; // Import PDF API
 import './Moderation.css';
 
 const Moderation = ({ view, selectedModeration, onViewModeration, onBackToList }) => {
@@ -133,7 +134,7 @@ const Moderation = ({ view, selectedModeration, onViewModeration, onBackToList }
             className={`tab-button ${activeTab === 'questions' ? 'active' : ''}`}
             onClick={() => setActiveTab('questions')}
           >
-            Questions ({questionReport?.count || 0})
+            Questions
           </button>
           <button 
             className={`tab-button ${activeTab === 'report' ? 'active' : ''}`}
@@ -166,10 +167,10 @@ const Moderation = ({ view, selectedModeration, onViewModeration, onBackToList }
 
           {activeTab === 'questions' && (
             <QuestionList 
-    questionReport={questionReport}
-    paperData={paperReport?.paper}
-    loading={loading && !questionReport}
-  />
+              questionReport={questionReport}
+              paperData={paperReport?.paper || moderation} // Fallback to moderation data
+              loading={loading && !questionReport}
+            />
           )}
 
           {activeTab === 'report' && (

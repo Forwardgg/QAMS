@@ -42,9 +42,16 @@ const bodySchema = Joi.object({
 async function fetchPaperDataFromDb(paperId) {
   const client = await pool.connect();
   try {
+    // UPDATED QUERY: Get all needed fields including course code and title
     const paperRes = await client.query(
-      `SELECT paper_id, title, course_id, created_by, assembled_html, academic_year, exam_type, full_marks, duration
-       FROM question_papers WHERE paper_id = $1`,
+      `SELECT 
+         qp.paper_id, qp.title, qp.course_id, qp.created_by, 
+         qp.assembled_html, qp.academic_year, qp.exam_type, 
+         qp.full_marks, qp.duration, qp.semester,
+         c.code as course_code, c.title as course_title
+       FROM question_papers qp
+       LEFT JOIN courses c ON qp.course_id = c.course_id
+       WHERE qp.paper_id = $1`,
       [paperId]
     );
 
@@ -56,14 +63,7 @@ async function fetchPaperDataFromDb(paperId) {
 
     const paper = paperRes.rows[0];
 
-    // Fetch course title (if any)
-    let courseTitle = '';
-    if (paper.course_id) {
-      const cRes = await client.query(`SELECT title FROM courses WHERE course_id = $1`, [paper.course_id]);
-      courseTitle = cRes.rowCount ? cRes.rows[0].title : '';
-    }
-
-    // Fetch questions ordered by sequence_number (NULLS LAST) then created_at
+    // Fetch questions ordered by sequence_number
     const qRes = await client.query(
       `SELECT question_id, sequence_number, content_html
        FROM questions
@@ -80,16 +80,17 @@ async function fetchPaperDataFromDb(paperId) {
 
     return {
       title: paper.title,
-      course: courseTitle,
+      course: `${paper.course_code}: ${paper.course_title}`, // Format: "CS343: COMPUTER NETWORKS"
       metadata: {
-        institution: process.env.INSTITUTION_NAME || '',
+        institution: process.env.INSTITUTION_NAME || 'TEZPUR UNIVERSITY',
         academic_year: paper.academic_year,
         exam_type: paper.exam_type,
+        semester: paper.semester, // ADD THIS
         duration: paper.duration,
         full_marks: paper.full_marks,
       },
       questions,
-      created_by: paper.created_by, // included for access checks if needed
+      created_by: paper.created_by,
     };
   } finally {
     client.release();

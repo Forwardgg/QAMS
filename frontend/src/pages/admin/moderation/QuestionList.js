@@ -1,50 +1,92 @@
 // src/pages/admin/Moderation/QuestionList.js
-import React from 'react';
+import React, { useState } from 'react';
+import moderatorAPI from '../../../api/moderator.api';
 import './QuestionList.css';
 
 const QuestionList = ({ questionReport, paperData, loading }) => {
-  console.log('QuestionList props:', { questionReport, paperData, loading });
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfMessage, setPdfMessage] = useState({ type: '', text: '' });
 
   if (loading) {
     return <div className="loading">Loading questions...</div>;
   }
 
-  // FIX: Check if questionReport is an array directly
+  // Check if we have valid question data
   const hasQuestions = Array.isArray(questionReport) && questionReport.length > 0;
-
-  console.log('Has questions:', hasQuestions);
-  console.log('Question report type:', typeof questionReport);
-  console.log('Question report value:', questionReport);
   
   if (!hasQuestions) {
     return (
       <div className="no-questions">
         <h3>Questions</h3>
         <p>No questions found for this paper.</p>
-        <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
-          Question Report: {questionReport ? `Type: ${typeof questionReport}, Length: ${questionReport.length}` : 'null'}
-        </p>
       </div>
     );
   }
 
-  // FIX: Use questionReport directly since it's an array
+  // Sort questions by sequence number
   const sortedQuestions = [...questionReport].sort((a, b) => 
     (a.sequence_number || 0) - (b.sequence_number || 0)
   );
 
-  console.log('Sorted questions:', sortedQuestions);
+  // Generate and download PDF
+  const handleGeneratePdf = async () => {
+    if (!paperData?.paper_id) {
+      setPdfMessage({ type: 'error', text: 'Paper ID not found' });
+      return;
+    }
+
+    setIsGeneratingPdf(true);
+    setPdfMessage({ type: '', text: '' });
+
+    try {
+      const pdfBlob = await moderatorAPI.generatePdf({
+        paperId: paperData.paper_id,
+        baseUrl: process.env.REACT_APP_BASE_URL || window.location.origin,
+        postOptions: {
+          addPageNumbers: true,
+          pageNumberOptions: { fontSize: 10, marginBottom: 18 },
+        },
+        filename: `${paperData.course_code || 'paper'}-${paperData.title || 'questions'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
+      });
+
+      // Download the PDF
+      moderatorAPI.downloadPdf(
+        pdfBlob, 
+        `${paperData.course_code || 'paper'}-${paperData.title || 'questions'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
+      );
+
+      setPdfMessage({ type: 'success', text: 'PDF generated and downloaded successfully!' });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      setPdfMessage({ 
+        type: 'error', 
+        text: error.message || 'Failed to generate PDF. Please try again.' 
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   return (
     <div className="question-list">
       <div className="print-controls">
-        <button className="btn-primary print-btn" onClick={() => window.print()}>
-          📄 Print Question Paper
+        <button 
+          className="btn-primary print-btn" 
+          onClick={handleGeneratePdf}
+          disabled={isGeneratingPdf}
+        >
+          {isGeneratingPdf ? '🔄 Generating PDF...' : '📄 Generate Question Paper PDF'}
         </button>
         <div className="question-count">
           {sortedQuestions.length} question{sortedQuestions.length !== 1 ? 's' : ''}
         </div>
       </div>
+
+      {pdfMessage.text && (
+        <div className={`pdf-message ${pdfMessage.type}`}>
+          {pdfMessage.text}
+        </div>
+      )}
 
       <div className="print-preview-wrapper">
         <div className="print-preview-page">
