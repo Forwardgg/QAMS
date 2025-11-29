@@ -9,67 +9,87 @@ export class Question {
    * Accepts optional client for transactionality
    */
   static async create(questionData, client = null) {
-    const { paper_id, content_html, co_id, status = 'draft', sequence_number = null } = questionData;
-    const executor = client || pool;
+  const executor = client || pool;
+  const { paper_id, content_html, co_id, status = 'draft', sequence_number = null } = questionData;
 
-    const query = `
-      INSERT INTO questions (paper_id, content_html, co_id, status, sequence_number, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
-    `;
-
-    const values = [paper_id || null, content_html, co_id || null, status, sequence_number];
-    const result = await executor.query(query, values);
-    return result.rows[0];
+  // Basic validation
+  if (!content_html) {
+    throw new Error('content_html is required');
   }
+
+  if (paper_id) {
+    // optionally validate the paper exists (use same executor to allow transactional callers)
+    const paperCheck = await executor.query('SELECT paper_id FROM question_papers WHERE paper_id = $1 LIMIT 1', [paper_id]);
+    if (!paperCheck.rows.length) {
+      throw new Error('paper_id not found');
+    }
+  }
+
+  const query = `
+    INSERT INTO questions (paper_id, content_html, co_id, status, sequence_number, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+  `;
+
+  const values = [paper_id || null, content_html, co_id || null, status, sequence_number];
+  const result = await executor.query(query, values);
+  return result.rows[0];
+}
+
 
   /**
    * Update an existing question
    * Accepts optional client
    */
   static async update(questionId, questionData, client = null) {
-    if (!questionId) throw new Error('Invalid questionId');
+  if (!questionId) throw new Error('Invalid questionId');
 
-    const executor = client || pool;
+  const executor = client || pool;
 
-    // Allowed updatable fields
-    const allowed = ['paper_id', 'content_html', 'co_id', 'status', 'sequence_number'];
-
-    const setClauses = [];
-    const values = [];
-    let idx = 1;
-
-    for (const key of allowed) {
-      if (Object.prototype.hasOwnProperty.call(questionData, key) && questionData[key] !== undefined) {
-        setClauses.push(`${key} = $${idx++}`);
-        // push null explicitly for empty strings for co_id/paper if you want to allow null
-        values.push(questionData[key] === '' ? null : questionData[key]);
-      }
+  // Validate status if provided
+  if (Object.prototype.hasOwnProperty.call(questionData, 'status')) {
+    const allowedStatuses = ['draft', 'submitted', 'under_review', 'change_requested', 'approved'];
+    if (!allowedStatuses.includes(questionData.status)) {
+      throw new Error(`Invalid status. Allowed: ${allowedStatuses.join(', ')}`);
     }
-
-    if (setClauses.length === 0) {
-      // nothing to update, return current row
-      const existing = await executor.query('SELECT * FROM questions WHERE question_id = $1', [questionId]);
-      if (!existing.rows.length) throw new Error('Question not found');
-      return existing.rows[0];
-    }
-
-    // add updated_at and where param
-    setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
-    const query = `
-      UPDATE questions
-      SET ${setClauses.join(', ')}
-      WHERE question_id = $${idx}
-      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
-    `;
-    values.push(questionId);
-
-    const result = await executor.query(query, values);
-    if (result.rows.length === 0) {
-      throw new Error('Question not found');
-    }
-    return result.rows[0];
   }
+
+  // Allowed updatable fields
+  const allowed = ['paper_id', 'content_html', 'co_id', 'status', 'sequence_number'];
+
+  const setClauses = [];
+  const values = [];
+  let idx = 1;
+
+  for (const key of allowed) {
+    if (Object.prototype.hasOwnProperty.call(questionData, key) && questionData[key] !== undefined) {
+      setClauses.push(`${key} = $${idx++}`);
+      values.push(questionData[key] === '' ? null : questionData[key]);
+    }
+  }
+
+  if (setClauses.length === 0) {
+    // nothing to update, return current row
+    const existing = await executor.query('SELECT * FROM questions WHERE question_id = $1', [questionId]);
+    if (!existing.rows.length) throw new Error('Question not found');
+    return existing.rows[0];
+  }
+
+  setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+  const query = `
+    UPDATE questions
+    SET ${setClauses.join(', ')}
+    WHERE question_id = $${idx}
+    RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+  `;
+  values.push(questionId);
+
+  const result = await executor.query(query, values);
+  if (result.rows.length === 0) {
+    throw new Error('Question not found');
+  }
+  return result.rows[0];
+}
 
   /**
    * Find question by ID
@@ -97,19 +117,20 @@ export class Question {
    * Find questions by paper ID
    */
   static async findByPaperId(paperId) {
-    const query = `
-      SELECT q.*, 
-             co.co_number, 
-             co.description as co_description
-      FROM questions q
-      LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-      WHERE q.paper_id = $1
-      ORDER BY q.sequence_number, q.question_id
-    `;
-    
-    const result = await pool.query(query, [paperId]);
-    return result.rows;
-  }
+  const query = `
+    SELECT q.*, 
+           co.co_number, 
+           co.description as co_description
+    FROM questions q
+    LEFT JOIN course_outcomes co ON q.co_id = co.co_id
+    WHERE q.paper_id = $1
+    ORDER BY q.sequence_number NULLS LAST, q.question_id
+  `;
+  
+  const result = await pool.query(query, [paperId]);
+  return result.rows;
+}
+
 
   /**
    * Delete a question
@@ -479,32 +500,33 @@ export class Question {
    * Get questions grouped by CO for moderation report
    */
   static async getQuestionsByCO(paperId) {
-    const query = `
-      SELECT 
-        co.co_id,
-        co.co_number,
-        co.description as co_description,
-        COUNT(q.question_id) as total_questions,
-        COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_questions,
-        COUNT(CASE WHEN q.status = 'change_requested' THEN 1 END) as change_requested_questions,
-        json_agg(
-          jsonb_build_object(
-            'question_id', q.question_id,
-            'sequence_number', q.sequence_number,
-            'content_preview', SUBSTRING(q.content_html FROM 1 FOR 100),
-            'status', q.status,
-            'created_at', q.created_at
-          )
-        ) as questions
-      FROM course_outcomes co
-      LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
-      LEFT JOIN question_papers qp ON co.course_id = qp.course_id
-      WHERE qp.paper_id = $1 OR qp.paper_id IS NULL
-      GROUP BY co.co_id, co.co_number, co.description
-      ORDER BY co.co_number
-    `;
+  const query = `
+    SELECT 
+      co.co_id,
+      co.co_number,
+      co.description as co_description,
+      COUNT(q.question_id) as total_questions,
+      COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_questions,
+      COUNT(CASE WHEN q.status = 'change_requested' THEN 1 END) as change_requested_questions,
+      json_agg(
+        jsonb_build_object(
+          'question_id', q.question_id,
+          'sequence_number', q.sequence_number,
+          'content_preview', SUBSTRING(q.content_html FROM 1 FOR 100),
+          'status', q.status,
+          'created_at', q.created_at
+        ) ORDER BY q.sequence_number NULLS LAST
+      ) FILTER (WHERE q.question_id IS NOT NULL) as questions
+    FROM course_outcomes co
+    JOIN (SELECT course_id FROM question_papers WHERE paper_id = $1 LIMIT 1) qp_course
+      ON co.course_id = qp_course.course_id
+    LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
+    GROUP BY co.co_id, co.co_number, co.description
+    ORDER BY co.co_number
+  `;
 
-    const { rows } = await pool.query(query, [paperId]);
-    return rows;
-  }
+  const { rows } = await pool.query(query, [paperId]);
+  return rows;
+}
+
 }

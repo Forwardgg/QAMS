@@ -1,14 +1,17 @@
-//src/pages/admin/Dashboard.js
+// src/pages/admin/Dashboard.js
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../../components/AuthProvider';
 import AdminHeader from '../../components/AdminHeader';
 import AdminSidebar from '../../components/AdminSidebar';
 import Courses from './Courses';
 import CO from './CO';
+import Moderation from './Moderation';
 import './Dashboard.css';
 
 const AdminDashboard = () => {
   const [activePage, setActivePage] = useState('dashboard');
+  const [moderationView, setModerationView] = useState('list'); // 'list' or 'details'
+  const [selectedModeration, setSelectedModeration] = useState(null);
   const auth = useContext(AuthContext);
 
   const handleLogout = () => {
@@ -17,6 +20,20 @@ const AdminDashboard = () => {
 
   const handlePageChange = (pageId) => {
     setActivePage(pageId);
+    setModerationView('list'); // Reset to list view when switching pages
+    setSelectedModeration(null);
+  };
+
+  // Handle viewing moderation details
+  const handleViewModeration = (moderationId, paperId) => {
+    setSelectedModeration({ moderationId, paperId });
+    setModerationView('details');
+  };
+
+  // Handle going back to moderation list
+  const handleBackToList = () => {
+    setModerationView('list');
+    setSelectedModeration(null);
   };
 
   // Render different content based on active page
@@ -46,37 +63,41 @@ const AdminDashboard = () => {
             </div>
           </div>
         );
-      case 'Moderation':
+      case 'moderation':
         return (
           <div className="dashboard-content">
-            <h1>Moderation</h1>
-            <p>Moderation content goes here...</p>
+            <Moderation 
+              view={moderationView}
+              selectedModeration={selectedModeration}
+              onViewModeration={handleViewModeration}
+              onBackToList={handleBackToList}
+            />
           </div>
         );
       case 'courses':
         return (
           <div className="dashboard-content">
-            <Courses /> {}
+            <Courses />
           </div>
         );
       case 'CO':
         return (
           <div className="dashboard-content">
-            <CO /> {}
+            <CO />
           </div>
         );
       case 'users':
         return (
           <div className="dashboard-content">
-            <h1>User mnagement</h1>
-            <p>usre mgmt content goes here...</p>
+            <h1>User Management</h1>
+            <p>User management content goes here...</p>
           </div>
         );
       case 'reports':
         return (
           <div className="dashboard-content">
-            <h1>reports</h1>
-            <p>reports content goes here...</p>
+            <h1>Reports</h1>
+            <p>Reports content goes here...</p>
           </div>
         );
       default:

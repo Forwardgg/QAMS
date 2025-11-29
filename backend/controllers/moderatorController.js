@@ -1,23 +1,20 @@
-// src/backend/controllers/moderatorController.js
+// backend/controllers/moderatorController.js
 import { QuestionPaper } from "../models/QuestionPaper.js";
 import { Question } from "../models/Question.js";
 import { Moderation } from "../models/Moderation.js";
 import { pool } from "../config/db.js";
+
 /**
  * Get papers available for moderation
- * GET /api/moderator/papers?courseId=123
+ * GET /api/moderator/papers?courseId=123&status=submitted
  */
 export const getPapersForModeration = async (req, res) => {
   try {
     const { courseId, status } = req.query;
     const moderatorId = req.user.user_id;
 
-    // Only moderators can access
     if (req.user.role !== 'moderator') {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Moderator role required."
-      });
+      return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
 
     const papers = await QuestionPaper.getAllPapersForModerator(courseId, status, moderatorId);
@@ -33,10 +30,7 @@ export const getPapersForModeration = async (req, res) => {
     });
   } catch (error) {
     console.error("getPapersForModeration error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -50,27 +44,22 @@ export const getPaperDetails = async (req, res) => {
     const moderatorId = req.user.user_id;
 
     if (req.user.role !== 'moderator') {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Moderator role required."
-      });
+      return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
 
-    // Get paper details
+    // Paper metadata and course outcomes
     const paper = await QuestionPaper.getPaperForModeration(id);
     if (!paper) {
-      return res.status(404).json({
-        success: false,
-        message: "Paper not found or not available for moderation"
-      });
+      return res.status(404).json({ success: false, message: "Paper not found or not available for moderation" });
     }
 
-    // Get questions for this paper
+    // Questions for moderation (content + COs)
     const questions = await Question.getQuestionsForModeration(id);
 
-    // Get existing moderation if any
-    const existingModeration = await Moderation.findByPaper(id);
+    // Active pending moderation (if any)
+    const existingModeration = await Moderation.findPendingByPaper(id);
 
+    // Return everything; front-end decides allowed actions based on existingModeration & user
     res.json({
       success: true,
       data: {
@@ -81,15 +70,12 @@ export const getPaperDetails = async (req, res) => {
     });
   } catch (error) {
     console.error("getPaperDetails error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 /**
- * Start moderating a paper (changes status to under_review)
+ * Start moderating a paper (transactional)
  * POST /api/moderator/papers/:id/start
  */
 export const startModeration = async (req, res) => {
@@ -98,46 +84,47 @@ export const startModeration = async (req, res) => {
     const moderatorId = req.user.user_id;
 
     if (req.user.role !== 'moderator') {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Moderator role required."
-      });
-    }
-
-    // Check if paper exists and is in submitted status
-    const paper = await QuestionPaper.getPaperForModeration(id);
-    if (!paper) {
-      return res.status(404).json({
-        success: false,
-        message: "Paper not found"
-      });
-    }
-
-    if (paper.status !== 'submitted') {
-      return res.status(400).json({
-        success: false,
-        message: `Paper is not in submitted status. Current status: ${paper.status}`
-      });
-    }
-
-    // Check if already being moderated by someone else
-    const existingModeration = await Moderation.findByPaper(id);
-    if (existingModeration && existingModeration.status === 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: "Paper is already being moderated by another moderator"
-      });
+      return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Update paper status to under_review
-      await QuestionPaper.startModeration(id);
+      // Lock the paper row to avoid concurrent starters
+      const paperRes = await client.query(
+        'SELECT paper_id, status FROM question_papers WHERE paper_id = $1 FOR UPDATE',
+        [id]
+      );
+      if (!paperRes.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ success: false, message: "Paper not found" });
+      }
+      const paper = paperRes.rows[0];
 
-      // Create moderation record
-      const moderation = await Moderation.create(id, moderatorId);
+      if (paper.status !== 'submitted') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: `Paper is not in submitted status. Current status: ${paper.status}`
+        });
+      }
+
+      // Ensure no pending moderation by other moderators exists
+      const pendingOther = await client.query(
+        `SELECT 1 FROM qp_moderations WHERE paper_id = $1 AND status = 'pending' AND moderator_id IS DISTINCT FROM $2 LIMIT 1`,
+        [id, moderatorId]
+      );
+      if (pendingOther.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: "Paper is already being moderated by another moderator" });
+      }
+
+      // Create moderation record using same client
+      const moderation = await Moderation.create(id, moderatorId, client);
+
+      // Update paper status to under_review using same client
+      await QuestionPaper.startModeration(id, client);
 
       await client.query('COMMIT');
 
@@ -145,7 +132,7 @@ export const startModeration = async (req, res) => {
         success: true,
         message: "Moderation started successfully",
         data: {
-          paper: { ...paper, status: 'under_review' },
+          paper: { paper_id: id, status: 'under_review' },
           moderation
         }
       });
@@ -157,10 +144,7 @@ export const startModeration = async (req, res) => {
     }
   } catch (error) {
     console.error("startModeration error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -175,37 +159,25 @@ export const updateQuestionStatus = async (req, res) => {
     const moderatorId = req.user.user_id;
 
     if (req.user.role !== 'moderator') {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Moderator role required."
-      });
+      return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
 
     if (!status || !['approved', 'change_requested'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Status must be either 'approved' or 'change_requested'"
-      });
+      return res.status(400).json({ success: false, message: "Status must be either 'approved' or 'change_requested'" });
     }
 
-    // Get question to verify it exists and get paper info
     const question = await Question.findById(id);
     if (!question) {
-      return res.status(404).json({
-        success: false,
-        message: "Question not found"
-      });
+      return res.status(404).json({ success: false, message: "Question not found" });
     }
 
-    // Verify moderator has access to this paper
-    const moderation = await Moderation.findByPaper(question.paper_id);
-    if (!moderation || moderation.moderator_id !== moderatorId) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not moderating this paper"
-      });
+    // Ensure the moderator has an active pending moderation for this paper
+    const isActive = await Moderation.isModeratingPaper(question.paper_id, moderatorId);
+    if (!isActive) {
+      return res.status(403).json({ success: false, message: "You are not moderating this paper" });
     }
 
+    // Update question status (single update)
     const updatedQuestion = await Question.updateQuestionStatus(id, status);
 
     res.json({
@@ -215,10 +187,7 @@ export const updateQuestionStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("updateQuestionStatus error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -232,22 +201,16 @@ export const bulkUpdateQuestionStatus = async (req, res) => {
     const moderatorId = req.user.user_id;
 
     if (req.user.role !== 'moderator') {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Moderator role required."
-      });
+      return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
 
     if (!Array.isArray(updates) || updates.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Updates array is required"
-      });
+      return res.status(400).json({ success: false, message: "Updates array is required" });
     }
 
-    // Validate all updates
-    for (const update of updates) {
-      if (!update.question_id || !['approved', 'change_requested'].includes(update.status)) {
+    // Validate payload
+    for (const upd of updates) {
+      if (!upd.question_id || !['approved', 'change_requested'].includes(upd.status)) {
         return res.status(400).json({
           success: false,
           message: "Each update must have question_id and status (approved/change_requested)"
@@ -255,53 +218,52 @@ export const bulkUpdateQuestionStatus = async (req, res) => {
       }
     }
 
-    // Verify all questions belong to the same paper and moderator has access
+    // Fetch first question and verify moderator access
     const firstQuestion = await Question.findById(updates[0].question_id);
     if (!firstQuestion) {
-      return res.status(404).json({
-        success: false,
-        message: "Question not found"
-      });
+      return res.status(404).json({ success: false, message: "Question not found" });
     }
 
-    const moderation = await Moderation.findByPaper(firstQuestion.paper_id);
-    if (!moderation || moderation.moderator_id !== moderatorId) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not moderating this paper"
-      });
+    const isActive = await Moderation.isModeratingPaper(firstQuestion.paper_id, moderatorId);
+    if (!isActive) {
+      return res.status(403).json({ success: false, message: "You are not moderating this paper" });
     }
 
-    // Verify all questions are from the same paper
-    for (const update of updates) {
-      const question = await Question.findById(update.question_id);
-      if (!question) {
-        return res.status(404).json({
-          success: false,
-          message: `Question ${update.question_id} not found`
-        });
-      }
-      if (question.paper_id !== firstQuestion.paper_id) {
-        return res.status(400).json({
-          success: false,
-          message: "All questions must be from the same paper"
-        });
+    // Fetch all question records in one query to validate paper ownership
+    const ids = updates.map(u => u.question_id);
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+    const qFetch = await pool.query(`SELECT question_id, paper_id FROM questions WHERE question_id IN (${placeholders})`, ids);
+
+    if (qFetch.rows.length !== ids.length) {
+      return res.status(404).json({ success: false, message: "One or more questions not found" });
+    }
+    for (const r of qFetch.rows) {
+      if (r.paper_id !== firstQuestion.paper_id) {
+        return res.status(400).json({ success: false, message: "All questions must be from the same paper" });
       }
     }
 
-    const results = await Question.bulkUpdateStatus(updates);
+    // Perform bulk update in a transaction (so either all succeed or none)
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const results = await Question.bulkUpdateStatus(updates, client);
+      await client.query('COMMIT');
 
-    res.json({
-      success: true,
-      message: `${results.length} question statuses updated successfully`,
-      data: results
-    });
+      res.json({
+        success: true,
+        message: `${results.length} question statuses updated successfully`,
+        data: results
+      });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("bulkUpdateQuestionStatus error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -333,40 +295,31 @@ export const submitModerationReport = async (req, res) => {
     const moderatorId = req.user.user_id;
 
     if (req.user.role !== 'moderator') {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Moderator role required."
-      });
+      return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
 
     if (!paper_id || !final_decision || !['approved', 'rejected'].includes(final_decision)) {
-      return res.status(400).json({
-        success: false,
-        message: "paper_id and final_decision (approved/rejected) are required"
-      });
+      return res.status(400).json({ success: false, message: "paper_id and final_decision (approved/rejected) are required" });
     }
 
-    // Verify moderator has access to this paper
-    const existingModeration = await Moderation.findByPaper(paper_id);
+    // Get pending moderation for this paper and ensure this moderator is assigned
+    const existingModeration = await Moderation.findPendingByPaper(paper_id);
     if (!existingModeration || existingModeration.moderator_id !== moderatorId) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not moderating this paper"
-      });
-    }
-
-    if (existingModeration.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: "Moderation report already submitted"
-      });
+      return res.status(403).json({ success: false, message: "You are not moderating this paper (or no active moderation found)" });
     }
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Update moderation record with criteria and decision
+      // Lock the moderation row to avoid races
+      const modLock = await client.query('SELECT moderation_id FROM qp_moderations WHERE moderation_id = $1 FOR UPDATE', [existingModeration.moderation_id]);
+      if (!modLock.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: "Moderation record not found" });
+      }
+
+      // Prepare moderationData for update
       const moderationData = {
         questions_set_per_co,
         questions_set_per_co_comment,
@@ -382,26 +335,27 @@ export const submitModerationReport = async (req, res) => {
         linguistically_accurate_comment,
         verbatim_copy_check,
         verbatim_copy_comment,
-        status: final_decision
+        status: final_decision === 'approved' ? 'approved' : 'rejected'
       };
 
-      const updatedModeration = await Moderation.update(existingModeration.moderation_id, moderationData);
+      // Update moderation record (within transaction)
+      const updatedModeration = await Moderation.update(existingModeration.moderation_id, moderationData, client);
 
-      // Update paper status based on final decision
+      // Update paper status (approved -> 'approved', rejected -> 'change_requested')
       const paperStatus = final_decision === 'approved' ? 'approved' : 'change_requested';
-      await QuestionPaper.updateStatus(paper_id, paperStatus);
+      await QuestionPaper.updateStatus(paper_id, paperStatus, client);
 
-      // If paper is approved, approve all questions that weren't individually rejected
+      // If paper approved, approve all questions that weren't individually marked change_requested
       if (final_decision === 'approved') {
         const questions = await Question.getQuestionsForModeration(paper_id);
         const questionsToApprove = questions.filter(q => q.status !== 'change_requested');
-        
+
         if (questionsToApprove.length > 0) {
           const approveUpdates = questionsToApprove.map(q => ({
             question_id: q.question_id,
             status: 'approved'
           }));
-          await Question.bulkUpdateStatus(approveUpdates);
+          await Question.bulkUpdateStatus(approveUpdates, client);
         }
       }
 
@@ -423,10 +377,7 @@ export const submitModerationReport = async (req, res) => {
     }
   } catch (error) {
     console.error("submitModerationReport error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -439,10 +390,7 @@ export const getModerationHistory = async (req, res) => {
     const moderatorId = req.user.user_id;
 
     if (req.user.role !== 'moderator') {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Moderator role required."
-      });
+      return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
 
     const moderations = await Moderation.getByModerator(moderatorId);
@@ -454,10 +402,7 @@ export const getModerationHistory = async (req, res) => {
     });
   } catch (error) {
     console.error("getModerationHistory error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -471,19 +416,13 @@ export const getCOBreakdown = async (req, res) => {
     const moderatorId = req.user.user_id;
 
     if (req.user.role !== 'moderator') {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Moderator role required."
-      });
+      return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
 
-    // Verify moderator has access to this paper
-    const moderation = await Moderation.findByPaper(id);
+    // Verify moderator has access to this paper (active moderation)
+    const moderation = await Moderation.findPendingByPaper(id);
     if (!moderation || moderation.moderator_id !== moderatorId) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not moderating this paper"
-      });
+      return res.status(403).json({ success: false, message: "You are not moderating this paper" });
     }
 
     const coBreakdown = await Question.getQuestionsByCO(id);
@@ -494,9 +433,236 @@ export const getCOBreakdown = async (req, res) => {
     });
   } catch (error) {
     console.error("getCOBreakdown error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/moderation/papers/:id/report/questions
+ * Returns list of questions with moderation status for a paper.
+ */
+export const viewQuestionReport = async (req, res) => {
+  try {
+    const { id } = req.params; // paper id
+    const requester = req.user; // { user_id, role }
+
+    // Permission checks:
+    if (!['moderator', 'instructor', 'admin'].includes(String(requester.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    // instructor must own the paper (unless admin)
+    if (String(requester.role).toLowerCase() === 'instructor') {
+      const isOwner = await QuestionPaper.isOwner(id, requester.user_id);
+      if (!isOwner) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+    }
+
+    // moderator must have a moderation record for this paper (any status)
+    if (String(requester.role).toLowerCase() === 'moderator') {
+      const mod = await Moderation.findByPaper(id);
+      if (!mod || !mod.moderator_id) {
+        return res.status(403).json({ success: false, message: 'You are not associated with this paper' });
+      }
+      // moderators are allowed if there is any moderation record (they worked on it)
+    }
+
+    // Fetch questions for the paper (moderation view)
+    const questions = await Question.getQuestionsForModeration(id);
+
+    // Transform for lightweight response (content preview)
+    const transformed = questions.map(q => ({
+      question_id: q.question_id,
+      sequence_number: q.sequence_number,
+      status: q.status,
+      content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
+      co_id: q.co_id,
+      co_number: q.co_number,
+      co_description: q.co_description,
+      updated_at: q.updated_at
+    }));
+
+    return res.json({
+      success: true,
+      data: transformed,
+      count: transformed.length
+    });
+  } catch (error) {
+    console.error('viewQuestionReport error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/moderation/papers/:id/report
+ * Returns overall paper moderation + questions summary
+ */
+export const viewPaperReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const requester = req.user;
+
+    if (!['moderator', 'instructor', 'admin'].includes(String(requester.role).toLowerCase())) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    // instructor must be owner
+    if (String(requester.role).toLowerCase() === 'instructor') {
+      const isOwner = await QuestionPaper.isOwner(id, requester.user_id);
+      if (!isOwner) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+    }
+
+    // moderators must have at least one moderation record (they can view reports they worked on).
+    if (String(requester.role).toLowerCase() === 'moderator') {
+      const modAny = await Moderation.findByPaper(id);
+      if (!modAny) {
+        return res.status(403).json({ success: false, message: 'You are not associated with this paper' });
+      }
+    }
+
+    // Paper metadata
+    const paper = await QuestionPaper.findById(id);
+    if (!paper) {
+      return res.status(404).json({ success: false, message: 'Paper not found' });
+    }
+
+    // Latest moderation record (if any)
+    const latestModeration = await Moderation.findByPaper(id); // returns latest (existing function)
+    // If you prefer the active pending moderation, use findPendingByPaper()
+
+    // Questions & counts
+    const questions = await Question.getQuestionsForModeration(id);
+    const counts = {
+      total: questions.length,
+      approved: questions.filter(q => q.status === 'approved').length,
+      change_requested: questions.filter(q => q.status === 'change_requested').length,
+      draft: questions.filter(q => q.status === 'draft').length,
+      submitted: questions.filter(q => q.status === 'submitted').length,
+      under_review: questions.filter(q => q.status === 'under_review').length
+    };
+
+    // Prepare a compact questions array (include content_preview)
+    const questionsCompact = questions.map(q => ({
+      question_id: q.question_id,
+      sequence_number: q.sequence_number,
+      status: q.status,
+      content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
+      co_id: q.co_id,
+      co_number: q.co_number,
+      co_description: q.co_description,
+      updated_at: q.updated_at
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        paper: {
+          paper_id: paper.paper_id,
+          title: paper.title,
+          course_id: paper.course_id,
+          course_code: paper.course_code,
+          course_title: paper.course_title,
+          status: paper.status,
+          version: paper.version,
+          created_by: paper.created_by,
+          created_at: paper.created_at,
+          updated_at: paper.updated_at
+        },
+        moderation: latestModeration, // can be null
+        counts,
+        questions: questionsCompact
+      }
+    });
+  } catch (error) {
+    console.error('viewPaperReport error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+export const getAllModerations = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Access denied. Admin role required." 
+      });
+    }
+
+    const {
+      search = '',
+      status = '',
+      courseCode = '',
+      moderatorName = '',
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    const filters = {
+      search,
+      status,
+      courseCode,
+      moderatorName,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    };
+
+    const result = await Moderation.getAllModerations(filters);
+
+    res.json({
+      success: true,
+      data: result.moderations,
+      pagination: {
+        total: result.totalCount,
+        page: result.currentPage,
+        totalPages: result.totalPages,
+        hasNext: result.hasNext,
+        hasPrev: result.hasPrev
+      },
+      filters
+    });
+  } catch (error) {
+    console.error("getAllModerations error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+/**
+ * Get moderation details by ID for admin
+ * GET /api/admin/moderations/:id
+ */
+export const getModerationDetails = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Access denied. Admin role required." 
+      });
+    }
+
+    const { id } = req.params;
+    const moderation = await Moderation.findById(id);
+
+    if (!moderation) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Moderation record not found" 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: moderation
+    });
+  } catch (error) {
+    console.error("getModerationDetails error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
     });
   }
 };

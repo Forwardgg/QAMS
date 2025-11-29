@@ -242,55 +242,56 @@ export class QuestionPaper {
    * Get papers available for moderation
    */
   static async getPapersForModeration(courseId = null, moderatorId = null) {
-    let whereConditions = [
-      "p.status IN ('submitted', 'under_review', 'change_requested')"
-    ];
-    let queryParams = [];
-    let paramCount = 0;
+  let whereConditions = [
+    "p.status IN ('submitted', 'under_review', 'change_requested')"
+  ];
+  let queryParams = [];
+  let paramCount = 0;
 
-    if (courseId) {
-      paramCount++;
-      whereConditions.push(`p.course_id = $${paramCount}`);
-      queryParams.push(courseId);
-    }
-
-    // Exclude papers already being moderated by this moderator
-    if (moderatorId) {
-      paramCount++;
-      whereConditions.push(`
-        NOT EXISTS (
-          SELECT 1 FROM qp_moderations m 
-          WHERE m.paper_id = p.paper_id 
-          AND m.moderator_id = $${paramCount}
-          AND m.status = 'pending'
-        )
-      `);
-      queryParams.push(moderatorId);
-    }
-
-    const whereClause = whereConditions.length > 0 
-      ? `WHERE ${whereConditions.join(' AND ')}` 
-      : '';
-
-    const query = `
-      SELECT 
-        p.paper_id, p.course_id, p.created_by, p.title, p.status, p.version,
-        p.exam_type, p.semester, p.academic_year, p.full_marks, p.duration,
-        p.created_at, p.updated_at,
-        c.code AS course_code, c.title AS course_title,
-        u.name AS creator_name,
-        (SELECT COUNT(*) FROM questions q WHERE q.paper_id = p.paper_id) as question_count,
-        (SELECT COUNT(*) FROM qp_moderations m WHERE m.paper_id = p.paper_id) as moderation_count
-      FROM question_papers p
-      LEFT JOIN courses c ON p.course_id = c.course_id
-      LEFT JOIN users u ON p.created_by = u.user_id
-      ${whereClause}
-      ORDER BY p.created_at DESC
-    `;
-
-    const { rows } = await pool.query(query, queryParams);
-    return rows;
+  if (courseId) {
+    paramCount++;
+    whereConditions.push(`p.course_id = $${paramCount}`);
+    queryParams.push(courseId);
   }
+
+  // If moderatorId provided, exclude papers that are being moderated by OTHER moderators (but keep ones this moderator is moderating)
+  if (moderatorId) {
+    paramCount++;
+    whereConditions.push(`
+      NOT EXISTS (
+        SELECT 1 FROM qp_moderations m 
+        WHERE m.paper_id = p.paper_id 
+          AND m.status = 'pending'
+          AND (m.moderator_id IS DISTINCT FROM $${paramCount})
+      )
+    `);
+    queryParams.push(moderatorId);
+  }
+
+  const whereClause = whereConditions.length > 0 
+    ? `WHERE ${whereConditions.join(' AND ')}` 
+    : '';
+
+  const query = `
+    SELECT 
+      p.paper_id, p.course_id, p.created_by, p.title, p.status, p.version,
+      p.exam_type, p.semester, p.academic_year, p.full_marks, p.duration,
+      p.created_at, p.updated_at,
+      c.code AS course_code, c.title AS course_title,
+      u.name AS creator_name,
+      (SELECT COUNT(*) FROM questions q WHERE q.paper_id = p.paper_id) as question_count,
+      (SELECT COUNT(*) FROM qp_moderations m WHERE m.paper_id = p.paper_id) as moderation_count
+    FROM question_papers p
+    LEFT JOIN courses c ON p.course_id = c.course_id
+    LEFT JOIN users u ON p.created_by = u.user_id
+    ${whereClause}
+    ORDER BY p.created_at DESC
+  `;
+
+  const { rows } = await pool.query(query, queryParams);
+  return rows;
+}
+
 
   /**
    * Get paper details for moderation (with questions and COs)
@@ -348,18 +349,21 @@ export class QuestionPaper {
   /**
    * Start moderation process for a paper
    */
-  static async startModeration(paperId) {
-    const query = `
-      UPDATE question_papers
-      SET status = 'under_review', updated_at = CURRENT_TIMESTAMP
-      WHERE paper_id = $1 AND status = 'submitted'
-      RETURNING paper_id, status, updated_at
-    `;
+  static async startModeration(paperId, client = null) {
+  const executor = client || pool;
 
-    const { rows } = await pool.query(query, [paperId]);
-    if (!rows.length) throw new Error('Paper not found or not in submitted status');
-    return rows[0];
-  }
+  const query = `
+    UPDATE question_papers
+    SET status = 'under_review', updated_at = CURRENT_TIMESTAMP
+    WHERE paper_id = $1 AND status = 'submitted'
+    RETURNING paper_id, status, updated_at
+  `;
+
+  const { rows } = await executor.query(query, [paperId]);
+  if (!rows.length) throw new Error('Paper not found or not in submitted status');
+  return rows[0];
+}
+
 
   static async getAllPapersForModerator(courseId = null, status = null, moderatorId = null) {
     let whereConditions = [];
@@ -378,19 +382,19 @@ export class QuestionPaper {
       queryParams.push(status);
     }
 
-    // Exclude papers currently being moderated by this moderator (optional)
     if (moderatorId) {
-      paramCount++;
-      whereConditions.push(`
-        NOT EXISTS (
-          SELECT 1 FROM qp_moderations m 
-          WHERE m.paper_id = p.paper_id 
-          AND m.moderator_id = $${paramCount}
-          AND m.status = 'pending'
-        )
-      `);
-      queryParams.push(moderatorId);
-    }
+  paramCount++;
+  whereConditions.push(`
+    NOT EXISTS (
+      SELECT 1 FROM qp_moderations m 
+      WHERE m.paper_id = p.paper_id 
+        AND m.status = 'pending'
+        AND (m.moderator_id IS DISTINCT FROM $${paramCount})
+    )
+  `);
+  queryParams.push(moderatorId);
+}
+
 
     const whereClause = whereConditions.length > 0 
       ? `WHERE ${whereConditions.join(' AND ')}` 

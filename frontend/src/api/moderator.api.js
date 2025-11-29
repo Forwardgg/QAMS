@@ -1,80 +1,134 @@
+// src/api/moderatorAPI.js - UPDATED VERSION
 import api from "./axios";
 
 const moderatorAPI = {
-  /**
-   * Get papers for moderation
-   * @param {Object} filters - { courseId, status }
-   */
   getPapers: async (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.courseId) params.append('courseId', filters.courseId);
-    if (filters.status) params.append('status', filters.status);
-    
-    const res = await api.get(`/moderation/papers?${params.toString()}`);
-    return res.data;
+    try {
+      const params = new URLSearchParams();
+      if (filters.courseId) params.append('courseId', filters.courseId);
+      if (filters.status) params.append('status', filters.status);
+      const res = await api.get(`/moderation/papers?${params.toString()}`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in getPapers:', error);
+      throw error;
+    }
   },
 
-  /**
-   * Get paper details with questions for moderation
-   * @param {number} paperId 
-   */
   getPaperDetails: async (paperId) => {
-    const res = await api.get(`/moderation/papers/${paperId}`);
-    return res.data;
+    try {
+      const res = await api.get(`/moderation/papers/${paperId}`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in getPaperDetails:', error);
+      throw error;
+    }
   },
 
-  /**
-   * Start moderating a paper
-   * @param {number} paperId 
-   */
   startModeration: async (paperId) => {
-    const res = await api.post(`/moderation/papers/${paperId}/start`);
-    return res.data;
+    try {
+      const res = await api.post(`/moderation/papers/${paperId}/start`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in startModeration:', error);
+      throw error;
+    }
   },
 
-  /**
-   * Update individual question status
-   * @param {number} questionId 
-   * @param {string} status - 'approved' or 'change_requested'
-   */
   updateQuestionStatus: async (questionId, status) => {
-    const res = await api.patch(`/moderation/questions/${questionId}`, { status });
-    return res.data;
+    try {
+      const res = await api.patch(`/moderation/questions/${questionId}`, { status });
+      return res.data;
+    } catch (error) {
+      console.error('API Error in updateQuestionStatus:', error);
+      throw error;
+    }
   },
 
-  /**
-   * Bulk update question statuses
-   * @param {Array} updates - [{ question_id, status }]
-   */
   bulkUpdateQuestionStatus: async (updates) => {
-    const res = await api.patch('/moderation/questions/bulk-status', { updates });
-    return res.data;
+    try {
+      const res = await api.patch(`/moderation/questions/bulk-status`, { updates });
+      return res.data;
+    } catch (error) {
+      console.error('API Error in bulkUpdateQuestionStatus:', error);
+      throw error;
+    }
   },
 
-  /**
-   * Submit final moderation report
-   * @param {Object} moderationData 
-   */
   submitModerationReport: async (moderationData) => {
-    const res = await api.post('/moderation/moderations', moderationData);
-    return res.data;
+    try {
+      const res = await api.post(`/moderation/moderations`, moderationData);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in submitModerationReport:', error);
+      throw error;
+    }
   },
 
-  /**
-   * Get moderation history for current moderator
-   */
   getModerationHistory: async () => {
-    const res = await api.get('/moderation/moderations');
-    return res.data;
+    try {
+      const res = await api.get(`/moderation/moderations`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in getModerationHistory:', error);
+      throw error;
+    }
   },
 
-  /**
-   * Get questions grouped by CO for moderation report
-   * @param {number} paperId 
-   */
   getCOBreakdown: async (paperId) => {
-    const res = await api.get(`/moderation/papers/${paperId}/co-breakdown`);
-    return res.data;
+    try {
+      const res = await api.get(`/moderation/papers/${paperId}/co-breakdown`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in getCOBreakdown:', error);
+      throw error;
+    }
+  },
+
+  // === Report endpoints ===
+  getPaperReport: async (paperId) => {
+    try {
+      const res = await api.get(`/moderation/papers/${paperId}/report`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in getPaperReport:', error);
+      throw error;
+    }
+  },
+
+  getQuestionReport: async (paperId) => {
+    try {
+      const res = await api.get(`/moderation/papers/${paperId}/report/questions`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in getQuestionReport:', error);
+      throw error;
+    }
+  },
+
+  // === ADMIN ENDPOINTS ===
+  getAllModerations: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+      const res = await api.get(`/moderation/admin/moderations?${params.toString()}`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in getAllModerations:', error);
+      throw error;
+    }
+  },
+
+  getModerationDetails: async (moderationId) => {
+    try {
+      const res = await api.get(`/moderation/admin/moderations/${moderationId}`);
+      return res.data;
+    } catch (error) {
+      console.error('API Error in getModerationDetails:', error);
+      throw error;
+    }
   }
 };
 

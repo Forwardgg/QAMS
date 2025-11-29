@@ -1,3 +1,4 @@
+// backend/routes/ModerationRoutes.js
 import express from "express";
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 import {
@@ -8,10 +9,16 @@ import {
   bulkUpdateQuestionStatus,
   submitModerationReport,
   getModerationHistory,
-  getCOBreakdown
+  getCOBreakdown,
+  viewQuestionReport,
+  viewPaperReport,
+  getAllModerations, 
+  getModerationDetails 
 } from "../controllers/moderatorController.js";
 
 const router = express.Router();
+
+// ===== MODERATOR ROUTES =====
 
 // Get papers available for moderation (filter by course)
 router.get("/papers", 
@@ -67,6 +74,40 @@ router.get("/papers/:id/co-breakdown",
   authenticate, 
   authorizeRoles("moderator"), 
   getCOBreakdown
+);
+
+// ===== ADMIN ROUTES =====
+
+// Get all moderation records (admin only)
+router.get("/admin/moderations", 
+  authenticate, 
+  authorizeRoles("admin"), 
+  getAllModerations
+);
+
+// Get moderation details by ID (admin only)
+router.get("/admin/moderations/:id", 
+  authenticate, 
+  authorizeRoles("admin"), 
+  getModerationDetails
+);
+
+// ===== SHARED REPORT ROUTES (Moderator, Instructor, Admin) =====
+
+// Questions-level report
+router.get(
+  "/papers/:id/report/questions",
+  authenticate,
+  authorizeRoles("moderator", "instructor", "admin"),
+  viewQuestionReport
+);
+
+// Paper-level overall report
+router.get(
+  "/papers/:id/report",
+  authenticate,
+  authorizeRoles("moderator", "instructor", "admin"),
+  viewPaperReport
 );
 
 export default router;

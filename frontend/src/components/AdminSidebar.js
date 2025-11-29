@@ -1,3 +1,4 @@
+// frontend/src/components/AdminSidebar.js
 import React, { useState } from 'react';
 import './Sidebar.css';
 
