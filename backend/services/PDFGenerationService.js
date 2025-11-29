@@ -392,7 +392,26 @@ class PDFGenerationService {
       display:block; 
       margin:2px 0;
     }
-    
+       img, .question-content img, figure img, figure.image img, .image img {
+    max-width: 100% !important;
+    max-height: 300px !important;
+    width: auto !important;
+    height: auto !important;
+    display: block !important;
+    margin: 4px auto !important;
+    object-fit: contain !important;
+  }
+    figure.image {
+    max-width: 100% !important;
+  }
+      .question-content img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block;
+    margin: 2px 0;
+    max-height: 400px !important; /* ADD THIS LINE */
+    object-fit: contain !important;
+  } 
     .footer { 
       display: none !important;
     }

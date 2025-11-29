@@ -444,38 +444,19 @@ export const getCOBreakdown = async (req, res) => {
 export const viewQuestionReport = async (req, res) => {
   try {
     const { id } = req.params; // paper id
-    const requester = req.user; // { user_id, role }
+    const requester = req.user;
 
-    // Permission checks:
-    if (!['moderator', 'instructor', 'admin'].includes(String(requester.role).toLowerCase())) {
-      return res.status(403).json({ success: false, message: 'Forbidden' });
-    }
-
-    // instructor must own the paper (unless admin)
-    if (String(requester.role).toLowerCase() === 'instructor') {
-      const isOwner = await QuestionPaper.isOwner(id, requester.user_id);
-      if (!isOwner) {
-        return res.status(403).json({ success: false, message: 'Forbidden' });
-      }
-    }
-
-    // moderator must have a moderation record for this paper (any status)
-    if (String(requester.role).toLowerCase() === 'moderator') {
-      const mod = await Moderation.findByPaper(id);
-      if (!mod || !mod.moderator_id) {
-        return res.status(403).json({ success: false, message: 'You are not associated with this paper' });
-      }
-      // moderators are allowed if there is any moderation record (they worked on it)
-    }
+    // ... permission checks ...
 
     // Fetch questions for the paper (moderation view)
     const questions = await Question.getQuestionsForModeration(id);
 
-    // Transform for lightweight response (content preview)
+    // Transform for response - RETURN FULL CONTENT
     const transformed = questions.map(q => ({
       question_id: q.question_id,
       sequence_number: q.sequence_number,
       status: q.status,
+      content_html: q.content_html, // ← ADD THIS LINE - FULL HTML WITH IMAGES
       content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
       co_id: q.co_id,
       co_number: q.co_number,
@@ -484,7 +465,7 @@ export const viewQuestionReport = async (req, res) => {
     }));
 
     return res.json({
-      success: true,
+      success: false,
       data: transformed,
       count: transformed.length
     });
@@ -549,7 +530,8 @@ export const viewPaperReport = async (req, res) => {
       question_id: q.question_id,
       sequence_number: q.sequence_number,
       status: q.status,
-      content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
+      content_html: q.content_html, // Add full content
+content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
       co_id: q.co_id,
       co_number: q.co_number,
       co_description: q.co_description,

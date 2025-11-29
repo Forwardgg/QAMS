@@ -6,6 +6,7 @@ import './QuestionList.css';
 const QuestionList = ({ questionReport, paperData, loading }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfMessage, setPdfMessage] = useState({ type: '', text: '' });
+  const [showCO, setShowCO] = useState(true); // Toggle state for CO display
 
   if (loading) {
     return <div className="loading">Loading questions...</div>;
@@ -67,18 +68,69 @@ const QuestionList = ({ questionReport, paperData, loading }) => {
     }
   };
 
+  // Format header data to match PDF
+  const formatHeaderData = () => {
+    const institution = 'TEZPUR UNIVERSITY';
+    const semester = paperData?.semester || '';
+    const examType = paperData?.exam_type || '';
+    const academicYear = paperData?.academic_year || '';
+    const course = paperData?.course_code && paperData?.course_title 
+      ? `${paperData.course_code}: ${paperData.course_title}`
+      : '';
+    const fullMarks = paperData?.full_marks || '';
+    const duration = paperData?.duration ? `${paperData.duration} mins` : '';
+
+    return {
+      institution,
+      semester,
+      examType,
+      academicYear,
+      course,
+      fullMarks,
+      duration
+    };
+  };
+
+  const headerData = formatHeaderData();
+
+  // Check if any questions have CO data
+  const hasCOData = sortedQuestions.some(question => question.co_number);
+
   return (
     <div className="question-list">
       <div className="print-controls">
-        <button 
-          className="btn-primary print-btn" 
-          onClick={handleGeneratePdf}
-          disabled={isGeneratingPdf}
-        >
-          {isGeneratingPdf ? '🔄 Generating PDF...' : '📄 Generate Question Paper PDF'}
-        </button>
-        <div className="question-count">
-          {sortedQuestions.length} question{sortedQuestions.length !== 1 ? 's' : ''}
+        <div className="controls-left">
+          <button 
+            className="btn-primary print-btn" 
+            onClick={handleGeneratePdf}
+            disabled={isGeneratingPdf}
+          >
+            {isGeneratingPdf ? '🔄 Generating PDF...' : '📄 Generate Question Paper PDF'}
+          </button>
+        </div>
+        
+        <div className="controls-right">
+          {/* CO Toggle Switch */}
+          {hasCOData && (
+            <div className="co-toggle">
+              <label className="toggle-label">
+                Show Course Outcomes
+                <div className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={showCO}
+                    onChange={(e) => setShowCO(e.target.checked)}
+                    className="toggle-checkbox"
+                  />
+                  <span className="toggle-slider"></span>
+                </div>
+              </label>
+            </div>
+          )}
+          
+          <div className="question-count">
+            {sortedQuestions.length} question{sortedQuestions.length !== 1 ? 's' : ''}
+          </div>
         </div>
       </div>
 
@@ -90,46 +142,36 @@ const QuestionList = ({ questionReport, paperData, loading }) => {
 
       <div className="print-preview-wrapper">
         <div className="print-preview-page">
-          {/* Paper Header */}
+          {/* Paper Header - Match PDF Format */}
           <header className="print-preview-header">
-            <div className="print-preview-title">
-              {paperData?.title || 'Question Paper'}
+            <div className="header-line1">{headerData.institution}</div>
+            <div className="header-line2">
+              {headerData.semester} {headerData.examType}, {headerData.academicYear}
             </div>
-            <div className="print-preview-meta">
-              {paperData?.course_code && (
-                <span>{paperData.course_code}</span>
-              )}
-              {paperData?.exam_type && (
-                <span> | {paperData.exam_type}</span>
-              )}
-              {paperData?.academic_year && (
-                <span> | AY: {paperData.academic_year}</span>
-              )}
-              {paperData?.full_marks != null && (
-                <span> | Marks: {paperData.full_marks}</span>
-              )}
-              {paperData?.duration != null && (
-                <span> | Duration: {paperData.duration} mins</span>
-              )}
+            <div className="header-line3">{headerData.course}</div>
+            
+            <div className="marks-time-line">
+              <div className="full-marks">Full mark : {headerData.fullMarks}</div>
+              <div className="time">Time: {headerData.duration}</div>
             </div>
           </header>
 
-          {/* Questions */}
+          {/* Questions - Match PDF Format */}
           <main className="print-preview-body">
             {sortedQuestions.map((question, index) => (
               <div key={question.question_id} className="print-preview-question">
-                <div className="question-header">
+                <div className="question-number-content">
                   <strong className="question-number">
-                    Q{question.sequence_number || index + 1}.
+                    {question.sequence_number || index + 1}.
                   </strong>
-                </div>
-                <div 
-                  className="question-content" 
-                  dangerouslySetInnerHTML={{ 
-                    __html: question.content_html || question.content_preview || 'No content available' 
+                  <div 
+                    className="question-content" 
+                    dangerouslySetInnerHTML={{ 
+                      __html: question.content_html || question.content_preview || 'No content available' 
                   }} 
-                />
-                {question.co_number && (
+                  />
+                </div>
+                {showCO && question.co_number && (
                   <div className="question-co">
                     Course Outcome: CO{question.co_number}
                   </div>
