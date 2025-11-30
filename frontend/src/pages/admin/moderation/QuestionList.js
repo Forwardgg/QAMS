@@ -36,6 +36,15 @@ const QuestionList = ({ questionReport, paperData, loading }) => {
       return;
     }
 
+    // ADD THIS CHECK - Prevent PDF generation for non-approved papers
+    if (paperData.status !== 'approved') {
+      setPdfMessage({ 
+        type: 'error', 
+        text: `Cannot generate PDF. Paper status is "${paperData.status}". Only approved papers can be downloaded.` 
+      });
+      return;
+    }
+
     setIsGeneratingPdf(true);
     setPdfMessage({ type: '', text: '' });
 
@@ -96,6 +105,9 @@ const QuestionList = ({ questionReport, paperData, loading }) => {
   // Check if any questions have CO data
   const hasCOData = sortedQuestions.some(question => question.co_number);
 
+  // Check if paper is approved for PDF generation
+  const isPaperApproved = paperData?.status === 'approved';
+
   return (
     <div className="question-list">
       <div className="print-controls">
@@ -103,10 +115,19 @@ const QuestionList = ({ questionReport, paperData, loading }) => {
           <button 
             className="btn-primary print-btn" 
             onClick={handleGeneratePdf}
-            disabled={isGeneratingPdf}
+            disabled={isGeneratingPdf || !isPaperApproved}
+            title={!isPaperApproved ? `Paper status: ${paperData?.status}. Only approved papers can be downloaded.` : 'Generate PDF'}
           >
             {isGeneratingPdf ? '🔄 Generating PDF...' : '📄 Generate Question Paper PDF'}
+            {!isPaperApproved && ' (Approved Only)'}
           </button>
+          
+          {/* Status indicator */}
+          {paperData?.status && (
+            <div className={`paper-status status-${paperData.status}`}>
+              Status: {paperData.status}
+            </div>
+          )}
         </div>
         
         <div className="controls-right">

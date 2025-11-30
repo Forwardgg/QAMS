@@ -86,6 +86,17 @@ const moderatorAPI = {
     }
   },
 
+  generateModerationReportPdf: async (moderationId) => {
+  try {
+    const response = await api.get(`/moderation/moderations/${moderationId}/report-pdf`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  } catch (error) {
+    console.error('API Error in generateModerationReportPdf:', error);
+    throw error;
+  }
+},
   generatePdf: async (params = {}) => {
     try {
       // Use the existing pdfAPI that we know works

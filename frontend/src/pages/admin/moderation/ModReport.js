@@ -1,12 +1,28 @@
 // src/pages/admin/Moderation/ModReport.js
-import React from 'react';
+import React, { useState } from 'react';
+import moderatorAPI from '../../../api/moderator.api';
 import './ModReport.css';
 
-const ModReport = ({ moderation }) => {
-  const BooleanIndicator = ({ value }) => {
+const ModReport = ({ moderation, paperData }) => {
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfMessage, setPdfMessage] = useState({ type: '', text: '' });
+
+  const BooleanIndicator = ({ value, criterionId }) => {
     if (value === null || value === undefined) {
       return <span className="not-evaluated">Not Evaluated</span>;
     }
+    
+    // Special case for verbatim copy check (criterion 7)
+    // "No" is good (green), "Yes" is bad (red)
+    if (criterionId === 7) {
+      return value ? (
+        <span className="criterion-fail">✗ Yes</span>  // Red - plagiarism found
+      ) : (
+        <span className="criterion-pass">✓ No</span>   // Green - no plagiarism
+      );
+    }
+    
+    // For all other criteria, "Yes" is good (green), "No" is bad (red)
     return value ? (
       <span className="criterion-pass">✓ Yes</span>
     ) : (
@@ -21,166 +37,178 @@ const ModReport = ({ moderation }) => {
     return <span className="comment-text">{comment}</span>;
   };
 
+  // Define criteria with exact PDF question text
+  const criteria = [
+    {
+      id: 1,
+      question: "Whether the question paper is set as per the COs?",
+      field: 'questions_set_per_co',
+      commentField: 'questions_set_per_co_comment'
+    },
+    {
+      id: 2,
+      question: "Does the question paper meet the standard of the level of the students?",
+      field: 'meets_level_standard',
+      commentField: 'meets_level_standard_comment'
+    },
+    {
+      id: 3,
+      question: "Does the question paper covers the syllabus specified for the exam?",
+      field: 'covers_syllabus',
+      commentField: 'covers_syllabus_comment'
+    },
+    {
+      id: 4,
+      question: "Whether the question paper is technically accurate?",
+      field: 'technically_accurate',
+      commentField: 'technically_accurate_comment'
+    },
+    {
+      id: 5,
+      question: "Whether the question paper is edited and formatted accurately?",
+      field: 'edited_formatted_accurately',
+      commentField: 'edited_formatted_comment'
+    },
+    {
+      id: 6,
+      question: "Whether the question paper is linguistically accurate?",
+      field: 'linguistically_accurate',
+      commentField: 'linguistically_accurate_comment'
+    },
+    {
+      id: 7,
+      question: "Whether any question is verbatim copy from any of the question papers of the course of last two years?",
+      field: 'verbatim_copy_check',
+      commentField: 'verbatim_copy_comment'
+    }
+  ];
+
+  // Generate Moderation Report PDF
+  const handleGenerateReportPdf = async () => {
+    if (!moderation?.moderation_id) {
+      setPdfMessage({ type: 'error', text: 'Moderation ID not found' });
+      return;
+    }
+
+    setIsGeneratingPdf(true);
+    setPdfMessage({ type: '', text: '' });
+
+    try {
+      const pdfBlob = await moderatorAPI.generateModerationReportPdf(moderation.moderation_id);
+
+      // Download the PDF
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `moderation-report-${moderation.course_code || 'paper'}-${moderation.semester || 'report'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setPdfMessage({ type: 'success', text: 'Moderation report PDF generated and downloaded successfully!' });
+    } catch (error) {
+      console.error('Moderation report PDF generation error:', error);
+      setPdfMessage({ 
+        type: 'error', 
+        text: error.message || 'Failed to generate moderation report PDF. Please try again.' 
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="mod-report">
-      <div className="mod-report-header">
-        <h3>Moderation Report</h3>
-        <button className="btn-primary print-btn" onClick={() => window.print()}>
-          📄 Print Moderation Report
+      {/* Header Section */}
+      <div className="header">
+        <div className="school">SCHOOL OF ENGINEERING</div>
+        <div className="university">TEZPUR UNIVERSITY</div>
+        <div className="department">DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING</div>
+      </div>
+
+      <div className="separator"></div>
+
+      <div className="report-title">MODERATION REPORT</div>
+
+      {/* Paper Information */}
+      <div className="info-grid">
+        <div className="info-label">Semester:</div>
+        <div>{paperData?.semester || moderation?.semester || 'N/A'}</div>
+        
+        <div className="info-label">Course Name:</div>
+        <div>{paperData?.course_title || moderation?.course_title || 'N/A'}</div>
+        
+        <div className="info-label">Course Code:</div>
+        <div>{paperData?.course_code || moderation?.course_code || 'N/A'}</div>
+        
+        <div className="info-label">Date:</div>
+        <div>{new Date().toLocaleDateString()}</div>
+        
+        <div className="info-label">Time:</div>
+        <div>{new Date().toLocaleTimeString()}</div>
+      </div>
+
+      {/* Criteria Table */}
+      <table className="criteria-table">
+        <tbody>
+          {criteria.map(criterion => (
+            <React.Fragment key={criterion.id}>
+              <tr>
+                <td className="col-number">{criterion.id}</td>
+                <td className="col-question">{criterion.question}</td>
+                <td className="col-answer">
+                  <BooleanIndicator 
+                    value={moderation[criterion.field]} 
+                    criterionId={criterion.id} 
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="col-number"></td>
+                <td className="comment-cell">
+                  Comments of the moderator if any:
+                  <div className="comment-text">
+                    <CommentDisplay comment={moderation[criterion.commentField]} />
+                  </div>
+                </td>
+                <td className="col-answer"></td>
+              </tr>
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Moderator Section */}
+      <div className="moderator-section">
+        <div className="moderator-title">Name of Moderator(s):</div>
+        <div className="moderator-list">
+          1. {moderation.moderator_name || 'Moderator Name'}<br />
+          2.<br />
+          3.
+        </div>
+      </div>
+
+      {/* HoD Signature */}
+      <div className="hod-signature">
+        Signature of HoD
+      </div>
+
+      {/* PDF Generation Button */}
+      <div className="pdf-generation-section">
+        <button 
+          className="btn-primary generate-pdf-btn" 
+          onClick={handleGenerateReportPdf}
+          disabled={isGeneratingPdf}
+        >
+          {isGeneratingPdf ? '🔄 Generating PDF...' : '📋 Generate Formal Report PDF'}
         </button>
-      </div>
-
-      <div className="criteria-section">
-        <h4>Moderation Criteria</h4>
-        <div className="criteria-grid">
-          {/* Questions Set per CO */}
-          <div className="criterion-card">
-            <div className="criterion-header">
-              <label>Questions Set per Course Outcomes</label>
-              <BooleanIndicator value={moderation.questions_set_per_co} />
-            </div>
-            <div className="criterion-comment">
-              <strong>Comments:</strong> <CommentDisplay comment={moderation.questions_set_per_co_comment} />
-            </div>
+        
+        {pdfMessage.text && (
+          <div className={`pdf-message ${pdfMessage.type}`}>
+            {pdfMessage.text}
           </div>
-
-          {/* Meets Level Standard */}
-          <div className="criterion-card">
-            <div className="criterion-header">
-              <label>Meets Level Standard</label>
-              <BooleanIndicator value={moderation.meets_level_standard} />
-            </div>
-            <div className="criterion-comment">
-              <strong>Comments:</strong> <CommentDisplay comment={moderation.meets_level_standard_comment} />
-            </div>
-          </div>
-
-          {/* Covers Syllabus */}
-          <div className="criterion-card">
-            <div className="criterion-header">
-              <label>Covers Syllabus Adequately</label>
-              <BooleanIndicator value={moderation.covers_syllabus} />
-            </div>
-            <div className="criterion-comment">
-              <strong>Comments:</strong> <CommentDisplay comment={moderation.covers_syllabus_comment} />
-            </div>
-          </div>
-
-          {/* Technically Accurate */}
-          <div className="criterion-card">
-            <div className="criterion-header">
-              <label>Technically Accurate</label>
-              <BooleanIndicator value={moderation.technically_accurate} />
-            </div>
-            <div className="criterion-comment">
-              <strong>Comments:</strong> <CommentDisplay comment={moderation.technically_accurate_comment} />
-            </div>
-          </div>
-
-          {/* Edited & Formatted Accurately */}
-          <div className="criterion-card">
-            <div className="criterion-header">
-              <label>Edited & Formatted Accurately</label>
-              <BooleanIndicator value={moderation.edited_formatted_accurately} />
-            </div>
-            <div className="criterion-comment">
-              <strong>Comments:</strong> <CommentDisplay comment={moderation.edited_formatted_comment} />
-            </div>
-          </div>
-
-          {/* Linguistically Accurate */}
-          <div className="criterion-card">
-            <div className="criterion-header">
-              <label>Linguistically Accurate</label>
-              <BooleanIndicator value={moderation.linguistically_accurate} />
-            </div>
-            <div className="criterion-comment">
-              <strong>Comments:</strong> <CommentDisplay comment={moderation.linguistically_accurate_comment} />
-            </div>
-          </div>
-
-          {/* Verbatim Copy Check */}
-          <div className="criterion-card">
-            <div className="criterion-header">
-              <label>Verbatim Copy Check</label>
-              <BooleanIndicator value={moderation.verbatim_copy_check} />
-            </div>
-            <div className="criterion-comment">
-              <strong>Comments:</strong> <CommentDisplay comment={moderation.verbatim_copy_comment} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Final Decision Section */}
-      <div className="final-decision-section">
-        <h4>Final Decision</h4>
-        <div className="decision-card">
-          <div className="decision-header">
-            <span className="decision-label">Overall Status:</span>
-            <span className={`decision-badge decision-${moderation.status}`}>
-              {moderation.status.toUpperCase()}
-            </span>
-          </div>
-          <div className="decision-meta">
-            <p><strong>Moderator:</strong> {moderation.moderator_name} ({moderation.moderator_email})</p>
-            <p><strong>Moderated on:</strong> {new Date(moderation.updated_at).toLocaleString()}</p>
-            <p><strong>Paper Version:</strong> {moderation.paper_version}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Statistics */}
-      <div className="summary-section">
-        <h4>Summary</h4>
-        <div className="summary-grid">
-          <div className="summary-item">
-            <span className="summary-label">Total Criteria:</span>
-            <span className="summary-value">7</span>
-          </div>
-          <div className="summary-item">
-            <span className="summary-label">Passed:</span>
-            <span className="summary-value passed">
-              {[
-                moderation.questions_set_per_co,
-                moderation.meets_level_standard,
-                moderation.covers_syllabus,
-                moderation.technically_accurate,
-                moderation.edited_formatted_accurately,
-                moderation.linguistically_accurate,
-                moderation.verbatim_copy_check
-              ].filter(Boolean).length}
-            </span>
-          </div>
-          <div className="summary-item">
-            <span className="summary-label">Failed:</span>
-            <span className="summary-value failed">
-              {[
-                moderation.questions_set_per_co,
-                moderation.meets_level_standard,
-                moderation.covers_syllabus,
-                moderation.technically_accurate,
-                moderation.edited_formatted_accurately,
-                moderation.linguistically_accurate,
-                moderation.verbatim_copy_check
-              ].filter(val => val === false).length}
-            </span>
-          </div>
-          <div className="summary-item">
-            <span className="summary-label">Not Evaluated:</span>
-            <span className="summary-value not-evaluated">
-              {[
-                moderation.questions_set_per_co,
-                moderation.meets_level_standard,
-                moderation.covers_syllabus,
-                moderation.technically_accurate,
-                moderation.edited_formatted_accurately,
-                moderation.linguistically_accurate,
-                moderation.verbatim_copy_check
-              ].filter(val => val === null || val === undefined).length}
-            </span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

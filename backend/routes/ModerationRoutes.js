@@ -13,7 +13,8 @@ import {
   viewQuestionReport,
   viewPaperReport,
   getAllModerations, 
-  getModerationDetails 
+  getModerationDetails,
+  generateModerationReportPdf
 } from "../controllers/moderatorController.js";
 
 const router = express.Router();
@@ -108,6 +109,12 @@ router.get(
   authenticate,
   authorizeRoles("moderator", "instructor", "admin"),
   viewPaperReport
+);
+router.get(
+  "/moderations/:id/report-pdf",
+  authenticate,
+  authorizeRoles("moderator", "instructor", "admin"),
+  generateModerationReportPdf
 );
 
 export default router;

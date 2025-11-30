@@ -1,354 +1,251 @@
 /* src/pages/admin/Moderation/ModReport.css */
 .mod-report {
+  max-width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 15mm;
   background: white;
-  border-radius: 8px;
-  padding: 0;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12pt;
+  line-height: 1.3;
+  color: #000;
 }
 
-.mod-report-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #e1e5e9;
-}
-
-.mod-report-header h3 {
-  margin: 0;
-  color: #2c3e50;
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.print-btn {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.print-btn:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
-}
-
-/* Criteria Section */
-.criteria-section {
-  margin-bottom: 32px;
-}
-
-.criteria-section h4 {
-  color: #2c3e50;
-  margin-bottom: 20px;
-  font-size: 18px;
-  font-weight: 600;
-  border-bottom: 1px solid #e1e5e9;
-  padding-bottom: 8px;
-}
-
-.criteria-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.criterion-card {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 20px;
-  transition: all 0.2s ease;
-}
-
-.criterion-card:hover {
-  border-color: #007bff;
-  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
-}
-
-.criterion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.criterion-header label {
-  font-weight: 600;
-  color: #2c3e50;
-  font-size: 15px;
-  flex: 1;
-  margin-right: 16px;
-}
-
-.criterion-comment {
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 12px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.criterion-comment strong {
-  color: #495057;
-  margin-right: 8px;
-}
-
-/* Boolean Indicators */
-.criterion-pass {
-  color: #28a745;
-  font-weight: 600;
-  background: #d4edda;
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid #c3e6cb;
-  font-size: 13px;
-  min-width: 60px;
+/* Header Section */
+.header {
   text-align: center;
+  margin-bottom: 8mm;
 }
 
-.criterion-fail {
-  color: #dc3545;
-  font-weight: 600;
-  background: #f8d7da;
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid #f5c6cb;
-  font-size: 13px;
-  min-width: 60px;
+.school {
+  font-size: 14pt;
+  font-weight: bold;
+  margin-bottom: 2mm;
+}
+
+.university {
+  font-size: 12pt;
+  font-weight: bold;
+  margin-bottom: 1mm;
+}
+
+.department {
+  font-size: 11pt;
+  margin-bottom: 4mm;
+}
+
+.separator {
+  border-top: 2px solid #000;
+  margin: 4mm 0;
+}
+
+.report-title {
   text-align: center;
+  font-size: 14pt;
+  font-weight: bold;
+  margin: 6mm 0;
+  text-decoration: underline;
 }
 
-.not-evaluated {
-  color: #6c757d;
-  font-weight: 600;
-  background: #e9ecef;
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid #dee2e6;
-  font-size: 13px;
-  min-width: 60px;
+/* Paper Information */
+.info-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2mm 4mm;
+  margin-bottom: 6mm;
+  font-size: 11pt;
+}
+
+.info-label {
+  font-weight: bold;
+}
+
+/* Criteria Table */
+.criteria-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 4mm;
+  border: 1px solid #000;
+}
+
+.criteria-table td {
+  border: 1px solid #000;
+  padding: 3mm;
+  vertical-align: top;
+}
+
+.col-number {
+  width: 8%;
   text-align: center;
+  font-weight: bold;
 }
 
-/* Comment Display */
-.no-comment {
-  color: #6c757d;
+.col-question {
+  width: 67%;
+  font-weight: bold;
+}
+
+.col-answer {
+  width: 25%;
+  text-align: center;
+  font-weight: bold;
+}
+
+.comment-cell {
+  border-left: none;
+  border-right: none;
+  padding-top: 1mm;
+  padding-bottom: 3mm;
   font-style: italic;
 }
 
 .comment-text {
-  color: #495057;
-  line-height: 1.5;
+  color: #333;
+  margin-top: 1mm;
+  font-weight: normal;
 }
 
-/* Final Decision Section */
-.final-decision-section {
-  margin-bottom: 32px;
+/* Boolean Indicators */
+.criterion-pass {
+  color: #2e7d32; /* Green for positive/passing */
+  font-weight: bold;
 }
 
-.final-decision-section h4 {
-  color: #2c3e50;
-  margin-bottom: 16px;
-  font-size: 18px;
-  font-weight: 600;
-  border-bottom: 1px solid #e1e5e9;
-  padding-bottom: 8px;
+.criterion-fail {
+  color: #c62828; /* Red for negative/failing */
+  font-weight: bold;
 }
 
-.decision-card {
-  background: #f8f9fa;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 24px;
+.not-evaluated {
+  color: #666;
+  font-style: italic;
 }
 
-.decision-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #dee2e6;
+.no-comment {
+  color: #666;
+  font-style: italic;
+  display: block;
+  margin-top: 2mm;
 }
 
-.decision-label {
-  font-weight: 600;
-  color: #2c3e50;
-  font-size: 16px;
+/* Moderator Section */
+.moderator-section {
+  margin-top: 12mm;
 }
 
-.decision-badge {
+.moderator-title {
+  font-weight: bold;
+  margin-bottom: 4mm;
+}
+
+.moderator-list {
+  margin-left: 10mm;
+  margin-bottom: 8mm;
+  line-height: 1.6;
+}
+
+/* HoD Signature */
+.hod-signature {
+  text-align: right;
+  margin-top: 20mm;
+  font-weight: bold;
+}
+
+/* PDF Generation Section */
+.pdf-generation-section {
+  margin-top: 10mm;
+  text-align: center;
+  padding-top: 10mm;
+  border-top: 1px dashed #ccc;
+}
+
+.generate-pdf-btn {
+  background: #2c3e50;
+  color: white;
+  border: none;
   padding: 10px 20px;
-  border-radius: 25px;
-  font-weight: 700;
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 11pt;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: "Times New Roman", serif;
+  transition: background-color 0.3s ease;
 }
 
-.decision-approved {
+.generate-pdf-btn:hover:not(:disabled) {
+  background: #34495e;
+}
+
+.generate-pdf-btn:disabled {
+  background: #7f8c8d;
+  cursor: not-allowed;
+}
+
+.pdf-message {
+  margin-top: 5mm;
+  padding: 2mm;
+  border-radius: 2px;
+  font-size: 10pt;
+}
+
+.pdf-message.success {
   background: #d4edda;
   color: #155724;
-  border: 2px solid #c3e6cb;
+  border: 1px solid #c3e6cb;
 }
 
-.decision-rejected {
+.pdf-message.error {
   background: #f8d7da;
   color: #721c24;
-  border: 2px solid #f5c6cb;
-}
-
-.decision-pending {
-  background: #fff3cd;
-  color: #856404;
-  border: 2px solid #ffeaa7;
-}
-
-.decision-meta p {
-  margin: 8px 0;
-  color: #495057;
-  font-size: 14px;
-}
-
-.decision-meta strong {
-  color: #2c3e50;
-  margin-right: 8px;
-}
-
-/* Summary Section */
-.summary-section {
-  margin-bottom: 20px;
-}
-
-.summary-section h4 {
-  color: #2c3e50;
-  margin-bottom: 16px;
-  font-size: 18px;
-  font-weight: 600;
-  border-bottom: 1px solid #e1e5e9;
-  padding-bottom: 8px;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-}
-
-.summary-item {
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 16px;
-  text-align: center;
-  transition: all 0.2s ease;
-}
-
-.summary-item:hover {
-  border-color: #007bff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.summary-label {
-  display: block;
-  font-size: 14px;
-  color: #6c757d;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.summary-value {
-  display: block;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.summary-value.passed {
-  color: #28a745;
-}
-
-.summary-value.failed {
-  color: #dc3545;
-}
-
-.summary-value.not-evaluated {
-  color: #6c757d;
+  border: 1px solid #f5c6cb;
 }
 
 /* Print Styles */
 @media print {
-  .mod-report-header {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-  }
-  
-  .print-btn {
+  .pdf-generation-section {
     display: none;
-  }
-  
-  .criterion-card {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  
-  .summary-grid {
-    grid-template-columns: repeat(4, 1fr);
   }
   
   .mod-report {
     box-shadow: none;
-    border: none;
+    padding: 0;
+    margin: 0;
   }
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
-  .mod-report-header {
-    flex-direction: column;
-    gap: 16px;
-    align-items: flex-start;
-  }
-  
-  .criterion-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  
-  .decision-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
-  
-  .summary-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media screen and (max-width: 1200px) {
+  .mod-report {
+    max-width: 100%;
+    padding: 10mm;
+    box-shadow: none;
   }
 }
 
-@media (max-width: 480px) {
-  .summary-grid {
+@media screen and (max-width: 768px) {
+  .mod-report {
+    padding: 5mm;
+    font-size: 11pt;
+  }
+  
+  .info-grid {
     grid-template-columns: 1fr;
+    gap: 1mm;
   }
   
-  .criterion-card {
-    padding: 16px;
+  .criteria-table {
+    font-size: 10pt;
   }
   
-  .decision-card {
-    padding: 16px;
+  .col-number {
+    width: 10%;
+  }
+  
+  .col-question {
+    width: 60%;
+  }
+  
+  .col-answer {
+    width: 30%;
   }
 }

@@ -2,6 +2,7 @@
 import { QuestionPaper } from "../models/QuestionPaper.js";
 import { Question } from "../models/Question.js";
 import { Moderation } from "../models/Moderation.js";
+import ModerationReportPdfService from "../services/ModerationReportPdfService.js";
 import { pool } from "../config/db.js";
 
 /**
@@ -646,5 +647,50 @@ export const getModerationDetails = async (req, res) => {
       success: false, 
       message: error.message 
     });
+  }
+};
+
+export const generateModerationReportPdf = async (req, res) => {
+  try {
+    const { id } = req.params; // moderation_id
+    const moderatorId = req.user.user_id;
+
+    if (req.user.role !== 'moderator' && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    // Get moderation details with paper data
+    const moderation = await Moderation.findById(id);
+    if (!moderation) {
+      return res.status(404).json({ success: false, message: "Moderation record not found" });
+    }
+
+    // Verify access (moderator can only access their own, admin can access all)
+    if (req.user.role === 'moderator' && moderation.moderator_id !== moderatorId) {
+      return res.status(403).json({ success: false, message: "Access denied to this moderation record" });
+    }
+
+    // Get paper details
+    const paper = await QuestionPaper.findById(moderation.paper_id);
+    if (!paper) {
+      return res.status(404).json({ success: false, message: "Paper not found" });
+    }
+
+    // Generate PDF
+    const pdfService = new ModerationReportPdfService();
+    const pdfBuffer = await pdfService.generateModerationReport(moderation, paper);
+
+    // Set response headers
+    const filename = `moderation-report-${paper.course_code}-${paper.semester}.pdf`;
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error("generateModerationReportPdf error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
