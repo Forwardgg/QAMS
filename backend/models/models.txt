@@ -1,95 +1,100 @@
 === COURSE MODEL === (finalized)
-createCourse() - Create new course with validation
-getAllCourses() - Get paginated courses with search/filter
-getCourseById() - Get course by ID
-getCourseByCode() - Get course by code
-updateCourse() - Update course with partial updates
-deleteCourse() - Delete course
-searchCourses() - Search courses (alias for getAllCourses)
+    create() - Creates new user with email validation and role checking
+    findByEmail() - Finds user by email (includes password hash, for auth only)
+    findPublicById() - Gets safe user data without password hash
+    findById() - Gets full user data including password hash (internal use)
+    getAll() - Gets all users with safe public data
+    updateStatus() - Updates user status (active/inactive)
+    updateProfile() - Updates user profile with email and role validation
+    updatePassword() - Updates user password hash
+    softDelete() - Soft deletes user by setting status to inactive
+    forceDelete() - Hard deletes user from database
+
+=== COURSE MODEL === (finalized)
+    createCourse() - Creates a new course with validation, prevents duplicate codes
+    getAllCourses() - Retrieves paginated courses with search, sorting and filtering
+    getCourseById() - Finds a single course by its numeric ID
+    getCourseByCode() - Finds a single course by its code string
+    updateCourse() - Updates course fields with validation and conflict checking
+    deleteCourse() - Removes a course and returns deleted record
+    searchCourses() - Simplified search interface for finding courses
 
 === COURSE OUTCOME MODEL === (finalized)
-createCourseOutcome() - Create new course outcome with validation
-getAllCourseOutcomes() - Get paginated course outcomes with course details
-getCourseOutcomesByCourseCode() - Get COs by course code
-getCourseOutcomesByCourseId() - Get COs by course ID
-getCourseOutcomeByNumber() - Get specific CO by course ID and CO number
-getCourseOutcomeById() - Get CO by ID
-updateCourseOutcome() - Update course outcome with partial updates
-deleteCourseOutcome() - Delete course outcome
-searchCourseOutcomes() - Search COs by course code and CO number
-
-=== MODERATION MODEL ===
-create() - Create new moderation record
-findByPaper() - Find moderation by paper ID with details
-update() - Update moderation record with criteria
-getByModerator() - Get all moderations by specific moderator
-findById() - Get moderation by ID with full details
-isModeratingPaper() - Check if moderator is already moderating a paper
-getPendingModerations() - Get all pending moderations
-getModeratorStats() - Get moderation statistics for a moderator
-getActiveModerations() - Get papers currently being moderated by a moderator
-delete() - Delete moderation record
-
-=== QUESTION MODEL ===  
-create() - Create new question with sequence number
-update() - Update question content, CO, status, sequence
-findById() - Get question by ID with CO and course details
-findByPaperId() - Get all questions for a paper in sequence order
-delete() - Delete a question
-updateSequenceNumbers() - Reorder questions in a paper
-getNextSequenceNumber() - Get next available sequence number
-extractMediaUrls() - Find media URLs in HTML content
-linkMedia() - Associate media files with question
-unlinkUnusedMedia() - Remove unused media links
-getQuestionMedia() - Get all media for a question
-updateQuestionStatus() - Change status of individual question
-bulkUpdateStatus() - Update multiple questions' status at once
-getQuestionsForModeration() - Get questions with CO details for moderation
-getQuestionsByCO() - Group questions by CO for moderation report
-validatePaperAccess() - Check if user owns the paper
-validateCOForPaper() - Verify CO belongs to paper's course
-search() - Search/filter questions with pagination
-
-=== QUESTION MEDIA MODEL ===
-validateFile() - Validate file object (size, type)
-isBufferSignatureValid() - Validate file signature (magic bytes)
-generateFilename() - Generate safe filename with timestamp and random hash
-saveFileToDisk() - Save file to disk with directory creation
-deleteFileIfExists() - Delete file if exists (cleanup)
-create() - Create media record in database
-findById() - Find media by ID
-findByQuestionId() - Find media by question ID
-findByPaperId() - Find media by paper ID
-update() - Update media record
-linkToQuestion() - Link media to question and mark as used
-unlinkFromQuestion() - Unlink media from question and mark as unused
-delete() - Delete media record
-getPublicUrl() - Get public URL for filename
-extractMediaUrls() - Extract media URLs from HTML content
-findByUrls() - Find media records by URLs
+    createCourseOutcome() - Creates a new course outcome with validation, prevents duplicates
+    getAllCourseOutcomes() - Gets paginated outcomes with course details
+    getCourseOutcomesByCourseCode() - Finds outcomes by course code
+    getCourseOutcomesByCourseId() - Finds outcomes by course ID
+    getCourseOutcomeByNumber() - Gets specific outcome by course ID and CO number
+    getCourseOutcomeById() - Finds single outcome by its ID
+    updateCourseOutcome() - Updates outcome fields with validation
+    deleteCourseOutcome() - Removes outcome and returns deleted record
+    searchCourseOutcomes() - Searches outcomes by course code and CO number
 
 === QUESTION PAPER MODEL ===
-create() - Create new question paper
-getAll() - Get all papers with course and creator details
-getByCourseCode() - Get papers by course code
-getByCourseAndCO() - Get papers by course and CO number
-update() - Update paper with status validation
-delete() - Delete paper
-isOwner() - Check if user owns the paper
-getPapersForModeration() - Get papers available for moderation with filters
-getPaperForModeration() - Get paper details for moderation with course outcomes
-updateStatus() - Update paper status
-startModeration() - Start moderation process for a paper
-getAllPapersForModerator() - Get papers for moderator with comprehensive details
+    create() - Creates a new question paper with validation, supports transactions
+    getAll() - Gets all papers with course and creator details
+    findById() - Gets paper by ID with full details
+    getByCourseCode() - Gets papers by course code
+    getByCourseAndCO() - Gets papers by course code and CO number
+    update() - Updates paper fields with status validation, supports transactions
+    delete() - Deletes paper and handles cascade deletion
+    isOwner() - Checks if user owns the paper for authorization
+    getPapersForModeration() - Gets papers available for moderation with filters
+    getPaperForModeration() - Gets paper details with course outcomes for moderation
+    updateStatus() - Updates paper status, supports transactions
+    startModeration() - Starts moderation process for submitted papers
+    getAllPapersForModerator() - Gets papers for moderators with exclusion logic
 
-=== USER MODEL ===
-create() - Create new user with email normalization and validation
-findByEmail() - Find user by email (internal, includes password_hash)
-findPublicById() - Find user by ID (public, excludes password_hash)
-findById() - Find user by ID (internal, includes password_hash)
-getAll() - Get all users (admin)
-updateStatus() - Update user status (active/inactive)
-updateProfile() - Update user profile (name, email, role)
-updatePassword() - Update user password hash
-softDelete() - Soft delete user (set to inactive)
-forceDelete() - Hard delete user
+=== QUESTION MODEL ===
+    create() - Creates a new question with validation, supports transactions
+    update() - Updates question fields with status validation, supports transactions
+    findById() - Gets question by ID with course and CO details
+    findByPaperId() - Gets all questions for a paper in sequence order
+    delete() - Deletes a question and returns deleted ID
+    updateSequenceNumbers() - Updates question ordering for a paper
+    extractMediaUrls() - Extracts image URLs from HTML content
+    linkMedia() - Links media files to a question
+    unlinkUnusedMedia() - Unlinks media no longer used by question
+    getQuestionMedia() - Gets all media records for a question
+    search() - Searches questions with filters and pagination
+    getNextSequenceNumber() - Gets next sequence number for a paper
+    validatePaperAccess() - Validates user access to paper
+    validateCOForPaper() - Validates CO belongs to paper's course
+    updateQuestionStatus() - Updates individual question status
+    getQuestionsForModeration() - Gets questions with details for moderation
+    bulkUpdateStatus() - Bulk updates question statuses
+    getQuestionsByCO() - Groups questions by CO for moderation reports
+
+=== QUESTION MEDIA MODEL ===
+    validateFile() - Validates file type, size, and structure
+    isBufferSignatureValid() - Validates file signature against MIME type
+    generateFilename() - Generates safe filename with timestamp and random hash
+    sanitizeFilename() - Sanitizes filename to prevent path traversal
+    saveFileToDisk() - Saves file buffer to uploads directory
+    deleteFileIfExists() - Deletes file from disk if it exists
+    create() - Creates media record in database
+    findById() - Finds media record by ID
+    findByQuestionId() - Finds all media for a question
+    findByPaperId() - Finds all media for a paper
+    update() - Updates media record fields
+    linkToQuestion() - Links media to a question and marks as used
+    unlinkFromQuestion() - Unlinks media from question
+    delete() - Hard deletes media record from database
+    getPublicUrl() - Generates public URL for a filename
+    extractMediaUrls() - Extracts image URLs from HTML content
+    findByUrls() - Finds media records by URL list
+
+=== MODERATION MODEL ===
+    create() - Creates new moderation record, prevents duplicates, supports transactions
+    findByPaper() - Gets latest moderation for a paper with details
+    findPendingByPaper() - Finds active pending moderation for a paper
+    update() - Updates moderation fields with validation, supports transactions
+    getByModerator() - Gets all moderations by a specific moderator
+    findById() - Gets moderation by ID with full details
+    isModeratingPaper() - Checks if moderator is already moderating a paper
+    isPaperBeingModerated() - Checks if paper has any pending moderation
+    getPendingModerations() - Gets all pending moderations across system
+    getModeratorStats() - Gets moderation statistics for a moderator
+    getActiveModerations() - Gets active moderations for a moderator
+    delete() - Deletes moderation record
+    getAllModerations() - Gets all moderations with search, filters and pagination

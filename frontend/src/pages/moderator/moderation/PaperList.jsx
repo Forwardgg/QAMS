@@ -5,21 +5,20 @@ import moderatorAPI from '../../../api/moderator.api';
 import courseAPI from '../../../api/course.api';
 import QuestionModeration from './QuestionModeration';
 import PaperModeration from './PaperModeration';
+import ModReportModal from './ModReportModal';
 import './PaperList.css';
 
 const PaperList = () => {
   const auth = useContext(AuthContext);
-  const [currentView, setCurrentView] = useState('list'); // 'list', 'questions', 'paper'
+  const [currentView, setCurrentView] = useState('list');
   const [selectedPaper, setSelectedPaper] = useState(null);
   const [papers, setPapers] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    courseId: '',
-    status: ''
-  });
+  const [filters, setFilters] = useState({ courseId: '', status: '' });
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedModeration, setSelectedModeration] = useState(null);
 
-  // Available status options
   const statusOptions = [
     { value: '', label: 'All Statuses' },
     { value: 'draft', label: 'Draft' },
@@ -29,7 +28,6 @@ const PaperList = () => {
     { value: 'approved', label: 'Approved' }
   ];
 
-  // Load papers and courses on component mount and filter changes
   useEffect(() => {
     if (currentView === 'list') {
       loadPapers();
@@ -53,17 +51,10 @@ const PaperList = () => {
     try {
       const response = await courseAPI.getAll();
       const data = response.data;
-      
-      if (Array.isArray(data)) {
-        setCourses(data);
-      } else if (data && Array.isArray(data.data)) {
-        setCourses(data.data);
-      } else if (data && Array.isArray(data.rows)) {
-        setCourses(data.rows);
-      } else {
-        console.warn('Unexpected courses data format:', data);
-        setCourses([]);
-      }
+      if (Array.isArray(data)) setCourses(data);
+      else if (data?.data) setCourses(data.data);
+      else if (data?.rows) setCourses(data.rows);
+      else setCourses([]);
     } catch (error) {
       console.error('Error loading courses:', error);
       setCourses([]);
@@ -71,13 +62,9 @@ const PaperList = () => {
   };
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  // Navigation handlers
   const handleStartQuestionModeration = (paper) => {
     setSelectedPaper(paper);
     setCurrentView('questions');
@@ -94,8 +81,51 @@ const PaperList = () => {
   const handleBackToList = () => {
     setSelectedPaper(null);
     setCurrentView('list');
-    // Refresh the papers list when returning
     loadPapers();
+  };
+
+  const handleViewReport = async (paper) => {
+    try {
+      let moderationData = null;
+      
+      try {
+        const reportResponse = await moderatorAPI.getPaperReport(paper.paper_id);
+        if (reportResponse.data?.moderation) {
+          moderationData = {
+            ...reportResponse.data.moderation,
+            paper_title: reportResponse.data.paper?.title || paper.title,
+            course_code: reportResponse.data.paper?.course_code || paper.course_code,
+            course_title: reportResponse.data.paper?.course_title || paper.course_title,
+            semester: reportResponse.data.paper?.semester || paper.semester,
+            academic_year: reportResponse.data.paper?.academic_year || paper.academic_year
+          };
+        }
+      } catch (error) {
+        console.log('getPaperReport failed:', error.message);
+      }
+      
+      if (!moderationData) {
+        try {
+          const historyResponse = await moderatorAPI.getModerationHistory();
+          if (historyResponse.data?.length) {
+            const paperModerations = historyResponse.data.filter(mod => mod.paper_id === paper.paper_id);
+            if (paperModerations.length) {
+              moderationData = paperModerations.sort((a, b) => 
+                new Date(b.created_at) - new Date(a.created_at)
+              )[0];
+            }
+          }
+        } catch (error) {
+          console.log('Moderation history failed:', error.message);
+        }
+      }
+      
+      setSelectedModeration(moderationData);
+    } catch (error) {
+      console.error('Failed to load moderation report:', error);
+    }
+    
+    setShowReportModal(true);
   };
 
   const getStatusBadgeClass = (status) => {
@@ -110,76 +140,31 @@ const PaperList = () => {
   };
 
   const getActionButton = (paper) => {
-    if (paper.status === 'submitted') {
+    if (paper.status === 'submitted' || paper.status === 'under_review') {
       return (
         <button
-          className="btn btn-start"
+          className={paper.status === 'submitted' ? 'btn btn-start' : 'btn btn-continue'}
           onClick={() => handleStartQuestionModeration(paper)}
         >
-          Start Moderation
-        </button>
-      );
-    } else if (paper.status === 'under_review') {
-      return (
-        <button
-          className="btn btn-continue"
-          onClick={() => handleStartQuestionModeration(paper)}
-        >
-          Continue Moderation
+          {paper.status === 'submitted' ? 'Start Moderation' : 'Continue Moderation'}
         </button>
       );
     } else if (paper.status === 'approved' || paper.status === 'change_requested') {
       return (
-        <button
-          className="btn btn-view"
-          onClick={() => handleStartQuestionModeration(paper)}
-        >
+        <button className="btn btn-view" onClick={() => handleViewReport(paper)}>
           View Report
         </button>
       );
-    } else {
-      return (
-        <button
-          className="btn btn-view"
-          onClick={() => handleStartQuestionModeration(paper)}
-          disabled
-        >
-          Not Available
-        </button>
-      );
     }
+    return <button className="btn btn-view" disabled>Not Available</button>;
   };
 
-  const getPaperStats = () => {
-    const stats = {
-      total: papers.length,
-      submitted: papers.filter(p => p.status === 'submitted').length,
-      under_review: papers.filter(p => p.status === 'under_review').length,
-      approved: papers.filter(p => p.status === 'approved').length,
-      change_requested: papers.filter(p => p.status === 'change_requested').length
-    };
-    return stats;
-  };
-
-  // Render different views
   const renderCurrentView = () => {
     switch (currentView) {
       case 'questions':
-        return (
-          <QuestionModeration
-            paperId={selectedPaper.paper_id}
-            onBack={handleBackToList}
-            onContinue={handleContinueToPaperModeration}
-          />
-        );
+        return <QuestionModeration paperId={selectedPaper.paper_id} onBack={handleBackToList} onContinue={handleContinueToPaperModeration} />;
       case 'paper':
-        return (
-          <PaperModeration
-            paperId={selectedPaper.paper_id}
-            onBack={handleBackToQuestionModeration}
-            onComplete={handleBackToList}
-          />
-        );
+        return <PaperModeration paperId={selectedPaper.paper_id} onBack={handleBackToQuestionModeration} onComplete={handleBackToList} />;
       case 'list':
       default:
         return renderPaperList();
@@ -187,64 +172,43 @@ const PaperList = () => {
   };
 
   const renderPaperList = () => {
-    const stats = getPaperStats();
+    const stats = {
+      total: papers.length,
+      submitted: papers.filter(p => p.status === 'submitted').length,
+      under_review: papers.filter(p => p.status === 'under_review').length,
+      approved: papers.filter(p => p.status === 'approved').length,
+      change_requested: papers.filter(p => p.status === 'change_requested').length
+    };
 
     return (
       <div className="paper-list-container">
         <div className="paper-list-header">
           <h1>Question Papers for Moderation</h1>
-          <p>Manage and moderate question papers</p>
         </div>
 
-        {/* Stats Overview */}
         <div className="stats-overview">
-          <div className="stat-card">
-            <div className="stat-number">{stats.total}</div>
-            <div className="stat-label">Total Papers</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">{stats.submitted}</div>
-            <div className="stat-label">Awaiting Review</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">{stats.under_review}</div>
-            <div className="stat-label">In Progress</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">{stats.approved + stats.change_requested}</div>
-            <div className="stat-label">Completed</div>
-          </div>
+          <div className="stat-card"><div className="stat-number">{stats.total}</div><div className="stat-label">Total</div></div>
+          <div className="stat-card"><div className="stat-number">{stats.submitted}</div><div className="stat-label">Awaiting</div></div>
+          <div className="stat-card"><div className="stat-number">{stats.under_review}</div><div className="stat-label">In Progress</div></div>
+          <div className="stat-card"><div className="stat-number">{stats.approved + stats.change_requested}</div><div className="stat-label">Completed</div></div>
         </div>
 
-        {/* Filters */}
         <div className="filters-section">
           <div className="filter-group">
-            <label htmlFor="course-filter">Filter by Course:</label>
-            <select
-              id="course-filter"
-              value={filters.courseId}
-              onChange={(e) => handleFilterChange('courseId', e.target.value)}
-            >
+            <label>Course:</label>
+            <select value={filters.courseId} onChange={(e) => handleFilterChange('courseId', e.target.value)}>
               <option value="">All Courses</option>
-              {Array.isArray(courses) && courses.map(course => (
-                <option key={course.course_id} value={course.course_id}>
-                  {course.code} - {course.title}
-                </option>
+              {courses.map(course => (
+                <option key={course.course_id} value={course.course_id}>{course.code} - {course.title}</option>
               ))}
             </select>
           </div>
 
           <div className="filter-group">
-            <label htmlFor="status-filter">Filter by Status:</label>
-            <select
-              id="status-filter"
-              value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-            >
+            <label>Status:</label>
+            <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
               {statusOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </div>
@@ -254,7 +218,6 @@ const PaperList = () => {
           </button>
         </div>
 
-        {/* Papers Table */}
         <div className="papers-table-container">
           {loading ? (
             <div className="loading">Loading papers...</div>
@@ -313,6 +276,16 @@ const PaperList = () => {
             </>
           )}
         </div>
+
+        <ModReportModal
+          isOpen={showReportModal}
+          onClose={() => {
+            setShowReportModal(false);
+            setSelectedModeration(null);
+          }}
+          moderation={selectedModeration}
+          paperData={selectedModeration}
+        />
       </div>
     );
   };

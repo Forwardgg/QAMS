@@ -1,60 +1,66 @@
 === AUTH CONTROLLER ===
-registerUser() - Register new user (excludes admin role)
-loginUser() - User login with JWT token
-forgotPassword() - Generate password reset token and link
-resetPassword() - Reset password using token
-deleteUser() - Soft delete user (deactivate)
-forceDeleteUser() - Hard delete user with cascade
-
-=== COURSE OUTCOME CONTROLLER ===
-getAllCourseOutcomes() - Get paginated course outcomes
-getCourseOutcomesByCourseCode() - Get COs by course code
-getCourseOutcomeByNumber() - Get specific CO by course ID and CO number
-getCourseOutcomeById() - Get CO by ID
-createCourseOutcome() - Create new course outcome
-updateCourseOutcome() - Update course outcome
-deleteCourseOutcome() - Delete course outcome
-searchCourseOutcomes() - Search COs by course code and CO number
+    registerUser() - Registers new user with email validation and role checking
+    loginUser() - Authenticates user and returns JWT token
+    forgotPassword() - Initiates password reset, sends reset link (logs to console)
+    resetPassword() - Validates reset token and updates password
+    deleteUser() - Soft deletes user by setting status to inactive
+    forceDeleteUser() - Hard deletes user from database
 
 === COURSE CONTROLLER ===
-getAllCourses() - Get paginated courses with search/filter
-getCourseById() - Get course by ID
-getCourseByCode() - Get course by code
-createCourse() - Create new course
-updateCourse() - Update course with partial updates
-deleteCourse() - Delete course
-searchCourses() - Search courses
+    getAllCourses() - Gets paginated courses with search and sorting
+    getCourseById() - Gets single course by ID
+    getCourseByCode() - Gets single course by code
+    createCourse() - Creates new course with validation
+    updateCourse() - Updates course fields with conflict checking
+    deleteCourse() - Deletes course and returns deleted record
+    searchCourses() - Searches courses with query and pagination
 
-=== MODERATOR CONTROLLER ===
-getPapersForModeration() - Get papers available for moderation with filters
-getPaperDetails() - Get paper details with questions for moderation
-startModeration() - Start moderating a paper (changes status to under_review)
-updateQuestionStatus() - Update individual question status (approved/change_requested)
-bulkUpdateQuestionStatus() - Bulk update multiple question statuses
-submitModerationReport() - Submit final moderation report with criteria and decision
-getModerationHistory() - Get moderation history for current moderator
-getCOBreakdown() - Get questions grouped by CO for moderation report
-
-=== PDF CONTROLLER ===
-generatePdf() - Generate PDF from HTML or paper ID with access control
-
-=== QUESTION CONTROLLER ===
-createQuestion() - Create new question with sequence number and media linking
-updateQuestion() - Update question with validation and media reconciliation
-getQuestion() - Get question by ID with media
-getQuestionsByPaper() - Get all questions for a paper
-deleteQuestion() - Delete question
-searchQuestions() - Search questions with filters
-updateQuestionSequence() - Update question sequence numbers for a paper
+=== COURSE OUTCOME CONTROLLER ===
+    getAllCourseOutcomes() - Gets paginated course outcomes with ordering
+    getCourseOutcomesByCourseCode() - Gets outcomes by course code
+    getCourseOutcomeByNumber() - Gets specific outcome by course ID and CO number
+    getCourseOutcomeById() - Gets outcome by its ID
+    createCourseOutcome() - Creates new course outcome with validation
+    updateCourseOutcome() - Updates outcome fields with conflict checking
+    deleteCourseOutcome() - Deletes outcome and returns deleted record
+    searchCourseOutcomes() - Searches outcomes by course code and CO number
 
 === QUESTION PAPER CONTROLLER ===
-createQuestionPaper() - Create new question paper
-getAllPapers() - Get all papers with pagination
-getPapersByCourse() - Get papers by course code
-getPapersByCourseAndCO() - Get papers by course and CO (to be enhanced)
-updatePaper() - Update paper with ownership check
-deletePaper() - Delete paper with ownership check
+    createQuestionPaper() - Creates new question paper with validation
+    getAllPapers() - Gets all papers with pagination
+    getPapersByCourse() - Gets papers by course code
+    getPapersByCourseAndCO() - Gets papers by course code and CO number
+    updatePaper() - Updates paper fields with ownership validation
+    submitForModeration() - Submits paper for moderation with ownership and status checks
+    deletePaper() - Deletes paper with ownership validation
+
+=== QUESTION CONTROLLER ===
+    createQuestion() - Creates new question with paper access validation and media linking
+    updateQuestion() - Updates question with transaction support and media reconciliation
+    getQuestion() - Gets question by ID with media details
+    getQuestionsByPaper() - Gets all questions for a paper in sequence order
+    deleteQuestion() - Deletes question and handles cleanup
+    searchQuestions() - Searches questions with filters and pagination
+    updateQuestionSequence() - Updates question ordering within a paper
+
+=== MODERATOR CONTROLLER ===
+    getPapersForModeration() - Gets papers available for moderation with filters
+    getPaperDetails() - Gets paper details with questions and moderation status
+    startModeration() - Starts moderation process with transaction support
+    updateQuestionStatus() - Updates individual question status
+    bulkUpdateQuestionStatus() - Bulk updates question statuses with validation
+    submitModerationReport() - Submits final moderation report with decision
+    getModerationHistory() - Gets moderation history for current moderator
+    getCOBreakdown() - Gets questions grouped by CO for moderation
+    viewQuestionReport() - Gets questions with full content for reports
+    viewPaperReport() - Gets comprehensive paper report with moderation data
+    getAllModerations() - Gets all moderations with search/filters (admin only)
+    getModerationDetails() - Gets detailed moderation record by ID
+    generateModerationReportPdf() - Generates PDF moderation report
 
 === UPLOAD CONTROLLER ===
-uploadFile() - Upload file with validation and media record creation
-getUploadConfig() - Get upload configuration (allowed types, max size)
+    uploadFile() - Handles file upload with validation, signature checking, and media record creation
+    getUploadConfig() - Returns upload configuration (allowed types, max file size, upload URL)
+
+=== PDF CONTROLLER ===
+    generatePdf() - Generates PDF from HTML or paper data with access control and validation

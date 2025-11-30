@@ -1,3 +1,4 @@
+/* src/frontend/src/pages/moderator/moderation/PaperList.css */
 .paper-list-container {
   padding: 2rem;
   max-width: 1400px;
@@ -315,6 +316,18 @@
   transform: translateY(-1px);
 }
 
+.btn:disabled {
+  background: #bdc3c7;
+  color: #7f8c8d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn:disabled:hover {
+  background: #bdc3c7;
+  transform: none;
+}
+
 /* Loading and Empty States */
 .loading {
   text-align: center;
@@ -336,6 +349,68 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
+/* Paper Row Enhancements */
+.paper-row {
+  transition: all 0.2s ease;
+}
+
+.paper-row:hover {
+  background-color: #f8f9fa !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Action Buttons Container */
+.actions-cell {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* Status Badge Enhancements */
+.status-badge {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.status-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+/* Filter Section Enhancements */
+.filters-section {
+  position: relative;
+}
+
+.filters-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #e67e22, #3498db, #95a5a6);
+  border-radius: 12px 12px 0 0;
+}
+
+/* Stats Card Colors */
+.stat-card:nth-child(1) {
+  border-top: 4px solid #e67e22;
+}
+
+.stat-card:nth-child(2) {
+  border-top: 4px solid #3498db;
+}
+
+.stat-card:nth-child(3) {
+  border-top: 4px solid #9b59b6;
+}
+
+.stat-card:nth-child(4) {
+  border-top: 4px solid #2ecc71;
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .paper-list-container {
@@ -351,6 +426,10 @@
   .filter-group {
     min-width: auto;
   }
+  
+  .paper-list-header h1 {
+    font-size: 2.2rem;
+  }
 }
 
 @media (max-width: 768px) {
@@ -360,19 +439,35 @@
   
   .stats-overview {
     grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  
+  .stat-card {
+    padding: 1.25rem;
+  }
+  
+  .stat-number {
+    font-size: 2rem;
   }
   
   .papers-table-container {
     overflow-x: auto;
+    border-radius: 8px;
   }
   
   .papers-table {
     min-width: 800px;
+    font-size: 0.9rem;
   }
   
   .paper-title,
   .course-info {
     max-width: 200px;
+  }
+  
+  .btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.85rem;
   }
 }
 
@@ -385,16 +480,128 @@
     font-size: 1.75rem;
   }
   
+  .paper-list-header p {
+    font-size: 1rem;
+  }
+  
   .stats-overview {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
   
   .filters-section {
-    padding: 1.5rem;
+    padding: 1.25rem;
+  }
+  
+  .filter-group select {
+    padding: 0.6rem 0.8rem;
   }
   
   .btn {
     width: 100%;
     justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .actions-cell {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .papers-table th,
+  .papers-table td {
+    padding: 1rem 0.75rem;
+  }
+  
+  .status-badge {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Animation for loading state */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.loading {
+  animation: pulse 2s infinite;
+}
+
+/* Print Styles */
+@media print {
+  .paper-list-container {
+    background: white;
+    padding: 0;
+  }
+  
+  .filters-section,
+  .btn-refresh,
+  .actions-cell {
+    display: none;
+  }
+  
+  .paper-list-header {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+  
+  .stats-overview {
+    break-inside: avoid;
+  }
+  
+  .papers-table {
+    break-inside: avoid;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .paper-list-container {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+  }
+  
+  .paper-list-header,
+  .stat-card,
+  .filters-section,
+  .papers-table-container {
+    background: #2d2d2d;
+    color: #e0e0e0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+  
+  .paper-list-header h1 {
+    color: #ffffff;
+  }
+  
+  .paper-list-header p {
+    color: #b0b0b0;
+  }
+  
+  .filter-group select {
+    background-color: #3d3d3d;
+    border-color: #4d4d4d;
+    color: #e0e0e0;
+  }
+  
+  .papers-table tr:hover {
+    background-color: #3d3d3d;
+  }
+  
+  .title-text {
+    color: #ffffff;
+  }
+  
+  .course-code {
+    color: #ffffff;
   }
 }

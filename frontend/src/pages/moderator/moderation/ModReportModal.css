@@ -1,0 +1,471 @@
+/* src/components/moderation/ModReportModal.css */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.mod-report-modal {
+  background: white;
+  border-radius: 12px;
+  width: 95%;
+  max-width: 900px; /* Reduced max-width */
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 2px solid #e1e5e9;
+  background: #f8f9fa;
+  border-radius: 12px 12px 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 4px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.modal-content {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+  width: 100%; /* Ensure full width */
+  max-width: 100%; /* Prevent any max-width restrictions */
+}
+
+.modal-footer {
+  padding: 20px 24px;
+  border-top: 2px solid #e1e5e9;
+  display: flex;
+  justify-content: flex-end;
+  background: #f8f9fa;
+  border-radius: 0 0 12px 12px;
+  position: sticky;
+  bottom: 0;
+}
+
+/* Header Section */
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  width: 100%; /* Full width */
+}
+
+.school {
+  font-size: 18px;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 4px;
+}
+
+.university {
+  font-size: 16px;
+  font-weight: bold;
+  color: #34495e;
+  margin: 4px 0;
+}
+
+.department {
+  font-size: 14px;
+  color: #7f8c8d;
+  margin-bottom: 8px;
+}
+
+.separator {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3498db, transparent);
+  margin: 16px 0;
+  width: 100%; /* Full width */
+}
+
+.report-title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 24px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 12px;
+  background: #e8f4fd;
+  border-radius: 6px;
+  border-left: 4px solid #3498db;
+  width: 100%; /* Full width */
+}
+
+/* Info Grid - Make it full width */
+.info-grid {
+  display: grid;
+  grid-template-columns: 150px 1fr 150px 1fr;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  width: 100%; /* Full width */
+  box-sizing: border-box;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 14px;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-approved {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-rejected {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.status-pending {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+/* Criteria Section - Make table full width */
+.criteria-section h3 {
+  color: #2c3e50;
+  margin-bottom: 16px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+  font-size: 18px;
+  width: 100%; /* Full width */
+}
+
+.criteria-table {
+  width: 100%; /* Full width */
+  border-collapse: collapse;
+  margin-bottom: 24px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  table-layout: fixed; /* Ensure consistent column widths */
+}
+
+.criteria-table tr {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.criteria-table tr:last-child {
+  border-bottom: none;
+}
+
+.col-number {
+  width: 60px;
+  text-align: center;
+  font-weight: bold;
+  background: #f8f9fa;
+  padding: 16px 8px;
+  border-right: 1px solid #dee2e6;
+  font-size: 14px;
+}
+
+.col-question {
+  padding: 16px;
+  background: white;
+  border-right: 1px solid #dee2e6;
+  font-size: 14px;
+  line-height: 1.4;
+  width: auto; /* Let it take available space */
+}
+
+.col-answer {
+  width: 120px;
+  text-align: center;
+  padding: 16px;
+  background: white;
+  font-size: 14px;
+}
+
+.comment-cell {
+  padding: 16px;
+  background: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  font-size: 14px;
+  width: auto; /* Let it take available space */
+}
+
+.comment-cell .comment-text {
+  margin-top: 8px;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  font-style: italic;
+  line-height: 1.4;
+  width: 100%; /* Full width within cell */
+}
+
+/* Boolean Indicators */
+.criterion-pass {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.criterion-fail {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.not-evaluated {
+  color: #6c757d;
+  font-style: italic;
+}
+
+.no-comment {
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Moderator Section - Full width */
+.moderator-section {
+  margin: 28px 0;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  width: 100%; /* Full width */
+}
+
+.moderator-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #495057;
+  font-size: 16px;
+}
+
+.moderator-list {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.hod-signature {
+  text-align: right;
+  margin: 32px 0 24px 0;
+  padding-top: 20px;
+  border-top: 2px solid #dee2e6;
+  font-weight: 600;
+  color: #495057;
+  font-size: 16px;
+  width: 100%; /* Full width */
+}
+
+/* PDF Generation - Full width */
+.pdf-generation-section {
+  text-align: center;
+  margin-top: 28px;
+  padding: 24px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  width: 100%; /* Full width */
+}
+
+.generate-pdf-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  width: auto; /* Don't force full width */
+  min-width: 250px; /* But have a minimum width */
+}
+
+.generate-pdf-btn:hover:not(:disabled) {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.generate-pdf-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.pdf-message {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  width: 100%; /* Full width */
+}
+
+.pdf-message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.pdf-message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Buttons */
+.btn-primary {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #545b62;
+  transform: translateY(-1px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .mod-report-modal {
+    width: 98%;
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+  
+  .modal-header {
+    padding: 16px 20px;
+  }
+  
+  .modal-header h2 {
+    font-size: 1.3rem;
+  }
+  
+  .modal-content {
+    padding: 16px;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .criteria-table {
+    font-size: 12px;
+  }
+  
+  .col-number {
+    width: 40px;
+    padding: 12px 4px;
+  }
+  
+  .col-question,
+  .col-answer,
+  .comment-cell {
+    padding: 12px 8px;
+  }
+  
+  .modal-footer {
+    padding: 16px 20px;
+  }
+  
+  .generate-pdf-btn {
+    min-width: 200px;
+    padding: 12px 20px;
+  }
+}
+
+/* Ensure all content elements take full width */
+.modal-content > * {
+  width: 100%;
+  box-sizing: border-box;
+}

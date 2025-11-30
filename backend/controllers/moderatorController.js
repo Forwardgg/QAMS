@@ -84,6 +84,9 @@ export const startModeration = async (req, res) => {
     const { id } = req.params;
     const moderatorId = req.user.user_id;
 
+    console.log('=== START MODERATION DEBUG ===');
+    console.log('Paper ID:', id, 'Moderator ID:', moderatorId);
+
     if (req.user.role !== 'moderator') {
       return res.status(403).json({ success: false, message: "Access denied. Moderator role required." });
     }
@@ -94,15 +97,21 @@ export const startModeration = async (req, res) => {
 
       // Lock the paper row to avoid concurrent starters
       const paperRes = await client.query(
-        'SELECT paper_id, status FROM question_papers WHERE paper_id = $1 FOR UPDATE',
+        'SELECT paper_id, status, version FROM question_papers WHERE paper_id = $1 FOR UPDATE',
         [id]
       );
+      
+      console.log('Paper query result:', paperRes.rows);
+      
       if (!paperRes.rows.length) {
         await client.query('ROLLBACK');
         return res.status(404).json({ success: false, message: "Paper not found" });
       }
+      
       const paper = paperRes.rows[0];
+      console.log('Paper status:', paper.status, 'Paper version:', paper.version);
 
+      // Check paper status
       if (paper.status !== 'submitted') {
         await client.query('ROLLBACK');
         return res.status(400).json({
@@ -111,23 +120,32 @@ export const startModeration = async (req, res) => {
         });
       }
 
-      // Ensure no pending moderation by other moderators exists
-      const pendingOther = await client.query(
-        `SELECT 1 FROM qp_moderations WHERE paper_id = $1 AND status = 'pending' AND moderator_id IS DISTINCT FROM $2 LIMIT 1`,
-        [id, moderatorId]
-      );
-      if (pendingOther.rows.length) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ success: false, message: "Paper is already being moderated by another moderator" });
-      }
+      const existingModeration = await client.query(
+  `SELECT 1 FROM qp_moderations WHERE paper_id = $1 AND status = 'pending' AND moderator_id = $2 LIMIT 1`,
+  [id, moderatorId]
+);
+      
+      console.log('Existing moderation check for same moderator:', existingModeration.rows);
+
+      if (existingModeration.rows.length) {
+  await client.query('ROLLBACK');
+  return res.status(400).json({ 
+    success: false, 
+    message: "You are already moderating this paper" 
+  });
+}
 
       // Create moderation record using same client
+      console.log('Creating moderation record...');
       const moderation = await Moderation.create(id, moderatorId, client);
+      console.log('Moderation created:', moderation);
 
       // Update paper status to under_review using same client
+      console.log('Updating paper status to under_review...');
       await QuestionPaper.startModeration(id, client);
 
       await client.query('COMMIT');
+      console.log('Transaction committed successfully');
 
       res.json({
         success: true,
@@ -137,14 +155,23 @@ export const startModeration = async (req, res) => {
           moderation
         }
       });
+      
     } catch (error) {
       await client.query('ROLLBACK');
+      console.error('Transaction error in startModeration:', error);
+      console.error('Error stack:', error.stack);
       throw error;
     } finally {
       client.release();
     }
   } catch (error) {
     console.error("startModeration error:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+      paperId: req.params.id,
+      moderatorId: req.user.user_id
+    });
     res.status(500).json({ success: false, message: error.message });
   }
 };

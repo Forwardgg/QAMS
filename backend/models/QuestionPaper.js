@@ -364,6 +364,22 @@ export class QuestionPaper {
   return rows[0];
 }
 
+static async submitForModeration(paperId, client = null) {
+  const executor = client || pool;
+  
+  const query = `
+    UPDATE question_papers 
+    SET status = 'submitted', updated_at = CURRENT_TIMESTAMP
+    WHERE paper_id = $1 AND status = 'draft'
+    RETURNING *
+  `;
+  
+  const { rows } = await executor.query(query, [paperId]);
+  if (!rows.length) {
+    throw new Error('Paper not found or not in draft status');
+  }
+  return rows[0];
+}
 
   static async getAllPapersForModerator(courseId = null, status = null, moderatorId = null) {
     let whereConditions = [];

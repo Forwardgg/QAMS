@@ -3,16 +3,13 @@ import { pool } from "../config/db.js";
 
 export class Course {
   static DEFAULT_LIMIT = 25;
-
   static _ensureRequiredString(val, name) {
     if (val === undefined || val === null || String(val).trim() === "") throw new Error(`${name} is required`);
   }
-
   static _ensureString(val, name) {
     if (val === undefined || val === null) return;
     if (typeof val !== "string") throw new Error(`${name} must be a string`);
   }
-
   static _ensureIntRange(val, name, min = 0, max = 9) {
     if (val === undefined || val === null) return;
     if (!Number.isInteger(val)) throw new Error(`${name} must be an integer`);

@@ -8,59 +8,58 @@ export class Moderation {
    * - Accepts an optional client to participate in transactions.
    * - Prevents creating duplicate moderation for same moderator & paper.
    */
-  static async create(paperId, moderatorId, client = null) {
-    const executor = client || pool;
+  // In backend/models/Moderation.js - replace the entire create() method
+static async create(paperId, moderatorId, client = null) {
+  const executor = client || pool;
 
-    // Ensure paper exists and read its current version
-    const pv = await executor.query(
-      "SELECT version FROM question_papers WHERE paper_id = $1 LIMIT 1",
-      [paperId]
-    );
-    if (!pv.rows.length) {
-      throw new Error("Paper not found");
-    }
-    const paperVersion = pv.rows[0].version ?? 1;
-
-    // Prevent duplicate moderation row for same moderator & paper
-    const existing = await executor.query(
-      `SELECT moderation_id, status FROM qp_moderations
-       WHERE paper_id = $1 AND moderator_id = $2 LIMIT 1`,
-      [paperId, moderatorId]
-    );
-    if (existing.rows.length) {
-      // If an existing row is present and is pending, inform caller
-      const ex = existing.rows[0];
-      throw new Error("Moderator already has a moderation record for this paper");
-    }
-
-    const query = `
-      INSERT INTO qp_moderations (
-        paper_id, moderator_id, paper_version, status,
-        questions_set_per_co, questions_set_per_co_comment,
-        meets_level_standard, meets_level_standard_comment,
-        covers_syllabus, covers_syllabus_comment,
-        technically_accurate, technically_accurate_comment,
-        edited_formatted_accurately, edited_formatted_comment,
-        linguistically_accurate, linguistically_accurate_comment,
-        verbatim_copy_check, verbatim_copy_comment
-      )
-      VALUES (
-        $1, $2, $3, 'pending',
-        NULL, 'N/A',
-        NULL, 'N/A',
-        NULL, 'N/A',
-        NULL, 'N/A',
-        NULL, 'N/A',
-        NULL, 'N/A',
-        NULL, 'N/A'
-      )
-      RETURNING *
-    `;
-
-    const values = [paperId, moderatorId, paperVersion];
-    const { rows } = await executor.query(query, values);
-    return rows[0];
+  // Ensure paper exists and read its current version
+  const pv = await executor.query(
+    "SELECT version FROM question_papers WHERE paper_id = $1 LIMIT 1",
+    [paperId]
+  );
+  if (!pv.rows.length) {
+    throw new Error("Paper not found");
   }
+  const paperVersion = pv.rows[0].version ?? 1;
+
+  // FIX: Only prevent if same moderator already has active moderation for this paper
+  const existing = await executor.query(
+    `SELECT moderation_id, status FROM qp_moderations
+     WHERE paper_id = $1 AND moderator_id = $2 AND status = 'pending' LIMIT 1`,
+    [paperId, moderatorId]  // Only check for same moderator
+  );
+  if (existing.rows.length) {
+    throw new Error("You are already moderating this paper");
+  }
+
+  const query = `
+    INSERT INTO qp_moderations (
+      paper_id, moderator_id, paper_version, status,
+      questions_set_per_co, questions_set_per_co_comment,
+      meets_level_standard, meets_level_standard_comment,
+      covers_syllabus, covers_syllabus_comment,
+      technically_accurate, technically_accurate_comment,
+      edited_formatted_accurately, edited_formatted_comment,
+      linguistically_accurate, linguistically_accurate_comment,
+      verbatim_copy_check, verbatim_copy_comment
+    )
+    VALUES (
+      $1, $2, $3, 'pending',
+      NULL, 'N/A',
+      NULL, 'N/A',
+      NULL, 'N/A',
+      NULL, 'N/A',
+      NULL, 'N/A',
+      NULL, 'N/A',
+      NULL, 'N/A'
+    )
+    RETURNING *
+  `;
+
+  const values = [paperId, moderatorId, paperVersion];
+  const { rows } = await executor.query(query, values);
+  return rows[0];
+}
 
   /**
    * Find the latest moderation row for a paper (any status).
