@@ -2,6 +2,7 @@
 import { pool } from "../config/db.js";
 
 export class Moderation {
+   static MODERATION_VERSION_LIMIT = 3;
   /**
    * Create a new moderation record.
    * - Uses the current paper version (reads from question_papers).
@@ -444,5 +445,27 @@ static async getAllModerations(filters = {}) {
     console.error('Error in getAllModerations:', error);
     throw error;
   }
+}
+
+static async cleanupOldVersions(paperId, client = null) {
+  const executor = client || pool;
+  
+  const query = `
+    DELETE FROM qp_moderations 
+    WHERE moderation_id IN (
+      SELECT moderation_id FROM (
+        SELECT 
+          moderation_id,
+          ROW_NUMBER() OVER (PARTITION BY paper_id ORDER BY paper_version DESC) as version_rank
+        FROM qp_moderations 
+        WHERE paper_id = $1
+      ) ranked
+      WHERE version_rank > $2  -- Keep only top N versions
+    )
+  `;
+  
+  const result = await executor.query(query, [paperId, this.MODERATION_VERSION_LIMIT]);
+  console.log(`Cleaned up ${result.rowCount} old moderation versions for paper ${paperId}`);
+  return result.rowCount;
 }
 }

@@ -19,6 +19,29 @@ const QuestionPaperList = ({
   // Utility: safely stringify a field for search/comparison
   const asStr = (v) => (v === undefined || v === null) ? '' : String(v);
 
+  // Check if paper can be edited/deleted
+  const canEditDelete = (paper) => {
+    return paper.status === 'draft' || paper.status === 'change_requested';
+  };
+
+  // Handle edit click with validation
+  const handleEditClick = (paper) => {
+    if (!canEditDelete(paper)) {
+      alert(`Cannot edit paper with status: ${paper.status}. Only "Draft" or "Changes Requested" papers can be edited.`);
+      return;
+    }
+    onEditClick(paper);
+  };
+
+  // Handle delete click with validation
+  const handleDeleteClick = (paper) => {
+    if (!canEditDelete(paper)) {
+      alert(`Cannot delete paper with status: ${paper.status}. Only "Draft" or "Changes Requested" papers can be deleted.`);
+      return;
+    }
+    onDeleteClick(paper);
+  };
+
   // derive unique courses (memoized)
   const availableCourses = useMemo(() => {
     const courseMap = {};
@@ -225,72 +248,77 @@ const QuestionPaperList = ({
                 </td>
               </tr>
             ) : (
-              filteredPapers.map((paper) => (
-                <tr key={paper.paper_id}>
-                  <td className="paper-title">{paper.title}</td>
-                  <td>
-                    <div className="course-info">
-                      <span className="course-code">{paper.course_code}</span>
-                      <span className="course-title">{paper.course_title}</span>
-                    </div>
-                  </td>
-                  <td>{paper.exam_type || '-'}</td>
-                  <td>
-                    {paper.academic_year && paper.semester 
-                      ? `${paper.academic_year} - ${paper.semester}`
-                      : paper.academic_year || paper.semester || '-'
-                    }
-                  </td>
-                  <td className="text-center">{paper.full_marks ?? '-'}</td>
-                  <td className="text-center">{paper.duration ? `${paper.duration} mins` : '-'}</td>
-                  <td>{getStatusBadge(paper.status)}</td>
-                  <td>
-                    <div className="action-buttons">
-                      <button 
-                        type="button"
-                        className="btn-preview"
-                        onClick={() => onPreviewClick(paper)}
-                        title="Preview"
-                        aria-label={`Preview ${paper.title}`}
-                      >
-                        👁️
-                      </button>
-                      <button 
-                        type="button"
-                        className="btn-edit"
-                        onClick={() => onEditClick(paper)}
-                        title="Edit"
-                        aria-label={`Edit ${paper.title}`}
-                      >
-                        ✏️
-                      </button>
-                      
-                      {/* Submit for Moderation Button */}
-                      {paper.status === 'draft' && (
+              filteredPapers.map((paper) => {
+                const editable = canEditDelete(paper);
+                return (
+                  <tr key={paper.paper_id}>
+                    <td className="paper-title">{paper.title}</td>
+                    <td>
+                      <div className="course-info">
+                        <span className="course-code">{paper.course_code}</span>
+                        <span className="course-title">{paper.course_title}</span>
+                      </div>
+                    </td>
+                    <td>{paper.exam_type || '-'}</td>
+                    <td>
+                      {paper.academic_year && paper.semester 
+                        ? `${paper.academic_year} - ${paper.semester}`
+                        : paper.academic_year || paper.semester || '-'
+                      }
+                    </td>
+                    <td className="text-center">{paper.full_marks ?? '-'}</td>
+                    <td className="text-center">{paper.duration ? `${paper.duration} mins` : '-'}</td>
+                    <td>{getStatusBadge(paper.status)}</td>
+                    <td>
+                      <div className="action-buttons">
                         <button 
                           type="button"
-                          className="btn-submit"
-                          onClick={() => onSubmitForModeration(paper)}
-                          title="Submit for Moderation"
-                          aria-label={`Submit ${paper.title} for moderation`}
+                          className="btn-action btn-view"
+                          onClick={() => onPreviewClick(paper)}
+                          title="View"
+                          aria-label={`View ${paper.title}`}
                         >
-                          📤
+                          View
                         </button>
-                      )}
-                      
-                      <button 
-                        type="button"
-                        className="btn-delete"
-                        onClick={() => onDeleteClick(paper)}
-                        title="Delete"
-                        aria-label={`Delete ${paper.title}`}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        <button 
+                          type="button"
+                          className={`btn-action btn-edit ${!editable ? 'btn-disabled' : ''}`}
+                          onClick={() => handleEditClick(paper)}
+                          title={editable ? "Edit" : `Cannot edit - Status: ${paper.status}`}
+                          aria-label={`Edit ${paper.title}`}
+                          disabled={!editable}
+                        >
+                          Edit
+                        </button>
+                        
+                        {/* Submit for Moderation Button */}
+                        {paper.status === 'draft' && (
+                          <button 
+                            type="button"
+                            className="btn-action btn-submit"
+                            onClick={() => onSubmitForModeration(paper)}
+                            title="Submit for Moderation"
+                            aria-label={`Submit ${paper.title} for moderation`}
+                          >
+                            Submit
+                          </button>
+                        )}
+                        
+                        <button 
+                          type="button"
+                          className={`btn-action btn-delete ${!editable ? 'btn-disabled' : ''}`}
+                          onClick={() => handleDeleteClick(paper)}
+                          title={editable ? "Delete" : `Cannot delete - Status: ${paper.status}`}
+                          aria-label={`Delete ${paper.title}`}
+                          disabled={!editable}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

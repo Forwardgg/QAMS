@@ -347,6 +347,33 @@ export const submitModerationReport = async (req, res) => {
         return res.status(400).json({ success: false, message: "Moderation record not found" });
       }
 
+      // Get all questions for validation BEFORE making any changes
+      const questions = await Question.getQuestionsForModeration(paper_id);
+      
+      // CRITICAL VALIDATION: Cannot approve paper if any questions are change_requested
+      if (final_decision === 'approved') {
+        const changeRequestedQuestions = questions.filter(q => q.status === 'change_requested');
+        if (changeRequestedQuestions.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            success: false,
+            message: `Cannot approve paper. ${changeRequestedQuestions.length} question(s) have change_requested status. All questions must be approved to approve the paper.`
+          });
+        }
+
+        // Additional validation: Ensure all questions have been explicitly reviewed
+        const unreviewedQuestions = questions.filter(q => 
+          !['approved', 'change_requested'].includes(q.status)
+        );
+        if (unreviewedQuestions.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            success: false,
+            message: `Cannot approve paper. ${unreviewedQuestions.length} question(s) have not been reviewed (current status: ${unreviewedQuestions.map(q => q.status).join(', ')}). Please review all questions before approving the paper.`
+          });
+        }
+      }
+
       // Prepare moderationData for update
       const moderationData = {
         questions_set_per_co,
@@ -373,28 +400,33 @@ export const submitModerationReport = async (req, res) => {
       const paperStatus = final_decision === 'approved' ? 'approved' : 'change_requested';
       await QuestionPaper.updateStatus(paper_id, paperStatus, client);
 
-      // If paper approved, approve all questions that weren't individually marked change_requested
+      // NEW LOGIC: Handle question status based on final decision
       if (final_decision === 'approved') {
-        const questions = await Question.getQuestionsForModeration(paper_id);
-        const questionsToApprove = questions.filter(q => q.status !== 'change_requested');
-
-        if (questionsToApprove.length > 0) {
-          const approveUpdates = questionsToApprove.map(q => ({
-            question_id: q.question_id,
-            status: 'approved'
-          }));
-          await Question.bulkUpdateStatus(approveUpdates, client);
-        }
+        // For approved papers: All questions should already be approved (validated above)
+        // No need to change question statuses since they're already correct
+        console.log(`Paper approved - ${questions.filter(q => q.status === 'approved').length} questions already approved`);
+      } else {
+        // For rejected papers: Questions keep their current status (no changes needed)
+        console.log(`Paper rejected - questions maintain their current status`);
       }
 
       await client.query('COMMIT');
+
+      // CLEANUP OLD VERSIONS AFTER SUCCESSFUL MODERATION
+      await Moderation.cleanupOldVersions(paper_id);
 
       res.json({
         success: true,
         message: `Moderation report submitted successfully. Paper ${final_decision}.`,
         data: {
           moderation: updatedModeration,
-          paper_status: paperStatus
+          paper_status: paperStatus,
+          question_summary: {
+            total: questions.length,
+            approved: questions.filter(q => q.status === 'approved').length,
+            change_requested: questions.filter(q => q.status === 'change_requested').length,
+            other: questions.filter(q => !['approved', 'change_requested'].includes(q.status)).length
+          }
         }
       });
     } catch (error) {
@@ -493,7 +525,7 @@ export const viewQuestionReport = async (req, res) => {
     }));
 
     return res.json({
-      success: false,
+      success: true,
       data: transformed,
       count: transformed.length
     });

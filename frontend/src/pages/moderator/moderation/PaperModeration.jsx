@@ -87,9 +87,49 @@ const PaperModeration = ({ paperId, onBack, onComplete }) => {
     }));
   };
 
+  const getStatusBadgeClass = (status) => {
+    const statusClasses = {
+      draft: 'status-draft',
+      submitted: 'status-submitted',
+      under_review: 'status-under-review',
+      change_requested: 'status-change-requested',
+      approved: 'status-approved'
+    };
+    return statusClasses[status] || 'status-default';
+  };
+
+  const getApprovalStats = () => {
+    const total = questions.length;
+    const approved = questions.filter(q => q.status === 'approved').length;
+    const changeRequested = questions.filter(q => q.status === 'change_requested').length;
+    const pending = questions.filter(q => q.status === 'submitted' || q.status === 'under_review').length;
+    
+    return { total, approved, changeRequested, pending };
+  };
+
+  const canApprovePaper = () => {
+    return stats.changeRequested === 0 && stats.pending === 0;
+  };
+
+  const getApprovalMessage = () => {
+    if (stats.changeRequested > 0) {
+      return `❌ Cannot approve paper: ${stats.changeRequested} question(s) have changes requested. All questions must be approved to approve the paper.`;
+    }
+    if (stats.pending > 0) {
+      return `❌ Cannot approve paper: ${stats.pending} question(s) are pending review. All questions must be approved to approve the paper.`;
+    }
+    return "✅ All questions are approved. You can approve the paper.";
+  };
+
   const handleSubmitModeration = async () => {
     if (!moderationData.final_decision) {
       alert('Please select a final decision');
+      return;
+    }
+
+    // Add validation for paper approval
+    if (moderationData.final_decision === 'approved' && !canApprovePaper()) {
+      alert(getApprovalMessage());
       return;
     }
 
@@ -126,30 +166,16 @@ const PaperModeration = ({ paperId, onBack, onComplete }) => {
       onComplete();
     } catch (error) {
       console.error('Failed to submit moderation report:', error);
-      alert('Failed to submit moderation report. Please try again.');
+      
+      // Show specific backend error message if available
+      if (error.response?.data?.message) {
+        alert(`Failed to submit: ${error.response.data.message}`);
+      } else {
+        alert('Failed to submit moderation report. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const getStatusBadgeClass = (status) => {
-    const statusClasses = {
-      draft: 'status-draft',
-      submitted: 'status-submitted',
-      under_review: 'status-under-review',
-      change_requested: 'status-change-requested',
-      approved: 'status-approved'
-    };
-    return statusClasses[status] || 'status-default';
-  };
-
-  const getApprovalStats = () => {
-    const total = questions.length;
-    const approved = questions.filter(q => q.status === 'approved').length;
-    const changeRequested = questions.filter(q => q.status === 'change_requested').length;
-    const pending = questions.filter(q => q.status === 'submitted' || q.status === 'under_review').length;
-    
-    return { total, approved, changeRequested, pending };
   };
 
   if (loading) {
@@ -218,6 +244,15 @@ const PaperModeration = ({ paperId, onBack, onComplete }) => {
             <div className="stat-number">{stats.pending}</div>
             <div className="stat-label">Pending</div>
           </div>
+        </div>
+        
+        {/* Approval Status Message */}
+        <div className="approval-status-message">
+          {moderationData.final_decision === 'approved' && (
+            <div className={canApprovePaper() ? "approval-success" : "approval-warning"}>
+              {getApprovalMessage()}
+            </div>
+          )}
         </div>
       </div>
 
@@ -502,6 +537,14 @@ const PaperModeration = ({ paperId, onBack, onComplete }) => {
       {/* Final Decision */}
       <div className="final-decision">
         <h3>Final Decision</h3>
+        
+        {/* Validation message */}
+        {moderationData.final_decision === 'approved' && !canApprovePaper() && (
+          <div className="approval-warning">
+            {getApprovalMessage()}
+          </div>
+        )}
+        
         <div className="decision-options">
           <label className="decision-option approve">
             <input
@@ -513,7 +556,7 @@ const PaperModeration = ({ paperId, onBack, onComplete }) => {
             />
             <span className="decision-label">✅ Approve Paper</span>
             <span className="decision-description">
-              All approved questions will be finalized. Questions marked for changes remain as is.
+              All questions must be approved to approve the paper. Questions with changes requested will block approval.
             </span>
           </label>
           

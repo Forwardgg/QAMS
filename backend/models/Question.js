@@ -4,96 +4,115 @@ import { pool } from '../config/db.js';
 export class Question {
   // Static methods for database operations
 
-  /**
-   * Create a new question
-   * Accepts optional client for transactionality
-   */
   static async create(questionData, client = null) {
-  const executor = client || pool;
-  const { paper_id, content_html, co_id, status = 'draft', sequence_number = null } = questionData;
+    const executor = client || pool;
+    const { paper_id, content_html, co_id, status = 'draft', sequence_number = null } = questionData;
 
-  // Basic validation
-  if (!content_html) {
-    throw new Error('content_html is required');
-  }
-
-  if (paper_id) {
-    // optionally validate the paper exists (use same executor to allow transactional callers)
-    const paperCheck = await executor.query('SELECT paper_id FROM question_papers WHERE paper_id = $1 LIMIT 1', [paper_id]);
-    if (!paperCheck.rows.length) {
-      throw new Error('paper_id not found');
+    // Basic validation
+    if (!content_html) {
+      throw new Error('content_html is required');
     }
+
+    if (paper_id) {
+      // Check paper exists AND validate status
+      const paperCheck = await executor.query(
+        'SELECT paper_id, status FROM question_papers WHERE paper_id = $1 LIMIT 1', 
+        [paper_id]
+      );
+      if (!paperCheck.rows.length) {
+        throw new Error('paper_id not found');
+      }
+      
+      // Validate paper status for adding questions
+      const paperStatus = paperCheck.rows[0].status;
+      if (!['draft', 'change_requested'].includes(paperStatus)) {
+        throw new Error(`Questions cannot be added. Paper status: ${paperStatus}. Only papers in 'draft' or 'change_requested' status can have questions added.`);
+      }
+    }
+
+    const query = `
+      INSERT INTO questions (paper_id, content_html, co_id, status, sequence_number, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+    `;
+
+    const values = [paper_id || null, content_html, co_id || null, status, sequence_number];
+    const result = await executor.query(query, values);
+    return result.rows[0];
   }
 
-  const query = `
-    INSERT INTO questions (paper_id, content_html, co_id, status, sequence_number, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
-  `;
-
-  const values = [paper_id || null, content_html, co_id || null, status, sequence_number];
-  const result = await executor.query(query, values);
-  return result.rows[0];
-}
-
-
-  /**
-   * Update an existing question
-   * Accepts optional client
-   */
   static async update(questionId, questionData, client = null) {
-  if (!questionId) throw new Error('Invalid questionId');
+    if (!questionId) throw new Error('Invalid questionId');
 
-  const executor = client || pool;
+    const executor = client || pool;
 
-  // Validate status if provided
-  if (Object.prototype.hasOwnProperty.call(questionData, 'status')) {
-    const allowedStatuses = ['draft', 'submitted', 'under_review', 'change_requested', 'approved'];
-    if (!allowedStatuses.includes(questionData.status)) {
-      throw new Error(`Invalid status. Allowed: ${allowedStatuses.join(', ')}`);
+    // First get the question to find paper_id and validate paper status
+    const existingQuestion = await executor.query(
+      'SELECT paper_id FROM questions WHERE question_id = $1', 
+      [questionId]
+    );
+    if (!existingQuestion.rows.length) {
+      throw new Error('Question not found');
     }
-  }
 
-  // Allowed updatable fields
-  const allowed = ['paper_id', 'content_html', 'co_id', 'status', 'sequence_number'];
+    const paperId = existingQuestion.rows[0].paper_id;
 
-  const setClauses = [];
-  const values = [];
-  let idx = 1;
-
-  for (const key of allowed) {
-    if (Object.prototype.hasOwnProperty.call(questionData, key) && questionData[key] !== undefined) {
-      setClauses.push(`${key} = $${idx++}`);
-      values.push(questionData[key] === '' ? null : questionData[key]);
+    // Validate paper status for editing questions
+    if (paperId) {
+      const paperCheck = await executor.query(
+        'SELECT status FROM question_papers WHERE paper_id = $1', 
+        [paperId]
+      );
+      if (paperCheck.rows.length) {
+        const paperStatus = paperCheck.rows[0].status;
+        if (!['draft', 'change_requested'].includes(paperStatus)) {
+          throw new Error(`Questions cannot be edited. Paper status: ${paperStatus}. Only papers in 'draft' or 'change_requested' status can have questions edited.`);
+        }
+      }
     }
+
+    // Validate status if provided
+    if (Object.prototype.hasOwnProperty.call(questionData, 'status')) {
+      const allowedStatuses = ['draft', 'submitted', 'under_review', 'change_requested', 'approved'];
+      if (!allowedStatuses.includes(questionData.status)) {
+        throw new Error(`Invalid status. Allowed: ${allowedStatuses.join(', ')}`);
+      }
+    }
+
+    // Allowed updatable fields
+    const allowed = ['paper_id', 'content_html', 'co_id', 'status', 'sequence_number'];
+
+    const setClauses = [];
+    const values = [];
+    let idx = 1;
+
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(questionData, key) && questionData[key] !== undefined) {
+        setClauses.push(`${key} = $${idx++}`);
+        values.push(questionData[key] === '' ? null : questionData[key]);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return existingQuestion.rows[0];
+    }
+
+    setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+    const query = `
+      UPDATE questions
+      SET ${setClauses.join(', ')}
+      WHERE question_id = $${idx}
+      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+    `;
+    values.push(questionId);
+
+    const result = await executor.query(query, values);
+    if (result.rows.length === 0) {
+      throw new Error('Question not found');
+    }
+    return result.rows[0];
   }
 
-  if (setClauses.length === 0) {
-    // nothing to update, return current row
-    const existing = await executor.query('SELECT * FROM questions WHERE question_id = $1', [questionId]);
-    if (!existing.rows.length) throw new Error('Question not found');
-    return existing.rows[0];
-  }
-
-  setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
-  const query = `
-    UPDATE questions
-    SET ${setClauses.join(', ')}
-    WHERE question_id = $${idx}
-    RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
-  `;
-  values.push(questionId);
-
-  const result = await executor.query(query, values);
-  if (result.rows.length === 0) {
-    throw new Error('Question not found');
-  }
-  return result.rows[0];
-}
-
-  /**
-   * Find question by ID
-   */
   static async findById(questionId) {
     const query = `
       SELECT q.*, 
@@ -113,40 +132,71 @@ export class Question {
     return result.rows[0];
   }
 
-  /**
-   * Find questions by paper ID
-   */
   static async findByPaperId(paperId) {
-  const query = `
-    SELECT q.*, 
-           co.co_number, 
-           co.description as co_description
-    FROM questions q
-    LEFT JOIN course_outcomes co ON q.co_id = co.co_id
-    WHERE q.paper_id = $1
-    ORDER BY q.sequence_number NULLS LAST, q.question_id
-  `;
-  
-  const result = await pool.query(query, [paperId]);
-  return result.rows;
-}
+    const query = `
+      SELECT q.*, 
+             co.co_number, 
+             co.description as co_description
+      FROM questions q
+      LEFT JOIN course_outcomes co ON q.co_id = co.co_id
+      WHERE q.paper_id = $1
+      ORDER BY q.sequence_number NULLS LAST, q.question_id
+    `;
+    
+    const result = await pool.query(query, [paperId]);
+    return result.rows;
+  }
 
+  static async delete(questionId, client = null) {
+    const executor = client || pool;
 
-  /**
-   * Delete a question
-   */
-  static async delete(questionId) {
+    // First get the question to find paper_id and validate paper status
+    const existingQuestion = await executor.query(
+      'SELECT paper_id FROM questions WHERE question_id = $1', 
+      [questionId]
+    );
+    if (!existingQuestion.rows.length) {
+      throw new Error('Question not found');
+    }
+
+    const paperId = existingQuestion.rows[0].paper_id;
+
+    // Validate paper status for deleting questions
+    if (paperId) {
+      const paperCheck = await executor.query(
+        'SELECT status FROM question_papers WHERE paper_id = $1', 
+        [paperId]
+      );
+      if (paperCheck.rows.length) {
+        const paperStatus = paperCheck.rows[0].status;
+        if (!['draft', 'change_requested'].includes(paperStatus)) {
+          throw new Error(`Questions cannot be deleted. Paper status: ${paperStatus}. Only papers in 'draft' or 'change_requested' status can have questions deleted.`);
+        }
+      }
+    }
+
     const query = 'DELETE FROM questions WHERE question_id = $1 RETURNING question_id';
-    const result = await pool.query(query, [questionId]);
+    const result = await executor.query(query, [questionId]);
     return result.rows[0];
   }
 
-  /**
-   * Update question sequence numbers for a paper
-   * Accepts optional client
-   */
   static async updateSequenceNumbers(paperId, sequenceUpdates, client = null) {
     const executor = client || pool;
+
+    // Validate paper status for sequence editing
+    const paperCheck = await executor.query(
+      'SELECT status FROM question_papers WHERE paper_id = $1', 
+      [paperId]
+    );
+    if (!paperCheck.rows.length) {
+      throw new Error('Paper not found');
+    }
+
+    const paperStatus = paperCheck.rows[0].status;
+    if (!['draft', 'change_requested'].includes(paperStatus)) {
+      throw new Error(`Sequence numbers cannot be edited. Paper status: ${paperStatus}. Only papers in 'draft' or 'change_requested' status can have sequence numbers edited.`);
+    }
+
     const clientProvided = Boolean(client);
 
     const run = async () => {
@@ -182,9 +232,6 @@ export class Question {
     }
   }
 
-  /**
-   * Extract media URLs from HTML content (more flexible)
-   */
   static extractMediaUrls(htmlContent) {
     const mediaUrls = [];
     if (!htmlContent) return mediaUrls;
@@ -202,10 +249,6 @@ export class Question {
     return mediaUrls;
   }
 
-  /**
-   * Link media to question
-   * Accept optional client to participate in transaction
-   */
   static async linkMedia(questionId, mediaUrls, client = null) {
     if (!mediaUrls || mediaUrls.length === 0) return;
 
@@ -220,10 +263,6 @@ export class Question {
     }
   }
 
-  /**
-   * Unlink media no longer referenced by question
-   * Accept optional client
-   */
   static async unlinkUnusedMedia(questionId, currentMediaUrls = [], client = null) {
     const executor = client || pool;
 
@@ -243,9 +282,6 @@ export class Question {
     await executor.query(query, params);
   }
 
-  /**
-   * Get media records for a question
-   */
   static async getQuestionMedia(questionId) {
     const query = `
       SELECT media_id, media_url, media_type, caption, is_used, created_at
@@ -258,9 +294,6 @@ export class Question {
     return result.rows;
   }
 
-  /**
-   * Search questions with filters
-   */
   static async search(filters = {}) {
     const {
       paper_id,
@@ -349,9 +382,6 @@ export class Question {
     };
   }
   
-  /**
-   * Get next sequence number for a paper
-   */
   static async getNextSequenceNumber(paperId) {
     const query = `
       SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_sequence
@@ -362,9 +392,6 @@ export class Question {
     return result.rows[0].next_sequence;
   }
 
-  /**
-   * Validate paper exists and belongs to user
-   */
   static async validatePaperAccess(paperId, userId) {
     const query = `
       SELECT paper_id FROM question_papers 
@@ -374,9 +401,6 @@ export class Question {
     return result.rows.length > 0;
   }
 
-  /**
-   * Validate CO belongs to course of paper
-   */
   static async validateCOForPaper(coId, paperId) {
     const query = `
       SELECT co.co_id 
@@ -387,9 +411,7 @@ export class Question {
     const result = await pool.query(query, [coId, paperId]);
     return result.rows.length > 0;
   }
-  /**
-   * Update individual question status for moderation
-   */
+
   static async updateQuestionStatus(questionId, status, client = null) {
     const allowedStatuses = ['draft', 'submitted', 'under_review', 'change_requested', 'approved'];
     
@@ -411,9 +433,6 @@ export class Question {
     return rows[0];
   }
 
-  /**
-   * Get all questions for a paper with CO details for moderation
-   */
   static async getQuestionsForModeration(paperId) {
     const query = `
       SELECT 
@@ -433,10 +452,6 @@ export class Question {
     return rows;
   }
 
-  /**
-   * Bulk update question statuses
-   * Accepts optional client
-   */
   static async bulkUpdateStatus(questionUpdates, client = null) {
     if (!Array.isArray(questionUpdates) || questionUpdates.length === 0) {
       throw new Error('Question updates array is required');
@@ -496,37 +511,33 @@ export class Question {
     }
   }
 
-  /**
-   * Get questions grouped by CO for moderation report
-   */
   static async getQuestionsByCO(paperId) {
-  const query = `
-    SELECT 
-      co.co_id,
-      co.co_number,
-      co.description as co_description,
-      COUNT(q.question_id) as total_questions,
-      COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_questions,
-      COUNT(CASE WHEN q.status = 'change_requested' THEN 1 END) as change_requested_questions,
-      json_agg(
-        jsonb_build_object(
-          'question_id', q.question_id,
-          'sequence_number', q.sequence_number,
-          'content_preview', SUBSTRING(q.content_html FROM 1 FOR 100),
-          'status', q.status,
-          'created_at', q.created_at
-        ) ORDER BY q.sequence_number NULLS LAST
-      ) FILTER (WHERE q.question_id IS NOT NULL) as questions
-    FROM course_outcomes co
-    JOIN (SELECT course_id FROM question_papers WHERE paper_id = $1 LIMIT 1) qp_course
-      ON co.course_id = qp_course.course_id
-    LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
-    GROUP BY co.co_id, co.co_number, co.description
-    ORDER BY co.co_number
-  `;
+    const query = `
+      SELECT 
+        co.co_id,
+        co.co_number,
+        co.description as co_description,
+        COUNT(q.question_id) as total_questions,
+        COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_questions,
+        COUNT(CASE WHEN q.status = 'change_requested' THEN 1 END) as change_requested_questions,
+        json_agg(
+          jsonb_build_object(
+            'question_id', q.question_id,
+            'sequence_number', q.sequence_number,
+            'content_preview', SUBSTRING(q.content_html FROM 1 FOR 100),
+            'status', q.status,
+            'created_at', q.created_at
+          ) ORDER BY q.sequence_number NULLS LAST
+        ) FILTER (WHERE q.question_id IS NOT NULL) as questions
+      FROM course_outcomes co
+      JOIN (SELECT course_id FROM question_papers WHERE paper_id = $1 LIMIT 1) qp_course
+        ON co.course_id = qp_course.course_id
+      LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
+      GROUP BY co.co_id, co.co_number, co.description
+      ORDER BY co.co_number
+    `;
 
-  const { rows } = await pool.query(query, [paperId]);
-  return rows;
-}
-
+    const { rows } = await pool.query(query, [paperId]);
+    return rows;
+  }
 }
