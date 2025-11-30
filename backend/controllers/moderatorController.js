@@ -620,14 +620,8 @@ export const getAllModerations = async (req, res) => {
  */
 export const getModerationDetails = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Access denied. Admin role required." 
-      });
-    }
-
     const { id } = req.params;
+
     const moderation = await Moderation.findById(id);
 
     if (!moderation) {
@@ -653,9 +647,11 @@ export const getModerationDetails = async (req, res) => {
 export const generateModerationReportPdf = async (req, res) => {
   try {
     const { id } = req.params; // moderation_id
-    const moderatorId = req.user.user_id;
+    const userId = req.user.user_id;
+    const userRole = req.user.role;
 
-    if (req.user.role !== 'moderator' && req.user.role !== 'admin') {
+    // Allow admin, moderator, and instructor roles
+    if (!['admin', 'moderator', 'instructor'].includes(userRole)) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
@@ -665,9 +661,24 @@ export const generateModerationReportPdf = async (req, res) => {
       return res.status(404).json({ success: false, message: "Moderation record not found" });
     }
 
-    // Verify access (moderator can only access their own, admin can access all)
-    if (req.user.role === 'moderator' && moderation.moderator_id !== moderatorId) {
-      return res.status(403).json({ success: false, message: "Access denied to this moderation record" });
+    // Additional permission checks for instructors
+    if (userRole === 'instructor') {
+      // Instructor can only generate PDF for their own papers
+      const isOwner = await QuestionPaper.isOwner(moderation.paper_id, userId);
+      if (!isOwner) {
+        return res.status(403).json({ 
+          success: false, 
+          message: "Access denied. You can only generate reports for your own papers." 
+        });
+      }
+    }
+
+    // Additional permission checks for moderators
+    if (userRole === 'moderator' && moderation.moderator_id !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Access denied to this moderation record" 
+      });
     }
 
     // Get paper details

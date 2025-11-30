@@ -1,0 +1,346 @@
+/* Moderation Report Modal Styles - Matching Admin Design */
+.moderation-report-modal {
+  max-width: 210mm;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: white;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 210mm;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 24px;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.btn-close:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.modal-body {
+  padding: 15mm;
+  overflow-y: auto;
+  flex: 1;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12pt;
+  line-height: 1.3;
+  color: #000;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Header Section */
+.header {
+  text-align: center;
+  margin-bottom: 8mm;
+}
+
+.school {
+  font-size: 14pt;
+  font-weight: bold;
+  margin-bottom: 2mm;
+}
+
+.university {
+  font-size: 12pt;
+  font-weight: bold;
+  margin-bottom: 1mm;
+}
+
+.department {
+  font-size: 11pt;
+  margin-bottom: 4mm;
+}
+
+.separator {
+  border-top: 2px solid #000;
+  margin: 4mm 0;
+}
+
+.report-title {
+  text-align: center;
+  font-size: 14pt;
+  font-weight: bold;
+  margin: 6mm 0;
+  text-decoration: underline;
+}
+
+/* Paper Information */
+.info-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2mm 4mm;
+  margin-bottom: 6mm;
+  font-size: 11pt;
+}
+
+.info-label {
+  font-weight: bold;
+}
+
+/* Criteria Table */
+.criteria-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 4mm;
+  border: 1px solid #000;
+}
+
+.criteria-table td {
+  border: 1px solid #000;
+  padding: 3mm;
+  vertical-align: top;
+}
+
+.col-number {
+  width: 8%;
+  text-align: center;
+  font-weight: bold;
+}
+
+.col-question {
+  width: 67%;
+  font-weight: bold;
+}
+
+.col-answer {
+  width: 25%;
+  text-align: center;
+  font-weight: bold;
+}
+
+.comment-cell {
+  border-left: none;
+  border-right: none;
+  padding-top: 1mm;
+  padding-bottom: 3mm;
+  font-style: italic;
+}
+
+.comment-text {
+  color: #333;
+  margin-top: 1mm;
+  font-weight: normal;
+}
+
+/* Boolean Indicators */
+.criterion-pass {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.criterion-fail {
+  color: #c62828;
+  font-weight: bold;
+}
+
+.not-evaluated {
+  color: #666;
+  font-style: italic;
+}
+
+.no-comment {
+  color: #666;
+  font-style: italic;
+  display: block;
+  margin-top: 2mm;
+}
+
+/* Moderator Section */
+.moderator-section {
+  margin-top: 12mm;
+}
+
+.moderator-title {
+  font-weight: bold;
+  margin-bottom: 4mm;
+}
+
+.moderator-list {
+  margin-left: 10mm;
+  margin-bottom: 8mm;
+  line-height: 1.6;
+}
+
+/* HoD Signature */
+.hod-signature {
+  text-align: right;
+  margin-top: 20mm;
+  font-weight: bold;
+}
+
+/* PDF Generation Section */
+.pdf-generation-section {
+  margin-top: 10mm;
+  text-align: center;
+  padding-top: 10mm;
+  border-top: 1px dashed #ccc;
+}
+
+.generate-pdf-btn {
+  background: #2c3e50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-size: 11pt;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: "Times New Roman", serif;
+  transition: background-color 0.3s ease;
+}
+
+.generate-pdf-btn:hover:not(:disabled) {
+  background: #34495e;
+}
+
+.generate-pdf-btn:disabled {
+  background: #7f8c8d;
+  cursor: not-allowed;
+}
+
+.pdf-message {
+  margin-top: 5mm;
+  padding: 2mm;
+  border-radius: 2px;
+  font-size: 10pt;
+}
+
+.pdf-message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.pdf-message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Button Styles */
+.btn-primary {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #5a6268;
+}
+
+/* Responsive design for modal */
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .modal-content {
+    max-height: 95vh;
+  }
+  
+  .modal-body {
+    padding: 10px;
+    font-size: 11pt;
+  }
+  
+  .modal-header {
+    padding: 16px 20px;
+  }
+  
+  .modal-header h2 {
+    font-size: 20px;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 1mm;
+  }
+  
+  .criteria-table {
+    font-size: 10pt;
+  }
+  
+  .col-number {
+    width: 10%;
+  }
+  
+  .col-question {
+    width: 60%;
+  }
+  
+  .col-answer {
+    width: 30%;
+  }
+}

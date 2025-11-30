@@ -89,7 +89,7 @@ router.get("/admin/moderations",
 // Get moderation details by ID (admin only)
 router.get("/admin/moderations/:id", 
   authenticate, 
-  authorizeRoles("admin"), 
+  authorizeRoles("moderator", "instructor", "admin"), 
   getModerationDetails
 );
 

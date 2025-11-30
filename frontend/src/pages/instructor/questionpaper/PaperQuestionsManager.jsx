@@ -20,7 +20,9 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import questionAPI from '../../../api/question.api';
 import questionPaperAPI from '../../../api/questionPaper.api';
+import moderatorAPI from '../../../api/moderator.api';
 import QuestionEditModal from './QuestionEditModal';
+import ModerationReportModal from './ModerationReportModal';
 import authService from '../../../services/authService';
 import './PaperQuestionsManager.css';
 
@@ -40,11 +42,14 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging })
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Check if question needs changes
+  const needsChanges = question.status === 'change_requested';
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`print-preview-question ${isDragging ? 'dragging' : ''}`}
+      className={`print-preview-question ${needsChanges ? 'question-needs-changes' : ''} ${isDragging ? 'dragging' : ''}`}
     >
       <div className="question-header">
         <div className="question-drag-handle" {...attributes} {...listeners}>
@@ -52,6 +57,12 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging })
         </div>
         <strong className="question-number">Q{question.sequence_number || index + 1}.</strong>
         <div className="question-actions">
+          {/* Change indicator */}
+          {needsChanges && (
+            <span className="change-indicator" title="Changes requested by moderator">
+              🔄
+            </span>
+          )}
           <button type="button" onClick={() => onEdit(question)} className="btn-edit">✏️ Edit</button>
           <button type="button" onClick={() => onDelete(question.question_id)} className="btn-delete">🗑️ Delete</button>
         </div>
@@ -72,9 +83,12 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   const [paper, setPaper] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [showModerationReport, setShowModerationReport] = useState(false);
+  const [moderationData, setModerationData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
+  const [isResubmitting, setIsResubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [activeId, setActiveId] = useState(null);
 
@@ -94,6 +108,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   useEffect(() => {
     mountedRef.current = true;
     loadPaperAndQuestions();
+    loadModerationData();
 
     return () => {
       mountedRef.current = false;
@@ -108,6 +123,57 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
+
+  // Load moderation data
+  const loadModerationData = async () => {
+  try {
+    // First, we need to get the moderation ID for this paper
+    const paperReport = await moderatorAPI.getPaperReport(paperId);
+    
+    if (paperReport.data?.moderation?.moderation_id) {
+      // Now use getModerationDetails with the actual moderation ID
+      const response = await moderatorAPI.getModerationDetails(paperReport.data.moderation.moderation_id);
+      console.log('Full moderation data:', response.data);
+      setModerationData(response.data);
+    } else {
+      console.log('No moderation record found for this paper');
+      setModerationData(null);
+    }
+  } catch (err) {
+    console.error('Error loading moderation data:', err);
+  }
+};
+
+  // Check if paper needs resubmission
+  const needsResubmission = questions.some(q => q.status === 'change_requested');
+  const rejectedQuestionsCount = questions.filter(q => q.status === 'change_requested').length;
+
+  // Handle resubmit for moderation
+  const handleResubmitForModeration = async () => {
+  if (!needsResubmission) {
+    setMessage({ type: 'error', text: 'No changes requested. Paper does not need resubmission.' });
+    return;
+  }
+
+  if (!window.confirm(`Resubmit "${paper?.title}" for moderation? This will send the paper back to moderators for review.`)) {
+    return;
+  }
+
+  setIsResubmitting(true);
+  setMessage({ type: '', text: '' });
+
+  try {
+    // Use the SAME method - it now handles both initial submission and resubmission
+    await questionPaperAPI.submitForModeration(paperId);
+    await loadPaperAndQuestions();
+    setMessage({ type: 'success', text: 'Paper resubmitted for moderation successfully!' });
+  } catch (err) {
+    const msg = err?.response?.data?.message || err?.message || 'Failed to resubmit paper';
+    setMessage({ type: 'error', text: msg });
+  } finally {
+    setIsResubmitting(false);
+  }
+};
 
   // helpers to normalize various API response shapes
   const normalizeArrayResponse = (resp) => {
@@ -130,12 +196,11 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     setIsLoading(true);
     setMessage({ type: '', text: '' });
 
-    // create an AbortController for this load, so we can cancel if unmounted
     const ac = new AbortController();
     loadAbortRef.current = ac;
 
     try {
-      // Load papers list (some wrappers return array, some return object)
+      // Load papers list
       let papersResponse;
       try {
         papersResponse = await questionPaperAPI.getAll();
@@ -220,7 +285,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
 
       await questionAPI.updateSequence(paperId, sequenceUpdates);
 
-      // Update local questions with new sequence numbers
       const updatedQuestions = reorderedQuestions.map((question, index) => ({
         ...question,
         sequence_number: index + 1
@@ -231,7 +295,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     } catch (error) {
       console.error('Error updating question sequence:', error);
       setMessage({ type: 'error', text: error?.message || 'Failed to update question order' });
-      // Revert to original order on error
       loadPaperAndQuestions();
     } finally {
       setIsReordering(false);
@@ -243,7 +306,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       const qid = updatedQuestion.question_id ?? updatedQuestion.id ?? updatedQuestion.questionId;
       if (!qid) throw new Error('Missing question id');
 
-      // payload normalization
       const payload = {
         content_html: updatedQuestion.content_html,
         paper_id: updatedQuestion.paper_id,
@@ -252,7 +314,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
 
       await questionAPI.update(qid, payload);
 
-      // Update local state (merge server fields if available)
       setQuestions(prev =>
         prev.map(q => (q.question_id === qid ? { ...q, ...updatedQuestion } : q))
       );
@@ -274,7 +335,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       setQuestions(prev => prev.filter(q => q.question_id !== questionId));
       setMessage({ type: 'success', text: 'Question deleted successfully!' });
       
-      // Reload to get proper sequence numbers after deletion
       setTimeout(() => {
         loadPaperAndQuestions();
       }, 500);
@@ -285,7 +345,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   };
 
   const handleAddNewQuestion = () => {
-    // navigate to create question page — encode paperId
     const encoded = encodeURIComponent(paperId);
     navigate(`/instructor/questions/create?paperId=${encoded}`);
   };
@@ -298,17 +357,12 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     }
   };
 
-  /**
-   * Export PDF:
-   * - Uses server-side paper (paperId) so the backend builds the HTML and PDF.
-   */
   const exportPdf = async () => {
     if (!paperId) return;
 
     setMessage({ type: '', text: '' });
     setIsGeneratingPdf(true);
 
-    // Abort previous pdf request if any
     if (pdfAbortRef.current) {
       try { pdfAbortRef.current.abort(); } catch (_) {}
       pdfAbortRef.current = null;
@@ -364,7 +418,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
 
       const blob = await resp.blob();
 
-      // Protect against empty blob
       if (!blob || blob.size === 0) {
         setMessage({ type: 'error', text: 'PDF generation returned an empty file.' });
         return;
@@ -460,6 +513,41 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         <div className={`message ${message.type}`}>{message.text}</div>
       )}
 
+      {/* MODERATION REPORT BUTTON - ABOVE QUESTIONS */}
+      {moderationData && (
+        <div className="moderation-report-section">
+          <button 
+            className="btn-moderation-report"
+            onClick={() => setShowModerationReport(true)}
+          >
+            📋 View Moderation Report
+          </button>
+        </div>
+      )}
+
+      {/* MODERATION ALERT BANNER - ABOVE QUESTIONS */}
+      {needsResubmission && (
+        <div className="moderation-alert">
+          <div className="alert-content">
+            <div className="alert-icon">⚠️</div>
+            <div className="alert-text">
+              <strong>Moderation Required</strong>
+              <p>
+                {rejectedQuestionsCount} question(s) need changes. 
+                Please review the highlighted questions and make corrections before resubmitting.
+              </p>
+            </div>
+            <button 
+              className="btn-resubmit"
+              onClick={handleResubmitForModeration}
+              disabled={isResubmitting}
+            >
+              {isResubmitting ? 'Resubmitting...' : '📤 Resubmit for Moderation'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Drag & Drop Instructions */}
       {questions.length > 0 && (
         <div className="drag-instructions">
@@ -467,7 +555,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         </div>
       )}
 
-      {/* PREVIEW SECTION */}
+      {/* PREVIEW SECTION - QUESTIONS APPEAR BELOW MODERATION CONTROLS */}
       <div className="preview-section">
         <div className="section-header">
           <h2>Paper Preview (Print Layout)</h2>
@@ -533,6 +621,15 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
           question={editingQuestion}
           onSave={handleUpdateQuestion}
           onClose={() => setEditingQuestion(null)}
+        />
+      )}
+
+      {/* Moderation Report Modal */}
+      {showModerationReport && moderationData && (
+        <ModerationReportModal
+          moderationData={moderationData}
+          paperData={paper}
+          onClose={() => setShowModerationReport(false)}
         />
       )}
     </div>
