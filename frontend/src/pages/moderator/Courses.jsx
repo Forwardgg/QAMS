@@ -201,9 +201,9 @@ const ModeratorCourses = () => {
                     </td>
                     <td className="status-cell">
                       <span className={`status-badge ${course.status || 'active'}`}>
-                        {course.status === 'active' ? '✅ Active' : 
-                         course.status === 'inactive' ? '❌ Inactive' : 
-                         '✅ Active'}
+                        {course.status === 'active' ? 'Active' : 
+                         course.status === 'inactive' ? 'Inactive' : 
+                         'Active'}
                       </span>
                     </td>
                     <td className="syllabus-cell">
@@ -224,7 +224,7 @@ const ModeratorCourses = () => {
                         onClick={() => handleView(course)}
                         title="View course details"
                       >
-                        👁️ View
+                        View
                       </button>
                     </td>
                   </tr>
@@ -295,9 +295,9 @@ const ModeratorCourses = () => {
               <div className="detail-row">
                 <label>Status:</label>
                 <span className={`status-badge large ${viewingCourse.status || 'active'}`}>
-                  {viewingCourse.status === 'active' ? '✅ Active' : 
-                   viewingCourse.status === 'inactive' ? '❌ Inactive' : 
-                   '✅ Active'}
+                  {viewingCourse.status === 'active' ? 'Active' : 
+                   viewingCourse.status === 'inactive' ? 'Inactive' : 
+                   'Active'}
                 </span>
               </div>
               

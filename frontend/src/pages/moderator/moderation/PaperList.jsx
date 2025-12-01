@@ -1,5 +1,5 @@
 // src/frontend/src/pages/moderator/moderation/PaperList.jsx
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { AuthContext } from '../../../components/AuthProvider';
 import moderatorAPI from '../../../api/moderator.api';
 import courseAPI from '../../../api/course.api';
@@ -18,15 +18,35 @@ const PaperList = () => {
   const [filters, setFilters] = useState({ courseId: '', status: '' });
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedModeration, setSelectedModeration] = useState(null);
+  const [modalPaperData, setModalPaperData] = useState(null);
 
-  const statusOptions = [
+  const statusOptions = useMemo(() => [
     { value: '', label: 'All Statuses' },
     { value: 'draft', label: 'Draft' },
     { value: 'submitted', label: 'Submitted' },
     { value: 'under_review', label: 'Under Review' },
     { value: 'change_requested', label: 'Change Requested' },
     { value: 'approved', label: 'Approved' }
-  ];
+  ], []);
+
+  // Memoize filtered papers
+  const { stats, filteredPapers } = useMemo(() => {
+    const filtered = papers.filter(paper => {
+      const matchesCourse = !filters.courseId || paper.course_id == filters.courseId;
+      const matchesStatus = !filters.status || paper.status === filters.status;
+      return matchesCourse && matchesStatus;
+    });
+
+    const stats = {
+      total: filtered.length,
+      submitted: filtered.filter(p => p.status === 'submitted').length,
+      under_review: filtered.filter(p => p.status === 'under_review').length,
+      approved: filtered.filter(p => p.status === 'approved').length,
+      change_requested: filtered.filter(p => p.status === 'change_requested').length
+    };
+
+    return { stats, filteredPapers: filtered };
+  }, [papers, filters]);
 
   useEffect(() => {
     if (currentView === 'list') {
@@ -35,7 +55,7 @@ const PaperList = () => {
     }
   }, [filters, currentView]);
 
-  const loadPapers = async () => {
+  const loadPapers = useCallback(async () => {
     setLoading(true);
     try {
       const data = await moderatorAPI.getPapers(filters);
@@ -45,9 +65,9 @@ const PaperList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  const loadCourses = async () => {
+  const loadCourses = useCallback(async () => {
     try {
       const response = await courseAPI.getAll();
       const data = response.data;
@@ -59,46 +79,45 @@ const PaperList = () => {
       console.error('Error loading courses:', error);
       setCourses([]);
     }
-  };
+  }, []);
 
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = useCallback((key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
-  const handleStartQuestionModeration = (paper) => {
+  const handleStartQuestionModeration = useCallback((paper) => {
     setSelectedPaper(paper);
     setCurrentView('questions');
-  };
+  }, []);
 
-  const handleContinueToPaperModeration = () => {
+  const handleContinueToPaperModeration = useCallback(() => {
     setCurrentView('paper');
-  };
+  }, []);
 
-  const handleBackToQuestionModeration = () => {
+  const handleBackToQuestionModeration = useCallback(() => {
     setCurrentView('questions');
-  };
+  }, []);
 
-  const handleBackToList = () => {
+  const handleBackToList = useCallback(() => {
     setSelectedPaper(null);
     setCurrentView('list');
     loadPapers();
-  };
+  }, [loadPapers]);
 
-  const handleViewReport = async (paper) => {
+  const handleViewReport = useCallback(async (paper) => {
     try {
       let moderationData = null;
+      let paperData = null;
       
       try {
         const reportResponse = await moderatorAPI.getPaperReport(paper.paper_id);
-        if (reportResponse.data?.moderation) {
-          moderationData = {
-            ...reportResponse.data.moderation,
-            paper_title: reportResponse.data.paper?.title || paper.title,
-            course_code: reportResponse.data.paper?.course_code || paper.course_code,
-            course_title: reportResponse.data.paper?.course_title || paper.course_title,
-            semester: reportResponse.data.paper?.semester || paper.semester,
-            academic_year: reportResponse.data.paper?.academic_year || paper.academic_year
-          };
+        if (reportResponse.data) {
+          if (reportResponse.data.moderation) {
+            moderationData = reportResponse.data.moderation;
+          }
+          if (reportResponse.data.paper) {
+            paperData = reportResponse.data.paper;
+          }
         }
       } catch (error) {
         console.log('getPaperReport failed:', error.message);
@@ -120,15 +139,22 @@ const PaperList = () => {
         }
       }
       
+      // Set paper data separately
+      setModalPaperData(paperData || {
+        title: paper.title,
+        course_code: paper.course_code,
+        course_title: paper.course_title,
+        semester: paper.semester,
+        academic_year: paper.academic_year
+      });
       setSelectedModeration(moderationData);
+      setShowReportModal(true);
     } catch (error) {
       console.error('Failed to load moderation report:', error);
     }
-    
-    setShowReportModal(true);
-  };
+  }, []);
 
-  const getStatusBadgeClass = (status) => {
+  const getStatusBadgeClass = useCallback((status) => {
     const statusClasses = {
       draft: 'status-draft',
       submitted: 'status-submitted',
@@ -137,9 +163,9 @@ const PaperList = () => {
       approved: 'status-approved'
     };
     return statusClasses[status] || 'status-default';
-  };
+  }, []);
 
-  const getActionButton = (paper) => {
+  const getActionButton = useCallback((paper) => {
     if (paper.status === 'submitted' || paper.status === 'under_review') {
       return (
         <button
@@ -157,7 +183,13 @@ const PaperList = () => {
       );
     }
     return <button className="btn btn-view" disabled>Not Available</button>;
-  };
+  }, [handleStartQuestionModeration, handleViewReport]);
+
+  const handleCloseModal = useCallback(() => {
+    setShowReportModal(false);
+    setSelectedModeration(null);
+    setModalPaperData(null);
+  }, []);
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -172,14 +204,6 @@ const PaperList = () => {
   };
 
   const renderPaperList = () => {
-    const stats = {
-      total: papers.length,
-      submitted: papers.filter(p => p.status === 'submitted').length,
-      under_review: papers.filter(p => p.status === 'under_review').length,
-      approved: papers.filter(p => p.status === 'approved').length,
-      change_requested: papers.filter(p => p.status === 'change_requested').length
-    };
-
     return (
       <div className="paper-list-container">
         <div className="paper-list-header">
@@ -196,25 +220,37 @@ const PaperList = () => {
         <div className="filters-section">
           <div className="filter-group">
             <label>Course:</label>
-            <select value={filters.courseId} onChange={(e) => handleFilterChange('courseId', e.target.value)}>
+            <select 
+              value={filters.courseId} 
+              onChange={(e) => handleFilterChange('courseId', e.target.value)}
+              className="filter-select"
+            >
               <option value="">All Courses</option>
               {courses.map(course => (
-                <option key={course.course_id} value={course.course_id}>{course.code} - {course.title}</option>
+                <option key={course.course_id} value={course.course_id}>
+                  {course.code} - {course.title}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="filter-group">
             <label>Status:</label>
-            <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
+            <select 
+              value={filters.status} 
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="filter-select"
+            >
               {statusOptions.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
             </select>
           </div>
 
           <button className="btn btn-refresh" onClick={loadPapers}>
-            🔄 Refresh
+            Refresh
           </button>
         </div>
 
@@ -235,7 +271,7 @@ const PaperList = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {papers.map(paper => (
+                  {filteredPapers.map(paper => (
                     <tr key={paper.paper_id} className="paper-row">
                       <td className="paper-title">
                         <div className="title-text">{paper.title}</div>
@@ -268,7 +304,7 @@ const PaperList = () => {
                 </tbody>
               </table>
 
-              {papers.length === 0 && !loading && (
+              {filteredPapers.length === 0 && !loading && (
                 <div className="no-papers">
                   No papers found matching your filters.
                 </div>
@@ -277,24 +313,24 @@ const PaperList = () => {
           )}
         </div>
 
-        <ModReportModal
-          isOpen={showReportModal}
-          onClose={() => {
-            setShowReportModal(false);
-            setSelectedModeration(null);
-          }}
-          moderation={selectedModeration}
-          paperData={selectedModeration}
-        />
+        {/* Only render modal when showReportModal is true */}
+        {showReportModal && (
+          <ModReportModal
+            isOpen={showReportModal}
+            onClose={handleCloseModal}
+            moderation={selectedModeration}
+            paperData={modalPaperData}
+          />
+        )}
       </div>
     );
   };
 
   return (
-    <div className="paper-list-wrapper">
+    <div className="moderator-page paper-list-wrapper">
       {renderCurrentView()}
     </div>
   );
 };
 
-export default PaperList;
+export default React.memo(PaperList);

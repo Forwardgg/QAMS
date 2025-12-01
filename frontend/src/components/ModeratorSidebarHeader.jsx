@@ -1,4 +1,5 @@
-import React, { useState, useContext } from 'react';
+// components/ModeratorSidebarHeader.jsx
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthContext } from './AuthProvider';
 import './AdminSidebarHeader.css';
@@ -8,23 +9,55 @@ const ModeratorSidebarHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
-  // INSTRUCTOR menu items configuration
+  // MODERATOR menu items configuration
   const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/instructor/dashboard' },
-  { id: 'courses', label: 'My Courses', icon: '📘', path: '/instructor/courses' },
-  { id: 'CO', label: 'Course Outcomes', icon: '🎯', path: '/instructor/cos' },
-  { id: 'questionCreate', label: 'Create Question', icon: '➕', path: '/instructor/questions/create' },
-  { id: 'questionPaper', label: 'Question Papers', icon: '📝', path: '/instructor/question-papers' }
-];
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/moderator/dashboard' },
+    { id: 'courses', label: 'Courses', icon: '📘', path: '/moderator/courses' },
+    { id: 'CO', label: 'Course Outcomes', icon: '🎯', path: '/moderator/cos' },
+    { 
+      id: 'moderation', 
+      label: 'Moderation', 
+      icon: '🔍', 
+      path: '/moderator/moderation/papers',
+      subPaths: [
+        '/moderator/moderation/',
+        '/moderator/moderation/papers',
+        '/moderator/moderation/paper/',
+        '/moderator/moderation/questions',
+        '/moderator/moderation/report/'
+      ]
+    }
+  ];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsUserDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Determine active page based on current route
   const getActivePage = () => {
     const currentPath = location.pathname;
-    const activeItem = menuItems.find(item => 
-      currentPath.startsWith(item.path) || 
-      (item.id === 'questionPaper' && currentPath.includes('/instructor/question-papers/'))
-    );
+    const activeItem = menuItems.find(item => {
+      // Check main path
+      if (currentPath.startsWith(item.path)) return true;
+      // Check subpaths if they exist
+      if (item.subPaths) {
+        return item.subPaths.some(subPath => currentPath.startsWith(subPath));
+      }
+      return false;
+    });
     return activeItem?.id || 'dashboard';
   };
 
@@ -34,11 +67,16 @@ const ModeratorSidebarHeader = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const toggleUserDropdown = () => {
+    setIsUserDropdownOpen(!isUserDropdownOpen);
+  };
+
   const handleNavigation = (path) => {
     navigate(path);
   };
 
   const handleLogout = () => {
+    setIsUserDropdownOpen(false);
     if (logout) {
       logout();
     } else {
@@ -55,11 +93,11 @@ const ModeratorSidebarHeader = () => {
         <div className="sidebar-header">
           {!isCollapsed && (
             <>
-              <div className="sidebar-logo">INSTRUCTOR</div>
+              <div className="sidebar-logo">MODERATOR</div>
               <div className="sidebar-title">Dashboard</div>
             </>
           )}
-          {isCollapsed && <div className="sidebar-collapsed-logo">I</div>}
+          {isCollapsed && <div className="sidebar-collapsed-logo">M</div>}
           
           <button 
             className="sidebar-toggle" 
@@ -92,21 +130,6 @@ const ModeratorSidebarHeader = () => {
             ))}
           </ul>
         </nav>
-
-        {/* Sidebar Footer */}
-        <div className="sidebar-footer">
-          {!isCollapsed && (
-            <button className="logout-btn" onClick={handleLogout}>
-              <span className="logout-icon">🚪</span>
-              <span className="logout-text">Logout</span>
-            </button>
-          )}
-          {isCollapsed && (
-            <button className="logout-btn-collapsed" onClick={handleLogout} title="Logout">
-              <span className="logout-icon">🚪</span>
-            </button>
-          )}
-        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -119,24 +142,41 @@ const ModeratorSidebarHeader = () => {
                 {menuItems.find(item => item.id === activePage)?.label || 'Dashboard'}
               </h1>
               <p className="page-description">
-                {activePage === 'dashboard' && 'Your teaching overview and recent activities'}
-                {activePage === 'courses' && 'View and manage your assigned courses'}
-                {activePage === 'CO' && 'Manage course outcomes for your courses'}
-                {activePage === 'questionCreate' && 'Create new questions for your courses'}
-                {activePage === 'questionPaper' && 'Create and manage question papers'}
+                {activePage === 'dashboard' && 'Your moderation overview and recent activities'}
+                {activePage === 'courses' && 'View courses available for moderation'}
+                {activePage === 'CO' && 'View course outcomes for moderation'}
+                {activePage === 'moderation' && 'Review and moderate question papers'}
               </p>
             </div>
           </div>
           
           <div className="header-right">
-            <div className="user-info-header">
-              <div className="header-avatar">
-                {user?.name?.charAt(0) || user?.email?.charAt(0) || 'I'}
-              </div>
-              <div className="header-user-details">
-                <div className="header-user-name">{user?.name || 'Instructor'}</div>
-                <div className="header-user-email">{user?.email || 'instructor@example.com'}</div>
-              </div>
+            {/* User Info with Dropdown */}
+            <div className="user-dropdown-container" ref={dropdownRef}>
+              <button 
+                className="user-info-header"
+                onClick={toggleUserDropdown}
+              >
+                <div className="header-avatar">
+                  {user?.name?.charAt(0) || user?.email?.charAt(0) || 'M'}
+                </div>
+                <div className="header-user-details">
+                  <div className="header-user-name">{user?.name || 'Moderator'}</div>
+                  <div className="header-user-email">{user?.email || 'moderator@example.com'}</div>
+                </div>
+                <div className="dropdown-arrow">
+                  {isUserDropdownOpen ? '▲' : '▼'}
+                </div>
+              </button>
+              
+              {/* Dropdown Menu */}
+              {isUserDropdownOpen && (
+                <div className="user-dropdown-menu">
+                  <button className="dropdown-item logout-item" onClick={handleLogout}>
+                    <span className="dropdown-item-text">Logout</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -151,10 +191,10 @@ const ModeratorSidebarHeader = () => {
           <div className="footer-content">
             <p>© {new Date().getFullYear()} Learning Management System • v1.0</p>
             <div className="footer-links">
-              <a href="/instructor/help" className="footer-link">Help</a>
-              <a href="/instructor/support" className="footer-link">Support</a>
-              <a href="/instructor/privacy" className="footer-link">Privacy</a>
-              <a href="/instructor/terms" className="footer-link">Terms</a>
+              <a href="/moderator/help" className="footer-link">Help</a>
+              <a href="/moderator/support" className="footer-link">Support</a>
+              <a href="/moderator/privacy" className="footer-link">Privacy</a>
+              <a href="/moderator/terms" className="footer-link">Terms</a>
             </div>
           </div>
         </footer>

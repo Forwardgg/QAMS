@@ -1,227 +1,242 @@
-// frontend/src/pages/instructor/Dashboard.js
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import './Dashboard.css';
+import React, { useEffect, useMemo, useState } from "react";
+import questionPaperAPI from "../../api/questionPaper.api";
+import courseAPI from "../../api/course.api";
+import coAPI from "../../api/co.api";
 
-const InstructorDashboard = () => {
-  const [stats, setStats] = useState({
-    totalCourses: 0,
-    totalQuestions: 0,
-    totalPapers: 0,
-    pendingReviews: 0
-  });
-  const [recentActivity, setRecentActivity] = useState([]);
+/**
+ * Instructor Dashboard (My Papers) — contains:
+ * A. Status Overview Panel (KPIs)
+ * C. My Pending Actions
+ * D. Quick-Action Toolbar (Create, View All Papers, View Courses, View COs)
+ *
+ * Notes:
+ * - No CSS included (structure-only).
+ * - Links for the Quick-Action buttons are placeholders and can be passed as props or replaced later.
+ * - Assumes APIs return either arrays or { rows, total } depending on backend.
+ */
+
+export default function InstructorDashboard({
+  user,
+  links = {
+    createPaper: "#create-paper",
+    viewAllPapers: "#papers",
+    viewCourses: "#courses",
+    viewCOs: "#cos",
+  },
+}) {
+  const [papers, setPapers] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [cosByCourse, setCosByCourse] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // fetch initial data: papers, courses, COs for courses the instructor has papers for
   useEffect(() => {
-    // Simulate API call
-    const fetchDashboardData = async () => {
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+
+    async function load() {
       try {
-        // TODO: Replace with actual API calls
-        const mockStats = {
-          totalCourses: 4,
-          totalQuestions: 42,
-          totalPapers: 12,
-          pendingReviews: 3
-        };
+        // Load papers (try to request only instructor's papers if supported)
+        const resp = await questionPaperAPI.getAll({ limit: 200, offset: 0 });
+        let fetchedPapers = [];
+        if (Array.isArray(resp)) fetchedPapers = resp;
+        else if (resp && resp.rows) fetchedPapers = resp.rows;
 
-        const mockActivity = [
-          { 
-            id: 1, 
-            type: 'question', 
-            action: 'created', 
-            title: 'Physics MCQ Set 1', 
-            time: '2 hours ago',
-            link: '/instructor/questions/create'
-          },
-          { 
-            id: 2, 
-            type: 'paper', 
-            action: 'created', 
-            title: 'Midterm Paper 2024', 
-            time: '1 day ago',
-            link: '/instructor/question-papers'
-          },
-          { 
-            id: 3, 
-            type: 'question', 
-            action: 'updated', 
-            title: 'Chemistry Problem', 
-            time: '2 days ago',
-            link: '/instructor/questions/create'
-          },
-          { 
-            id: 4, 
-            type: 'moderation', 
-            action: 'reviewed', 
-            title: 'Question Paper Review Completed', 
-            time: '3 days ago',
-            link: '/instructor/question-papers'
+        // Filter to instructor's own papers if user info available
+        const my = user?.user_id ? fetchedPapers.filter(p => p.created_by === user.user_id || p.creator_name === user.name) : fetchedPapers;
+
+        // Load courses (we load all and later show shortcuts)
+        const coursesResp = await courseAPI.getAll({ limit: 500 });
+        let fetchedCourses = [];
+        if (Array.isArray(coursesResp)) fetchedCourses = coursesResp;
+        else if (coursesResp && coursesResp.rows) fetchedCourses = coursesResp.rows;
+
+        // Preload COs for courses referenced in my papers
+        const uniqueCourseCodes = Array.from(new Set(my.map(p => p.course_code).filter(Boolean)));
+        const cosMap = {};
+        for (const code of uniqueCourseCodes) {
+          try {
+            const cosResp = await coAPI.getByCourseCode(code);
+            if (Array.isArray(cosResp)) cosMap[code] = cosResp;
+            else cosMap[code] = cosResp?.rows ?? [];
+          } catch (e) {
+            cosMap[code] = [];
           }
-        ];
+        }
 
-        setStats(mockStats);
-        setRecentActivity(mockActivity);
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-      } finally {
+        if (!mounted) return;
+        setPapers(my);
+        setCourses(fetchedCourses);
+        setCosByCourse(cosMap);
+        setLoading(false);
+      } catch (err) {
+        if (!mounted) return;
+        console.error("InstructorDashboard load error", err);
+        setError(err?.message ?? String(err));
         setLoading(false);
       }
+    }
+
+    load();
+    return () => { mounted = false; };
+  }, [user]);
+
+  // KPI calculations
+  const kpis = useMemo(() => {
+    const totals = {
+      drafts: 0,
+      submitted: 0,
+      under_review: 0,
+      change_requested: 0,
+      approved: 0,
+      rejected: 0,
+      total: papers.length,
     };
 
-    fetchDashboardData();
-  }, []);
+    for (const p of papers) {
+      const st = (p.status || "draft").toLowerCase();
+      if (st === "draft") totals.drafts++;
+      else if (st === "submitted") totals.submitted++;
+      else if (st === "under_review") totals.under_review++;
+      else if (st === "change_requested") totals.change_requested++;
+      else if (st === "approved") totals.approved++;
+      else if (st === "rejected") totals.rejected++;
+    }
 
-  if (loading) {
-    return (
-      <div className="dashboard-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading dashboard...</p>
-      </div>
-    );
-  }
+    return totals;
+  }, [papers]);
+
+  // Pending actions derived client-side
+  const pendingActions = useMemo(() => {
+    const items = [];
+
+    // 1. Papers with change_requested
+    for (const p of papers.filter(x => (x.status || "").toLowerCase() === "change_requested")) {
+      items.push({ type: "change_requested", paper: p, message: `Paper \"${p.title}\" requires your changes.` });
+    }
+
+    // 2. Drafts older than 7 days (use updated_at)
+    const now = new Date();
+    for (const p of papers.filter(x => (x.status || "").toLowerCase() === "draft")) {
+      const updated = p.updated_at ? new Date(p.updated_at) : null;
+      if (!updated) continue;
+      const ageDays = Math.floor((now - updated) / (1000 * 60 * 60 * 24));
+      if (ageDays >= 7) {
+        items.push({ type: "stale_draft", paper: p, message: `Draft \"${p.title}\" hasn't been edited in ${ageDays} days.` });
+      }
+    }
+
+    // 3. Papers missing questions (question_count available or otherwise check 0)
+    for (const p of papers) {
+      const qCount = typeof p.question_count === 'number' ? p.question_count : p.questions_count || p.questions || (p._questions && p._questions.length) || 0;
+      if (qCount === 0) items.push({ type: "no_questions", paper: p, message: `Paper \"${p.title}\" has no questions.` });
+    }
+
+    // 4. Papers missing CO coverage (compare course COs vs questions mapping if available)
+    for (const p of papers) {
+      const courseCode = p.course_code;
+      const cos = cosByCourse[courseCode] || [];
+      if (!cos || cos.length === 0) continue; // can't evaluate
+
+      // try to compute covered CO numbers from questions if available
+      const qList = p._questions || p.questions || [];
+      // if questions not preloaded in paper object, skip coverage detection
+      if (!Array.isArray(qList) || qList.length === 0) continue;
+
+      const covered = new Set(qList.map(q => (q.co_number || q.co_number_raw || q.co || q.co_id || "").toString()).filter(Boolean));
+      const missing = cos.filter(c => !covered.has(String(c.co_number)));
+      if (missing.length > 0) items.push({ type: "missing_cos", paper: p, message: `Paper \"${p.title}\" is missing ${missing.length} CO(s).` });
+    }
+
+    return items;
+  }, [papers, cosByCourse]);
+
+  if (loading) return <div>Loading dashboard...</div>;
+  if (error) return <div>Failed to load dashboard: {error}</div>;
 
   return (
-    <div className="instructor-dashboard">
-      {/* Welcome Section */}
-      <div className="dashboard-welcome">
-        <h1 className="welcome-title">Welcome back, Instructor!</h1>
-        <p className="welcome-subtitle">
-          Here's what's happening with your teaching activities today.
-        </p>
-      </div>
+    <div>
+      <h2>Instructor Dashboard — My Papers</h2>
 
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon">📘</div>
-          <div className="stat-info">
-            <h3 className="stat-title">My Courses</h3>
-            <p className="stat-number">{stats.totalCourses}</p>
-            <p className="stat-desc">Active courses assigned</p>
-          </div>
-          <Link to="/instructor/courses" className="stat-link">View All →</Link>
+      {/* Quick Action Toolbar (D) */}
+      <section aria-label="quick-actions">
+        <h3>Quick Actions</h3>
+        <div>
+          <a href={links.createPaper}>Create New Paper</a>
+          {' | '}
+          <a href={links.viewAllPapers}>View All Papers</a>
+          {' | '}
+          <a href={links.viewCourses}>View Courses</a>
+          {' | '}
+          <a href={links.viewCOs}>View COs</a>
         </div>
+      </section>
 
-        <div className="stat-card">
-          <div className="stat-icon">❓</div>
-          <div className="stat-info">
-            <h3 className="stat-title">Total Questions</h3>
-            <p className="stat-number">{stats.totalQuestions}</p>
-            <p className="stat-desc">Questions created</p>
-          </div>
-          <Link to="/instructor/questions/create" className="stat-link">Create New →</Link>
-        </div>
+      {/* Status Overview Panel (A) */}
+      <section aria-label="status-overview">
+        <h3>Status Overview</h3>
+        <ul>
+          <li>Drafts: {kpis.drafts}</li>
+          <li>Submitted: {kpis.submitted}</li>
+          <li>Under Review: {kpis.under_review}</li>
+          <li>Change Requested: {kpis.change_requested}</li>
+          <li>Approved: {kpis.approved}</li>
+          <li>Rejected: {kpis.rejected}</li>
+          <li>Total Papers: {kpis.total}</li>
+        </ul>
+      </section>
 
-        <div className="stat-card">
-          <div className="stat-icon">📝</div>
-          <div className="stat-info">
-            <h3 className="stat-title">Question Papers</h3>
-            <p className="stat-number">{stats.totalPapers}</p>
-            <p className="stat-desc">Papers created</p>
-          </div>
-          <Link to="/instructor/question-papers" className="stat-link">Manage →</Link>
-        </div>
+      {/* My Pending Actions (C) */}
+      <section aria-label="pending-actions">
+        <h3>Pending Actions</h3>
+        {pendingActions.length === 0 ? (
+          <div>No pending actions. Good job!</div>
+        ) : (
+          <ul>
+            {pendingActions.map((it, idx) => (
+              <li key={`${it.type}-${it.paper?.paper_id || idx}`}>
+                <strong>[{it.type}]</strong> {it.message} {' '}
+                {it.paper && <a href={`${links.viewAllPapers}#paper-${it.paper.paper_id}`}>Open</a>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
-        <div className="stat-card">
-          <div className="stat-icon">⏳</div>
-          <div className="stat-info">
-            <h3 className="stat-title">Pending Reviews</h3>
-            <p className="stat-number">{stats.pendingReviews}</p>
-            <p className="stat-desc">Awaiting moderation</p>
-          </div>
-          <Link to="/instructor/question-papers" className="stat-link">Review →</Link>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="dashboard-section">
-        <div className="section-header">
-          <h2 className="section-title">Quick Actions</h2>
-          <p className="section-subtitle">Frequently used actions</p>
-        </div>
-        <div className="action-buttons">
-          <Link to="/instructor/questions/create" className="action-btn primary">
-            <span className="action-icon">➕</span>
-            <span className="action-text">Create New Question</span>
-          </Link>
-          <Link to="/instructor/question-papers/create" className="action-btn secondary">
-            <span className="action-icon">📄</span>
-            <span className="action-text">Build Question Paper</span>
-          </Link>
-          <Link to="/instructor/cos" className="action-btn secondary">
-            <span className="action-icon">🎯</span>
-            <span className="action-text">Manage Course Outcomes</span>
-          </Link>
-          <Link to="/instructor/courses" className="action-btn secondary">
-            <span className="action-icon">📘</span>
-            <span className="action-text">View My Courses</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="dashboard-section">
-        <div className="section-header">
-          <h2 className="section-title">Recent Activity</h2>
-          <p className="section-subtitle">Your recent teaching activities</p>
-        </div>
-        <div className="activity-list">
-          {recentActivity.map(activity => (
-            <div key={activity.id} className="activity-item">
-              <div className={`activity-icon ${activity.type}`}>
-                {activity.type === 'question' && '❓'}
-                {activity.type === 'paper' && '📄'}
-                {activity.type === 'moderation' && '✓'}
-              </div>
-              <div className="activity-details">
-                <p className="activity-text">
-                  You <span className="activity-action">{activity.action}</span> {activity.type}: 
-                  <strong> "{activity.title}"</strong>
-                </p>
-                <span className="activity-time">{activity.time}</span>
-              </div>
-              <Link to={activity.link} className="activity-link">
-                View →
-              </Link>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Upcoming Deadlines */}
-      <div className="dashboard-section">
-        <div className="section-header">
-          <h2 className="section-title">Upcoming Deadlines</h2>
-          <p className="section-subtitle">Important dates to remember</p>
-        </div>
-        <div className="deadlines-list">
-          <div className="deadline-item">
-            <div className="deadline-date">
-              <span className="date-day">15</span>
-              <span className="date-month">DEC</span>
-            </div>
-            <div className="deadline-details">
-              <h4 className="deadline-title">Midterm Papers Submission</h4>
-              <p className="deadline-course">Physics 101</p>
-            </div>
-            <span className="deadline-status warning">5 days left</span>
-          </div>
-          <div className="deadline-item">
-            <div className="deadline-date">
-              <span className="date-day">20</span>
-              <span className="date-month">DEC</span>
-            </div>
-            <div className="deadline-details">
-              <h4 className="deadline-title">Final Question Paper Review</h4>
-              <p className="deadline-course">Chemistry 201</p>
-            </div>
-            <span className="deadline-status info">10 days left</span>
-          </div>
-        </div>
-      </div>
+      {/* Minimal list of papers for convenience */}
+      <section aria-label="my-papers-list">
+        <h3>My Papers (preview)</h3>
+        {papers.length === 0 ? (
+          <div>No papers found.</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Paper ID</th>
+                <th>Title</th>
+                <th>Course</th>
+                <th>Status</th>
+                <th>Version</th>
+                <th>Last Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {papers.map(p => (
+                <tr key={p.paper_id}>
+                  <td>{p.paper_id}</td>
+                  <td>{p.title}</td>
+                  <td>{p.course_code}</td>
+                  <td>{p.status}</td>
+                  <td>{p.version}</td>
+                  <td>{p.updated_at}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
     </div>
   );
-};
-
-export default InstructorDashboard;
+}

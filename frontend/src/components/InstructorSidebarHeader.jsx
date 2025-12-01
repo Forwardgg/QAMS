@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthContext } from './AuthProvider';
 import './AdminSidebarHeader.css';
@@ -8,15 +8,31 @@ const InstructorSidebarHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   // INSTRUCTOR menu items configuration
   const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/instructor/dashboard' },
-  { id: 'courses', label: 'My Courses', icon: '📘', path: '/instructor/courses' },
-  { id: 'CO', label: 'Course Outcomes', icon: '🎯', path: '/instructor/cos' },
-  { id: 'questionCreate', label: 'Create Question', icon: '➕', path: '/instructor/questions/create' },
-  { id: 'questionPaper', label: 'Question Papers', icon: '📝', path: '/instructor/question-papers' }
-];
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/instructor/dashboard' },
+    { id: 'courses', label: 'My Courses', icon: '📘', path: '/instructor/courses' },
+    { id: 'CO', label: 'Course Outcomes', icon: '🎯', path: '/instructor/cos' },
+    { id: 'questionCreate', label: 'Create Question', icon: '➕', path: '/instructor/questions/create' },
+    { id: 'questionPaper', label: 'Question Papers', icon: '📝', path: '/instructor/question-papers' }
+  ];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsUserDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Determine active page based on current route
   const getActivePage = () => {
@@ -34,11 +50,16 @@ const InstructorSidebarHeader = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const toggleUserDropdown = () => {
+    setIsUserDropdownOpen(!isUserDropdownOpen);
+  };
+
   const handleNavigation = (path) => {
     navigate(path);
   };
 
   const handleLogout = () => {
+    setIsUserDropdownOpen(false);
     if (logout) {
       logout();
     } else {
@@ -92,21 +113,6 @@ const InstructorSidebarHeader = () => {
             ))}
           </ul>
         </nav>
-
-        {/* Sidebar Footer */}
-        <div className="sidebar-footer">
-          {!isCollapsed && (
-            <button className="logout-btn" onClick={handleLogout}>
-              <span className="logout-icon">🚪</span>
-              <span className="logout-text">Logout</span>
-            </button>
-          )}
-          {isCollapsed && (
-            <button className="logout-btn-collapsed" onClick={handleLogout} title="Logout">
-              <span className="logout-icon">🚪</span>
-            </button>
-          )}
-        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -129,14 +135,32 @@ const InstructorSidebarHeader = () => {
           </div>
           
           <div className="header-right">
-            <div className="user-info-header">
-              <div className="header-avatar">
-                {user?.name?.charAt(0) || user?.email?.charAt(0) || 'I'}
-              </div>
-              <div className="header-user-details">
-                <div className="header-user-name">{user?.name || 'Instructor'}</div>
-                <div className="header-user-email">{user?.email || 'instructor@example.com'}</div>
-              </div>
+            {/* User Info with Dropdown */}
+            <div className="user-dropdown-container" ref={dropdownRef}>
+              <button 
+                className="user-info-header"
+                onClick={toggleUserDropdown}
+              >
+                <div className="header-avatar">
+                  {user?.name?.charAt(0) || user?.email?.charAt(0) || 'I'}
+                </div>
+                <div className="header-user-details">
+                  <div className="header-user-name">{user?.name || 'Instructor'}</div>
+                  <div className="header-user-email">{user?.email || 'instructor@example.com'}</div>
+                </div>
+                <div className="dropdown-arrow">
+                  {isUserDropdownOpen ? '▲' : '▼'}
+                </div>
+              </button>
+              
+              {/* Dropdown Menu */}
+              {isUserDropdownOpen && (
+                <div className="user-dropdown-menu">
+                  <button className="dropdown-item logout-item" onClick={handleLogout}>
+                    <span className="dropdown-item-text">Logout</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

@@ -7,7 +7,16 @@ import "./App.css";
 // Lazy load components
 const Login = lazy(() => import("./pages/auth/LoginPage"));
 const Register = lazy(() => import("./pages/auth/RegisterPage"));
-const ModeratorDashboard = lazy(() => import("./pages/moderator/Dashboard"));
+
+// Moderator components
+const ModeratorLayout = lazy(() => import("./pages/moderator/ModeratorLayout"));
+const ModDashboard = lazy(() => import("./pages/moderator/Dashboard"));
+const ModCourses = lazy(() => import("./pages/moderator/Courses"));
+const ModCO = lazy(() => import("./pages/moderator/COs"));
+const ModPaperList = lazy(() => import("./pages/moderator/moderation/PaperList"));
+const ModPaperModeration = lazy(() => import("./pages/moderator/moderation/PaperModeration"));
+const ModReportModal = lazy(() => import("./pages/moderator/moderation/ModReportModal"));
+const ModQuestions = lazy(() => import("./pages/moderator/moderation/QuestionModeration"));
 
 // Admin components
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
@@ -29,15 +38,6 @@ const InstructorQuestionPaperForm = lazy(() => import("./pages/instructor/questi
 const InstructorQuestionEditModal = lazy(() => import("./pages/instructor/questionpaper/QuestionEditModal"));
 const InstructorPaperQuestionManager = lazy(() => import("./pages/instructor/questionpaper/PaperQuestionsManager"));
 const InstructorModReportManager = lazy(() => import("./pages/instructor/questionpaper/ModerationReportModal"));
-
-// moderator components
-const ModDashboard = lazy(() => import("./pages/moderator/Dashboard"));
-const ModCourses = lazy(() => import("./pages/moderator/Courses"));
-const ModCO = lazy(() => import("./pages/moderator/COs"));
-const ModPaperList = lazy(() => import("./pages/moderator/moderation/PaperList"));
-const ModPaperModeration = lazy(() => import("./pages/moderator/moderation/PaperModeration"));
-const ModReportModal = lazy(() => import("./pages/moderator/moderation/ModReportModal"));
-const ModQuestions = lazy(() => import("./pages/moderator/moderation/QuestionModeration"));
 
 const Loading = () => <div style={{ padding: 24 }}>Loading…</div>;
 
@@ -111,15 +111,29 @@ function AppRoutes() {
               </Route>
             </Route>
 
-            {/* Moderator routes (if they need layout too) */}
+            {/* Moderator routes with nested layout */}
             <Route
               path="/moderator"
               element={
                 <RequireAuth requireRole="moderator">
-                  <ModeratorDashboard />
+                  <ModeratorLayout />
                 </RequireAuth>
               }
-            />
+            >
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<ModDashboard />} />
+              <Route path="courses" element={<ModCourses />} />
+              <Route path="cos" element={<ModCO />} />
+              
+              {/* Moderation nested routes */}
+              <Route path="moderation">
+                <Route index element={<Navigate to="papers" replace />} />
+                <Route path="papers" element={<ModPaperList />} />
+                <Route path="paper/:id" element={<ModPaperModeration />} />
+                <Route path="questions" element={<ModQuestions />} />
+                <Route path="report/:id" element={<ModReportModal />} />
+              </Route>
+            </Route>
 
             {/* Alternative routes for backward compatibility */}
             <Route
@@ -149,7 +163,7 @@ function AppRoutes() {
                   ) : auth.user?.role === "instructor" ? (
                     <Navigate to="/instructor/dashboard" replace />
                   ) : auth.user?.role === "moderator" ? (
-  <Navigate to="/moderator" replace />
+                    <Navigate to="/moderator/dashboard" replace />
                   ) : (
                     <div style={{ padding: 24 }}>Unknown role: {auth.user?.role}</div>
                   )

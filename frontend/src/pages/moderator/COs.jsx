@@ -144,7 +144,7 @@ const ModeratorCO = () => {
         
         <div className="co-actions">
           <button onClick={loadAllData} className="refresh-btn">
-            🔄 Refresh
+            Refresh
           </button>
         </div>
       </div>
@@ -240,7 +240,7 @@ const ModeratorCO = () => {
                     className="btn btn-view"
                     title="View details"
                   >
-                    👁️ View
+                    View
                   </button>
                 </td>
               </tr>

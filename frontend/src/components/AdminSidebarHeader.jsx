@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthContext } from './AuthProvider';
 import './AdminSidebarHeader.css';
@@ -8,6 +8,8 @@ const AdminSidebarHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Menu items configuration
   const menuItems = [
@@ -17,6 +19,20 @@ const AdminSidebarHeader = () => {
     { id: 'CO', label: 'CO Management', icon: '🎯', path: '/admin/cos' },
     { id: 'questionPaper', label: 'Question Papers', icon: '📝', path: '/admin/question-papers' }
   ];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsUserDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Determine active page based on current route
   const getActivePage = () => {
@@ -34,11 +50,16 @@ const AdminSidebarHeader = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const toggleUserDropdown = () => {
+    setIsUserDropdownOpen(!isUserDropdownOpen);
+  };
+
   const handleNavigation = (path) => {
     navigate(path);
   };
 
   const handleLogout = () => {
+    setIsUserDropdownOpen(false);
     if (logout) {
       logout();
     } else {
@@ -92,21 +113,6 @@ const AdminSidebarHeader = () => {
             ))}
           </ul>
         </nav>
-
-        {/* Sidebar Footer */}
-        <div className="sidebar-footer">
-          {!isCollapsed && (
-            <button className="logout-btn" onClick={handleLogout}>
-              <span className="logout-icon">🚪</span>
-              <span className="logout-text">Logout</span>
-            </button>
-          )}
-          {isCollapsed && (
-            <button className="logout-btn-collapsed" onClick={handleLogout} title="Logout">
-              <span className="logout-icon">🚪</span>
-            </button>
-          )}
-        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -129,14 +135,31 @@ const AdminSidebarHeader = () => {
           </div>
           
           <div className="header-right">
-            <div className="user-info-header">
-              <div className="header-avatar">
-                {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-              </div>
-              <div className="header-user-details">
-                <div className="header-user-name">{user?.name || 'Administrator'}</div>
-                <div className="header-user-email">{user?.email || 'admin@example.com'}</div>
-              </div>
+            <div className="user-dropdown-container" ref={dropdownRef}>
+              <button 
+                className="user-info-header"
+                onClick={toggleUserDropdown}
+              >
+                <div className="header-avatar">
+                  {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                </div>
+                <div className="header-user-details">
+                  <div className="header-user-name">{user?.name || 'Administrator'}</div>
+                  <div className="header-user-email">{user?.email || 'admin@example.com'}</div>
+                </div>
+                <div className="dropdown-arrow">
+                  {isUserDropdownOpen ? '▲' : '▼'}
+                </div>
+              </button>
+              
+              {/* Dropdown Menu - Minimal */}
+              {isUserDropdownOpen && (
+                <div className="user-dropdown-menu">
+                  <button className="dropdown-item logout-item" onClick={handleLogout}>
+  <span className="dropdown-item-text">Logout</span>
+</button>
+                </div>
+              )}
             </div>
           </div>
         </header>

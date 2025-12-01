@@ -1,212 +1,287 @@
-// src/frontend/src/pages/moderator/Dashboard.jsx
-import React, { useState, useContext } from 'react';
-import { AuthContext } from '../../components/AuthProvider';
-import ModeratorHeader from '../../components/ModeratorHeader';
-import ModeratorSidebar from '../../components/ModeratorSidebar';
-import ModeratorCourses from './Courses';
-import ModeratorCO from './COs';
-import PaperList from './moderation/PaperList';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import moderatorAPI from '../../api/moderator.api';
 import './Dashboard.css';
 
 const ModeratorDashboard = () => {
-  const [activePage, setActivePage] = useState('dashboard');
-  const auth = useContext(AuthContext);
+  const navigate = useNavigate();
+  const [dashboardData, setDashboardData] = useState({
+    pendingPapers: 0,
+    activeModerations: 0,
+    completedReviews: 0,
+    recentActivity: [],
+    stats: {
+      totalModerations: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      pendingCount: 0
+    }
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const handleLogout = () => {
-    auth.logout();
-  };
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const handlePageChange = (pageId) => {
-    setActivePage(pageId);
-  };
+      // Fetch papers for moderation
+      const papersResponse = await moderatorAPI.getPapers();
+      const pendingPapers = papersResponse.data?.filter(paper => 
+        paper.status === 'submitted'
+      ).length || 0;
 
-  // Mock data for dashboard stats
-  const dashboardStats = {
-    pendingReviews: 15,
-    approvedToday: 8,
-    rejectedToday: 3,
-    totalModerated: 127
-  };
+      // Fetch moderation history
+      const historyResponse = await moderatorAPI.getModerationHistory();
+      const moderations = historyResponse.data || [];
+      
+      const activeModerations = moderations.filter(m => m.status === 'pending').length;
+      const completedReviews = moderations.filter(m => 
+        m.status === 'approved' || m.status === 'rejected'
+      ).length;
 
-  const recentActivity = [
-    { id: 1, type: 'question', action: 'approved', title: 'Physics MCQ Set 1', time: '1 hour ago' },
-    { id: 2, type: 'question', action: 'rejected', title: 'Chemistry Problem', time: '3 hours ago' },
-    { id: 3, type: 'paper', action: 'reviewed', title: 'Midterm Paper 2024', time: '5 hours ago' },
-    { id: 4, type: 'course', action: 'approved', title: 'Advanced Mathematics', time: '1 day ago' }
-  ];
+      // Get recent activity
+      const recentActivity = moderations
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+        .slice(0, 5)
+        .map(mod => ({
+          id: mod.moderation_id,
+          paperTitle: mod.paper_title || 'Untitled Paper',
+          courseCode: mod.course_code || 'N/A',
+          status: mod.status,
+          date: new Date(mod.updated_at).toLocaleDateString(),
+          time: new Date(mod.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        }));
 
-  const moderationQueue = [
-    { id: 1, type: 'question', title: 'Quantum Mechanics Problems', submittedBy: 'Dr. Smith', waitingTime: '2 days' },
-    { id: 2, type: 'paper', title: 'Final Exam 2024', submittedBy: 'Prof. Johnson', waitingTime: '1 day' },
-    { id: 3, type: 'course', title: 'Data Science Fundamentals', submittedBy: 'Dr. Brown', waitingTime: '3 days' }
-  ];
+      // Calculate stats
+      const statsData = {
+        totalModerations: moderations.length,
+        approvedCount: moderations.filter(m => m.status === 'approved').length,
+        rejectedCount: moderations.filter(m => m.status === 'rejected').length,
+        pendingCount: moderations.filter(m => m.status === 'pending').length
+      };
 
-  // Render different content based on active page
-  const renderContent = () => {
-    switch (activePage) {
-      case 'dashboard':
-        return (
-          <div className="moderator-dashboard-content">
-            <div className="dashboard-header">
-              <h1>Moderation Dashboard</h1>
-              <p>Welcome back! Manage content moderation and reviews.</p>
-            </div>
-            
-            {/* Stats Grid */}
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-icon">⏳</div>
-                <div className="stat-info">
-                  <h3>Pending Reviews</h3>
-                  <p className="stat-number">{dashboardStats.pendingReviews}</p>
-                  <span className="stat-trend warning">Requires attention</span>
-                </div>
-              </div>
-              
-              <div className="stat-card">
-                <div className="stat-icon">✅</div>
-                <div className="stat-info">
-                  <h3>Approved Today</h3>
-                  <p className="stat-number">{dashboardStats.approvedToday}</p>
-                  <span className="stat-trend">Good progress</span>
-                </div>
-              </div>
-              
-              <div className="stat-card">
-                <div className="stat-icon">❌</div>
-                <div className="stat-info">
-                  <h3>Rejected Today</h3>
-                  <p className="stat-number">{dashboardStats.rejectedToday}</p>
-                  <span className="stat-trend">Quality control</span>
-                </div>
-              </div>
-              
-              <div className="stat-card">
-                <div className="stat-icon">📊</div>
-                <div className="stat-info">
-                  <h3>Total Moderated</h3>
-                  <p className="stat-number">{dashboardStats.totalModerated}</p>
-                  <span className="stat-trend">All time</span>
-                </div>
-              </div>
-            </div>
+      setDashboardData({
+        pendingPapers,
+        activeModerations,
+        completedReviews,
+        recentActivity,
+        stats: statsData
+      });
 
-            {/* Quick Actions */}
-            <div className="dashboard-section">
-              <h2>Quick Actions</h2>
-              <div className="action-buttons">
-                <button className="action-btn primary">
-                  ⚡ Start Reviewing
-                </button>
-                <button className="action-btn secondary">
-                  📋 View Pending Queue
-                </button>
-                <button className="action-btn secondary">
-                  📊 Generate Reports
-                </button>
-                <button className="action-btn secondary">
-                  ⚙️ Moderation Settings
-                </button>
-              </div>
-            </div>
-
-            <div className="content-row">
-              {/* Recent Activity */}
-              <div className="dashboard-section half-width">
-                <h2>Recent Moderation Activity</h2>
-                <div className="activity-list">
-                  {recentActivity.map(activity => (
-                    <div key={activity.id} className="activity-item">
-                      <div className="activity-icon">
-                        {activity.action === 'approved' ? '✅' : 
-                         activity.action === 'rejected' ? '❌' : '📄'}
-                      </div>
-                      <div className="activity-details">
-                        <p className="activity-text">
-                          {activity.title}
-                        </p>
-                        <div className="activity-meta">
-                          <span className={`activity-type ${activity.action}`}>
-                            {activity.action}
-                          </span>
-                          <span className="activity-time">{activity.time}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Moderation Queue */}
-              <div className="dashboard-section half-width">
-                <h2>Moderation Queue</h2>
-                <div className="queue-list">
-                  {moderationQueue.map(item => (
-                    <div key={item.id} className="queue-item">
-                      <div className="queue-icon">
-                        {item.type === 'question' ? '❓' : 
-                         item.type === 'paper' ? '📄' : '📚'}
-                      </div>
-                      <div className="queue-details">
-                        <p className="queue-title">{item.title}</p>
-                        <div className="queue-meta">
-                          <span className="queue-submitter">By: {item.submittedBy}</span>
-                          <span className="queue-waiting">Waiting: {item.waitingTime}</span>
-                        </div>
-                      </div>
-                      <button className="queue-action-btn">
-                        Review
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      case 'courses':
-        return (
-          <div className="moderator-dashboard-content">
-            <ModeratorCourses />
-          </div>
-        );
-      case 'COs':
-        return (
-          <div className="moderator-dashboard-content">
-            <ModeratorCO />
-          </div>
-        );
-      case 'question_paper':
-        return (
-          <div className="moderator-dashboard-content">
-            <PaperList />
-          </div>
-        );
-      case 'reports':
-        return (
-          <div className="moderator-dashboard-content">
-            <h1>Moderation Reports</h1>
-            <p>View moderation statistics and reports</p>
-          </div>
-        );
-      default:
-        return (
-          <div className="moderator-dashboard-content">
-            <h1>Moderator Panel</h1>
-            <p>Welcome to the moderation panel</p>
-          </div>
-        );
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError(err.response?.data?.message || 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const handleStartNewModeration = () => {
+    navigate('/moderator/moderation/papers');
+  };
+
+  const handleViewCourses = () => {
+    navigate('/moderator/courses');
+  };
+
+  const handleViewCOs = () => {
+    navigate('/moderator/cos');
+  };
+
+  const handleDownloadReports = () => {
+    navigate('/moderator/moderation/papers');
+  };
+
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'approved': return 'status-approved';
+      case 'pending': return 'status-pending';
+      case 'rejected': return 'status-rejected';
+      default: return '';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'approved': return '✓';
+      case 'pending': return '●';
+      case 'rejected': return '✗';
+      default: return '●';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="dashboard-container">
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <p>Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="moderator-dashboard">
-      <ModeratorHeader user={auth.user} onLogout={handleLogout} />
-      <div className="moderator-dashboard-body">
-        <ModeratorSidebar activePage={activePage} onPageChange={handlePageChange} />
-        <main className="moderator-main-content">
-          {renderContent()}
-        </main>
+    <div className="dashboard-container">
+      {/* Header */}
+      <div className="dashboard-header">
+        <div>
+          <h1 className="dashboard-title">Moderator Dashboard</h1>
+          <p className="dashboard-subtitle">Welcome back! Here's your moderation overview</p>
+        </div>
+        <button className="refresh-btn" onClick={fetchDashboardData} title="Refresh">
+          ↻
+        </button>
+      </div>
+
+      {error && (
+        <div className="error-alert">
+          <span className="error-icon">⚠</span>
+          <span className="error-message">{error}</span>
+          <button className="error-close" onClick={() => setError(null)}>×</button>
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="stats-grid">
+        <div className="stats-card">
+          <div className="stats-icon">📄</div>
+          <div className="stats-content">
+            <h3 className="stats-number">{dashboardData.pendingPapers}</h3>
+            <p className="stats-label">PENDING PAPERS</p>
+            <p className="stats-description">Papers waiting for moderation</p>
+          </div>
+        </div>
+
+        <div className="stats-card">
+          <div className="stats-icon">📋</div>
+          <div className="stats-content">
+            <h3 className="stats-number">{dashboardData.activeModerations}</h3>
+            <p className="stats-label">ACTIVE MODERATIONS</p>
+            <p className="stats-description">Currently moderating</p>
+          </div>
+        </div>
+
+        <div className="stats-card">
+          <div className="stats-icon">✅</div>
+          <div className="stats-content">
+            <h3 className="stats-number">{dashboardData.completedReviews}</h3>
+            <p className="stats-label">COMPLETED REVIEWS</p>
+            <p className="stats-description">Total moderated papers</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Statistics Panel */}
+      <div className="statistics-panel">
+        <h2 className="section-title">Moderation Statistics</h2>
+        <div className="stats-grid-inner">
+          <div className="stat-item">
+            <h3 className="stat-number">{dashboardData.stats.totalModerations}</h3>
+            <p className="stat-label">Total Moderations</p>
+          </div>
+          <div className="stat-item">
+            <h3 className="stat-number stat-success">{dashboardData.stats.approvedCount}</h3>
+            <p className="stat-label">Approved</p>
+          </div>
+          <div className="stat-item">
+            <h3 className="stat-number stat-error">{dashboardData.stats.rejectedCount}</h3>
+            <p className="stat-label">Rejected</p>
+          </div>
+          <div className="stat-item">
+            <h3 className="stat-number stat-warning">{dashboardData.stats.pendingCount}</h3>
+            <p className="stat-label">In Progress</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="quick-actions-panel">
+        <h2 className="section-title">Quick Actions</h2>
+        <div className="actions-grid">
+          <button 
+            className="action-btn action-btn-primary" 
+            onClick={handleStartNewModeration}
+          >
+            <span className="action-icon">▶</span>
+            <span className="action-title">Start New Moderation</span>
+            {dashboardData.pendingPapers > 0 && (
+              <span className="action-badge">{dashboardData.pendingPapers}</span>
+            )}
+          </button>
+
+          <button 
+            className="action-btn" 
+            onClick={handleViewCourses}
+          >
+            <span className="action-icon">📚</span>
+            <span className="action-title">View Courses</span>
+          </button>
+
+          <button 
+            className="action-btn" 
+            onClick={handleViewCOs}
+          >
+            <span className="action-icon">📊</span>
+            <span className="action-title">View COs</span>
+          </button>
+
+          <button 
+            className="action-btn" 
+            onClick={handleDownloadReports}
+          >
+            <span className="action-icon">📥</span>
+            <span className="action-title">Download Reports</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="recent-activity-panel">
+        <div className="activity-header">
+          <h2 className="section-title">Recent Activity</h2>
+          <button 
+            className="view-all-btn"
+            onClick={() => navigate('/moderator/moderation/papers')}
+          >
+            View All
+          </button>
+        </div>
+        
+        {dashboardData.recentActivity.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">📭</div>
+            <p className="empty-text">No recent moderation activity found.</p>
+          </div>
+        ) : (
+          <div className="activity-list">
+            {dashboardData.recentActivity.map((activity, index) => (
+              <div 
+                key={activity.id} 
+                className="activity-item"
+              >
+                <div className={`activity-icon ${getStatusClass(activity.status)}`}>
+                  {getStatusIcon(activity.status)}
+                </div>
+                <div className="activity-content">
+                  <h4 className="activity-title">{activity.paperTitle}</h4>
+                  <div className="activity-meta">
+                    <span className="activity-chip course-chip">{activity.courseCode}</span>
+                    <span className={`activity-chip status-chip ${getStatusClass(activity.status)}`}>
+                      {activity.status}
+                    </span>
+                    <span className="activity-time">{activity.date} at {activity.time}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
