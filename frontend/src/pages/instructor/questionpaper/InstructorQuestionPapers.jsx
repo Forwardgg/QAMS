@@ -1,10 +1,10 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { AuthContext } from '../../components/AuthProvider';
-import questionPaperAPI from '../../api/questionPaper.api';
-import QuestionPaperList from './questionpaper/QuestionPapersList';
-import QuestionPaperForm from './questionpaper/QuestionPaperForm';
-import PaperQuestionsManager from './questionpaper/PaperQuestionsManager';
-import './QuestionPaper.css';
+import { AuthContext } from '../../../components/AuthProvider';
+import questionPaperAPI from '../../../api/questionPaper.api';
+import QuestionPaperList from './QuestionPapersTable';
+import QuestionPaperForm from './QuestionPaperForm';
+import PaperQuestionsManager from './PaperQuestionsManager';
+import './InstructorQuestionPapers.css';
 
 const QuestionPapers = () => {
   const { user } = useContext(AuthContext);

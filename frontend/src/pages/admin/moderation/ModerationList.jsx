@@ -1,10 +1,11 @@
-// src/pages/admin/Moderation/ModerationList.js
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../components/AuthProvider';
 import moderatorAPI from '../../../api/moderator.api';
 import './ModerationList.css';
 
-const ModerationList = ({ onViewModeration }) => {
+const ModerationList = () => {
+  const navigate = useNavigate();
   const [moderations, setModerations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -26,7 +27,6 @@ const ModerationList = ({ onViewModeration }) => {
   const [sortConfig, setSortConfig] = useState({ key: 'updated_at', direction: 'desc' });
   const auth = useContext(AuthContext);
 
-  // Fetch all moderation records
   const fetchModerations = async () => {
     setLoading(true);
     setError(null);
@@ -49,22 +49,19 @@ const ModerationList = ({ onViewModeration }) => {
     }
   };
 
-  // Handle filter changes
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
       [key]: value,
-      page: 1 // Reset to first page when filters change
+      page: 1
     }));
   };
 
-  // Handle search
   const handleSearch = (e) => {
     e.preventDefault();
     fetchModerations();
   };
 
-  // Handle sort
   const handleSort = (key) => {
     setSortConfig({
       key,
@@ -72,12 +69,10 @@ const ModerationList = ({ onViewModeration }) => {
     });
   };
 
-  // Handle pagination
   const handlePageChange = (newPage) => {
     setFilters(prev => ({ ...prev, page: newPage }));
   };
 
-  // Reset filters
   const handleResetFilters = () => {
     setFilters({
       search: '',
@@ -89,20 +84,35 @@ const ModerationList = ({ onViewModeration }) => {
     });
   };
 
-  // Get unique values for filters
+  // Navigate to ModReport with moderation details
+  const handleViewReport = (moderation) => {
+    navigate(`/admin/moderation/report?moderationId=${moderation.moderation_id}&paperId=${moderation.paper_id}`);
+  };
+
+  // Navigate to QuestionList
+  const handleViewQuestions = (moderation) => {
+    navigate(`/admin/moderation/questions?moderationId=${moderation.moderation_id}&paperId=${moderation.paper_id}`);
+  };
+
   const getUniqueValues = (key) => {
     return [...new Set(moderations.map(mod => mod[key]).filter(Boolean))].sort();
   };
 
-  // Apply client-side sorting
   const getSortedModerations = () => {
     if (!sortConfig.key) return moderations;
 
     return [...moderations].sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+      
+      if (aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1;
       }
-      if (a[sortConfig.key] > b[sortConfig.key]) {
+      if (aValue > bValue) {
         return sortConfig.direction === 'asc' ? 1 : -1;
       }
       return 0;
@@ -130,21 +140,54 @@ const ModerationList = ({ onViewModeration }) => {
 
   return (
     <div className="moderation-list">
-      <div className="moderation-header">
+      <div className="page-header">
         <h1>Moderation Records</h1>
+        <div className="header-actions">
+          <button 
+            onClick={() => navigate('/admin/dashboard')} 
+            className="btn btn-outline"
+          >
+            ← Dashboard
+          </button>
+          <button 
+            onClick={fetchModerations} 
+            className="btn btn-secondary"
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
+      <div className="page-subtitle">
         <p>View and manage all moderation activities</p>
+        <div className="quick-stats">
+          <span className="stat-item">Total: {pagination.total}</span>
+          <span className="stat-item">Showing: {moderations.length}</span>
+          <span className="stat-item">Page: {pagination.page}/{pagination.totalPages}</span>
+        </div>
       </div>
 
       {error && (
         <div className="error-message">
           <strong>Error:</strong> {error}
           <button onClick={() => setError(null)} className="close-error">×</button>
+          <button onClick={fetchModerations} className="retry-btn">Retry</button>
         </div>
       )}
 
-      {/* Filters Section */}
       <div className="filters-section">
-        <h3>Filters</h3>
+        <div className="section-header">
+          <h3>Filters</h3>
+          <button 
+            onClick={fetchModerations} 
+            className="btn btn-refresh"
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : '↻ Refresh'}
+          </button>
+        </div>
+        
         <form onSubmit={handleSearch} className="filter-controls">
           <div className="filter-row">
             <div className="filter-group">
@@ -154,6 +197,7 @@ const ModerationList = ({ onViewModeration }) => {
                 placeholder="Search paper title, course, or moderator..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
+                disabled={loading}
               />
             </div>
 
@@ -162,6 +206,7 @@ const ModerationList = ({ onViewModeration }) => {
               <select 
                 value={filters.status} 
                 onChange={(e) => handleFilterChange('status', e.target.value)}
+                disabled={loading}
               >
                 <option value="">All Statuses</option>
                 {uniqueStatuses.map(status => (
@@ -177,6 +222,7 @@ const ModerationList = ({ onViewModeration }) => {
               <select 
                 value={filters.courseCode} 
                 onChange={(e) => handleFilterChange('courseCode', e.target.value)}
+                disabled={loading}
               >
                 <option value="">All Courses</option>
                 {uniqueCourses.map(course => (
@@ -190,6 +236,7 @@ const ModerationList = ({ onViewModeration }) => {
               <select 
                 value={filters.moderatorName} 
                 onChange={(e) => handleFilterChange('moderatorName', e.target.value)}
+                disabled={loading}
               >
                 <option value="">All Moderators</option>
                 {uniqueModerators.map(moderator => (
@@ -200,20 +247,19 @@ const ModerationList = ({ onViewModeration }) => {
           </div>
 
           <div className="filter-actions">
-            <button type="submit" className="btn btn-primary">
+            <button type="submit" className="btn btn-primary" disabled={loading}>
               Apply Filters
             </button>
-            <button type="button" className="btn btn-outline" onClick={handleResetFilters}>
+            <button type="button" className="btn btn-outline" onClick={handleResetFilters} disabled={loading}>
               Reset
             </button>
             <span className="result-count">
-              {pagination.total} records found
+              {loading ? 'Loading...' : `${pagination.total} records found`}
             </span>
           </div>
         </form>
       </div>
 
-      {/* Moderation Table */}
       <div className="moderation-table-container">
         {loading ? (
           <div className="loading">Loading moderation records...</div>
@@ -223,6 +269,14 @@ const ModerationList = ({ onViewModeration }) => {
               ? "No records found matching your criteria" 
               : "No moderation records found"
             }
+            {!filters.search && !filters.status && !filters.courseCode && !filters.moderatorName && (
+              <div className="no-data-actions">
+                <p>It looks like there are no moderation records yet.</p>
+                <button className="btn btn-primary" onClick={fetchModerations}>
+                  Refresh
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -230,30 +284,30 @@ const ModerationList = ({ onViewModeration }) => {
               <table className="moderation-table">
                 <thead>
                   <tr>
-                    <th onClick={() => handleSort('paper_title')}>
+                    <th onClick={() => handleSort('paper_title')} className="sortable-header">
                       Paper Title <SortIcon columnKey="paper_title" />
                     </th>
-                    <th onClick={() => handleSort('course_code')}>
+                    <th onClick={() => handleSort('course_code')} className="sortable-header">
                       Course <SortIcon columnKey="course_code" />
                     </th>
-                    <th onClick={() => handleSort('creator_name')}>
+                    <th onClick={() => handleSort('creator_name')} className="sortable-header">
                       Instructor <SortIcon columnKey="creator_name" />
                     </th>
-                    <th onClick={() => handleSort('moderator_name')}>
+                    <th onClick={() => handleSort('moderator_name')} className="sortable-header">
                       Moderator <SortIcon columnKey="moderator_name" />
                     </th>
-                    <th onClick={() => handleSort('status')}>
+                    <th onClick={() => handleSort('status')} className="sortable-header">
                       Status <SortIcon columnKey="status" />
                     </th>
-                    <th onClick={() => handleSort('updated_at')}>
+                    <th onClick={() => handleSort('updated_at')} className="sortable-header">
                       Updated <SortIcon columnKey="updated_at" />
                     </th>
-                    <th>Actions</th>
+                    <th className="actions-col">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedModerations.map((moderation) => (
-                    <tr key={moderation.moderation_id}>
+                    <tr key={moderation.moderation_id} className="moderation-row">
                       <td className="paper-title">
                         <div className="title-text" title={moderation.paper_title}>
                           {moderation.paper_title}
@@ -287,10 +341,17 @@ const ModerationList = ({ onViewModeration }) => {
                       <td className="actions-cell">
                         <button
                           className="btn btn-sm btn-primary"
-                          onClick={() => onViewModeration(moderation.moderation_id, moderation.paper_id)}
-                          title="View moderation details"
+                          onClick={() => handleViewReport(moderation)}
+                          title="View moderation report"
                         >
-                          View
+                          Report
+                        </button>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => handleViewQuestions(moderation)}
+                          title="View question analysis"
+                        >
+                          Questions
                         </button>
                       </td>
                     </tr>
@@ -299,16 +360,41 @@ const ModerationList = ({ onViewModeration }) => {
               </table>
             </div>
 
-            {/* Pagination */}
             {pagination.totalPages > 1 && (
               <div className="pagination">
                 <button
                   className="btn btn-outline"
-                  disabled={!pagination.hasPrev}
+                  disabled={!pagination.hasPrev || loading}
                   onClick={() => handlePageChange(pagination.page - 1)}
                 >
-                  Previous
+                  ← Previous
                 </button>
+                
+                <div className="page-numbers">
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (pagination.totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (pagination.page <= 3) {
+                      pageNum = i + 1;
+                    } else if (pagination.page >= pagination.totalPages - 2) {
+                      pageNum = pagination.totalPages - 4 + i;
+                    } else {
+                      pageNum = pagination.page - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        className={`btn btn-page ${pageNum === pagination.page ? 'active' : ''}`}
+                        onClick={() => handlePageChange(pageNum)}
+                        disabled={loading}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
                 
                 <span className="page-info">
                   Page {pagination.page} of {pagination.totalPages}
@@ -316,10 +402,10 @@ const ModerationList = ({ onViewModeration }) => {
                 
                 <button
                   className="btn btn-outline"
-                  disabled={!pagination.hasNext}
+                  disabled={!pagination.hasNext || loading}
                   onClick={() => handlePageChange(pagination.page + 1)}
                 >
-                  Next
+                  Next →
                 </button>
               </div>
             )}

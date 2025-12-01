@@ -1,7 +1,7 @@
-// frontend/src/pages/instructor/questionpaper/QuestionPapersList.js
+// frontend/src/pages/instructor/questionpaper/QuestionPapersTable.js
 import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import './QuestionPapersList.css';
+import './QuestionPapersTable.css';
 
 const QuestionPaperList = ({ 
   questionPapers = [], 

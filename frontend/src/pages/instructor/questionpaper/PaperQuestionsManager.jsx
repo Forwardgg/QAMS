@@ -1,4 +1,4 @@
-// frontend/src/pages/instructor/questionpaper/PaperQuestionsManager.js
+// frontend/src/pages/instructor/questionpaper/PaperQuestionsManager.jsx
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

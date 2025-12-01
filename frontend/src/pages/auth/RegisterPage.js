@@ -270,10 +270,6 @@ const RegisterPage = () => {
             </button>
           </p>
         </div>
-
-        <div className="auth-info">
-          <p><strong>Note:</strong> Admin accounts are created by system administrators only.</p>
-        </div>
       </div>
     </div>
   );

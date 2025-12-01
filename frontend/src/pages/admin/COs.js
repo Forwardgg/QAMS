@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Added for routing
 import coAPI from '../../api/co.api';
-import coursesAPI from '../../api/course.api'; // Add this import
+import coursesAPI from '../../api/course.api';
 import './CO.css';
 
 const CO = () => {
+  const navigate = useNavigate(); // For routing
   const [courseOutcomes, setCourseOutcomes] = useState([]);
-  const [courses, setCourses] = useState([]); // Add courses state
+  const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,7 +18,7 @@ const CO = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingCO, setEditingCO] = useState(null);
   const [formData, setFormData] = useState({
-    course_code: '', // Change from course_id to course_code
+    course_code: '',
     co_number: '',
     description: ''
   });
@@ -74,7 +76,13 @@ const CO = () => {
       return matchesSearch && matchesCourse;
     });
 
-  const sortedCOs = coAPI.sortCOs(filteredCOs, sortField, sortDirection);
+  const sortedCOs = coAPI.sortCOs ? 
+    coAPI.sortCOs(filteredCOs, sortField, sortDirection) : 
+    filteredCOs.sort((a, b) => {
+      if (a[sortField] < b[sortField]) return sortDirection === 'asc' ? -1 : 1;
+      if (a[sortField] > b[sortField]) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -95,7 +103,7 @@ const CO = () => {
     setSelectedCourse('');
   };
 
-  // CRUD Functions - UPDATED
+  // CRUD Functions
   const resetForm = () => {
     setFormData({
       course_code: '',
@@ -113,7 +121,7 @@ const CO = () => {
 
   const handleEdit = (co) => {
     setFormData({
-      course_code: co.course_code, // Use course_code instead of course_id
+      course_code: co.course_code,
       co_number: co.co_number,
       description: co.description
     });
@@ -122,7 +130,8 @@ const CO = () => {
   };
 
   const handleDelete = async (co) => {
-    if (!window.confirm(`Are you sure you want to delete ${coAPI.formatCO(co)}?`)) {
+    const coName = coAPI.formatCO ? coAPI.formatCO(co) : `CO${co.co_number}`;
+    if (!window.confirm(`Are you sure you want to delete ${coName}?`)) {
       return;
     }
 
@@ -152,7 +161,7 @@ const CO = () => {
 
     if (!formData.co_number || formData.co_number.trim() === '') {
       errors.push("CO number is required");
-    } else if (!coAPI.validateCONumber(formData.co_number)) {
+    } else if (coAPI.validateCONumber && !coAPI.validateCONumber(formData.co_number)) {
       errors.push("CO number must be in valid format (e.g., '1', '2.1', '3.2.1')");
     }
 
@@ -169,7 +178,7 @@ const CO = () => {
 
     try {
       if (editingCO) {
-        // For edit - course_id remains the same, only update co_number and description
+        // For edit
         await coAPI.update(editingCO.co_id, {
           co_number: formData.co_number,
           description: formData.description
@@ -184,7 +193,7 @@ const CO = () => {
         }
 
         await coAPI.create({
-          course_id: courseId, // Send course_id to backend
+          course_id: courseId,
           co_number: formData.co_number,
           description: formData.description
         });
@@ -240,7 +249,14 @@ const CO = () => {
             Create CO
           </button>
           <button onClick={loadAllData} className="refresh-btn">
-            🔄 Refresh
+            Refresh
+          </button>
+          {/* Optional: Back to dashboard button */}
+          <button 
+            onClick={() => navigate('/admin/dashboard')} 
+            className="back-btn"
+          >
+            ← Dashboard
           </button>
         </div>
       </div>
@@ -249,13 +265,15 @@ const CO = () => {
       {showForm && (
         <div className="form-modal">
           <div className="form-content">
-            <h2>{editingCO ? 'Edit' : 'Create'} Course Outcome</h2>
+            <div className="form-header">
+              <h2>{editingCO ? 'Edit' : 'Create'} Course Outcome</h2>
+              <button onClick={resetForm} className="close-form-btn">×</button>
+            </div>
             
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Course Code *</label>
                 {editingCO ? (
-                  // Display course code as read-only when editing
                   <input
                     type="text"
                     value={formData.course_code}
@@ -263,7 +281,6 @@ const CO = () => {
                     className="readonly-input"
                   />
                 ) : (
-                  // Dropdown for course selection when creating
                   <select
                     name="course_code"
                     value={formData.course_code}
@@ -440,6 +457,9 @@ const CO = () => {
         <div className="summary">
           Displaying {sortedCOs.length} of {courseOutcomes.length} course outcomes
           {selectedCourse && ` for course ${selectedCourse}`}
+        </div>
+        <div className="export-options">
+          {/* Add export buttons if needed */}
         </div>
       </div>
     </div>

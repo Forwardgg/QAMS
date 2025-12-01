@@ -1,4 +1,5 @@
-/* src/pages/admin/Moderation/ModReport.css */
+/* ModReport.css - Updated for top section changes */
+
 .mod-report {
   max-width: 210mm;
   min-height: 297mm;
@@ -12,7 +13,215 @@
   color: #000;
 }
 
-/* Header Section */
+/* Top Section (before PDF content) */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #dee2e6;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.page-header h1 {
+  color: #2c3e50;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 200px;
+}
+
+/* Header Right Section with proper spacing */
+.header-right {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Button Styles */
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #4dabf7;
+  color: white;
+  border: 1px solid #4dabf7;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #339af0;
+  border-color: #339af0;
+  box-shadow: 0 2px 8px rgba(77, 171, 247, 0.3);
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: 1px solid #6c757d;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #5a6268;
+  border-color: #5a6268;
+  box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+}
+
+.btn-outline {
+  background: white;
+  color: #495057;
+  border: 1px solid #dee2e6;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+/* Report Info Card */
+.report-info-card {
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 30px;
+  border: 1px solid #dee2e6;
+}
+
+.report-info-card h2 {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.info-grid-small {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.info-item label {
+  font-size: 14px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.info-item span {
+  color: #2c3e50;
+  font-size: 15px;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-pending {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.status-approved {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-rejected {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Report Actions */
+.report-actions {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: center;
+}
+
+.generate-pdf-btn {
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.generate-pdf-btn:disabled {
+  background: #adb5bd;
+  border-color: #adb5bd;
+}
+
+.pdf-message {
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-size: 14px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.pdf-message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.pdf-message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* PDF Content Section - This is where the actual report starts */
+.formal-report-section {
+  margin-top: 40px;
+  padding-top: 30px;
+  border-top: 2px solid #2c3e50;
+}
+
+/* Header Section for PDF */
 .header {
   text-align: center;
   margin-bottom: 8mm;
@@ -108,12 +317,12 @@
 
 /* Boolean Indicators */
 .criterion-pass {
-  color: #2e7d32; /* Green for positive/passing */
+  color: #2e7d32;
   font-weight: bold;
 }
 
 .criterion-fail {
-  color: #c62828; /* Red for negative/failing */
+  color: #c62828;
   font-weight: bold;
 }
 
@@ -152,57 +361,60 @@
   font-weight: bold;
 }
 
-/* PDF Generation Section */
-.pdf-generation-section {
-  margin-top: 10mm;
+/* Bottom Report Actions */
+.report-actions-bottom {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #dee2e6;
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+/* Loading and Error States */
+.loading {
+  padding: 60px 20px;
   text-align: center;
-  padding-top: 10mm;
-  border-top: 1px dashed #ccc;
+  color: #6c757d;
+  font-size: 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-.generate-pdf-btn {
-  background: #2c3e50;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  font-size: 11pt;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: "Times New Roman", serif;
-  transition: background-color 0.3s ease;
+.error-message {
+  background: #fff5f5;
+  border: 1px solid #ffc9c9;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+  color: #c92a2a;
 }
 
-.generate-pdf-btn:hover:not(:disabled) {
-  background: #34495e;
+.error-message p {
+  margin: 0 0 15px 0;
 }
 
-.generate-pdf-btn:disabled {
-  background: #7f8c8d;
-  cursor: not-allowed;
+.no-data {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6c757d;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-.pdf-message {
-  margin-top: 5mm;
-  padding: 2mm;
-  border-radius: 2px;
-  font-size: 10pt;
-}
-
-.pdf-message.success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.pdf-message.error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+.no-data p {
+  font-size: 16px;
+  margin-bottom: 20px;
 }
 
 /* Print Styles */
 @media print {
-  .pdf-generation-section {
+  .page-header,
+  .report-info-card,
+  .report-actions,
+  .report-actions-bottom {
     display: none;
   }
   
@@ -228,6 +440,20 @@
     font-size: 11pt;
   }
   
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .header-right {
+    width: 100%;
+  }
+  
+  .info-grid-small {
+    grid-template-columns: 1fr;
+  }
+  
   .info-grid {
     grid-template-columns: 1fr;
     gap: 1mm;
@@ -247,5 +473,37 @@
   
   .col-answer {
     width: 30%;
+  }
+  
+  .report-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .report-actions-bottom {
+    flex-direction: column;
+  }
+  
+  .report-actions-bottom .btn {
+    width: 100%;
+  }
+}
+
+@media screen and (max-width: 576px) {
+  .mod-report {
+    padding: 3mm;
+  }
+  
+  .btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .header-right {
+    flex-direction: column;
+  }
+  
+  .header-right .btn {
+    width: 100%;
   }
 }

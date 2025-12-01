@@ -20,17 +20,20 @@
   font-size: 28px;
 }
 
+/* Improved Stats Section - Blue theme */
 .co-stats {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   font-size: 14px;
 }
 
 .stat-total, .stat-filtered, .stat-courses {
-  padding: 4px 8px;
-  background: #f8f9fa;
-  border-radius: 4px;
-  border: 1px solid #e9ecef;
+  padding: 6px 12px;
+  background: #1976d2;
+  color: white;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
 }
 
 .co-actions {
@@ -38,18 +41,20 @@
   gap: 12px;
 }
 
+/* Blue theme for refresh button */
 .refresh-btn {
   padding: 8px 16px;
-  background: #28a745;
+  background: #1976d2;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  transition: background-color 0.2s ease;
 }
 
 .refresh-btn:hover {
-  background: #218838;
+  background: #1565c0;
 }
 
 /* Filters Section */
@@ -93,22 +98,24 @@
   min-width: 200px;
 }
 
+/* Blue theme for clear filters button */
 .clear-filters-btn {
   padding: 8px 16px;
-  background: #6c757d;
+  background: #64b5f6;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   height: fit-content;
+  transition: background-color 0.2s ease;
 }
 
 .clear-filters-btn:hover {
-  background: #5a6268;
+  background: #42a5f5;
 }
 
-/* Table Styles */
+/* Table Styles - Compact layout */
 .co-table-container {
   background: white;
   border-radius: 8px;
@@ -123,12 +130,13 @@
 
 .co-table th {
   background: #f8f9fa;
-  padding: 16px 12px;
+  padding: 14px 12px;
   text-align: left;
   font-weight: 600;
   color: #495057;
   border-bottom: 2px solid #dee2e6;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .sortable-header {
@@ -142,9 +150,10 @@
 }
 
 .co-table td {
-  padding: 16px 12px;
+  padding: 12px;
   border-bottom: 1px solid #e9ecef;
   font-size: 14px;
+  vertical-align: top;
 }
 
 .co-row:hover {
@@ -159,6 +168,7 @@
   border-radius: 4px;
   font-weight: 600;
   font-size: 13px;
+  display: inline-block;
 }
 
 .course-title .title-text {
@@ -169,17 +179,19 @@
 }
 
 .co-number .co-badge {
-  background: #fff3e0;
-  color: #f57c00;
-  padding: 6px 12px;
+  background: #c9ecfc;
+  color: #294973;
+  padding: 4px 10px;
   border-radius: 20px;
   font-weight: 600;
-  font-size: 13px;
-  border: 1px solid #ffe0b2;
+  font-size: 12px;
+  border: 1px solid #e2e2ea;
+  display: inline-block;
 }
 
+/* Shorter description width to make room for buttons */
 .co-description .description-text {
-  max-width: 400px;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -212,57 +224,26 @@
   margin: 20px 0;
 }
 
+/* Blue theme for retry button */
 .retry-btn {
   padding: 8px 16px;
-  background: #007bff;
+  background: #1976d2;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   margin-top: 12px;
+  transition: background-color 0.2s ease;
 }
 
 .retry-btn:hover {
-  background: #0056b3;
+  background: #1565c0;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .co-page {
-    padding: 12px;
-  }
-  
-  .co-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .filters-section {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .search-input {
-    width: 100%;
-  }
-  
-  .course-select {
-    min-width: unset;
-    width: 100%;
-  }
-  
-  .co-table-container {
-    overflow-x: auto;
-  }
-  
-  .co-description .description-text {
-    max-width: 300px;
-  }
-}
-/* Create Button */
+/* Create Button - Blue theme */
 .create-btn {
   padding: 10px 16px;
-  background: #28a745;
+  background: #1976d2;
   color: white;
   border: none;
   border-radius: 6px;
@@ -270,10 +251,11 @@
   font-size: 14px;
   font-weight: 500;
   margin-right: 10px;
+  transition: background-color 0.2s ease;
 }
 
 .create-btn:hover {
-  background: #218838;
+  background: #1565c0;
 }
 
 /* Form Modal */
@@ -332,8 +314,8 @@
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.25);
 }
 
 .form-group textarea {
@@ -355,7 +337,7 @@
   margin-top: 25px;
 }
 
-/* Buttons */
+/* Buttons - Blue theme */
 .btn {
   padding: 8px 16px;
   border: none;
@@ -363,73 +345,123 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease;
 }
 
 .btn-primary {
-  background: #007bff;
+  background: #1976d2;
   color: white;
 }
 
 .btn-primary:hover {
-  background: #0056b3;
+  background: #1565c0;
 }
 
 .btn-secondary {
-  background: #6c757d;
+  background: #64b5f6;
   color: white;
 }
 
 .btn-secondary:hover {
-  background: #545b62;
+  background: #42a5f5;
 }
 
+/* Compact edit/delete buttons */
 .btn-edit {
-  background: #ffc107;
+  background: #edc15a;
   color: #212529;
-  padding: 6px 12px;
-  font-size: 13px;
-  margin-right: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  margin-right: 5px;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
 }
 
 .btn-edit:hover {
-  background: #e0a800;
+  background: #e59d20;
 }
 
 .btn-delete {
-  background: #dc3545;
+  background: #da2d3e;
   color: white;
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
 }
 
 .btn-delete:hover {
-  background: #c82333;
+  background: #8f0011;
 }
 
-/* Actions Column */
+/* Actions Column - Fixed width to prevent wrapping */
 .actions {
-  width: 150px;
+  width: 140px;
   text-align: center;
+  white-space: nowrap;
+}
+
+/* Read-only input style for edit form */
+.readonly-input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f9fa;
+  color: #6c757d;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* No Data State */
 .no-data button {
   background: none;
   border: none;
-  color: #007bff;
+  color: #1976d2;
   cursor: pointer;
   text-decoration: underline;
   padding: 0;
   margin-left: 5px;
+  transition: color 0.2s ease;
 }
 
 .no-data button:hover {
-  color: #0056b3;
+  color: #1565c0;
 }
 
-/* Responsive Design for Actions */
+/* Responsive Design */
 @media (max-width: 768px) {
+  .co-page {
+    padding: 12px;
+  }
+  
+  .co-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filters-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-input {
+    width: 100%;
+  }
+  
+  .course-select {
+    min-width: unset;
+    width: 100%;
+  }
+  
+  .co-table-container {
+    overflow-x: auto;
+  }
+  
+  .co-description .description-text {
+    max-width: 200px;
+  }
+  
   .actions {
     width: 120px;
   }
@@ -437,7 +469,7 @@
   .btn-edit,
   .btn-delete {
     padding: 4px 8px;
-    font-size: 12px;
+    font-size: 11px;
     margin-right: 4px;
   }
   

@@ -1,10 +1,12 @@
 import React, { useState, useContext, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../components/AuthProvider';
 import courseAPI from '../../api/course.api';
 import './Courses.css';
 
 const Courses = () => {
   const auth = useContext(AuthContext);
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -14,7 +16,7 @@ const Courses = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
   const [selectedCourses, setSelectedCourses] = useState([]);
-  const [viewingCourse, setViewingCourse] = useState(null); // Modal view state
+  const [viewingCourse, setViewingCourse] = useState(null);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -115,7 +117,18 @@ const Courses = () => {
 
   // Get sorted courses
   const getSortedCourses = () => {
-    return courseAPI.sortCourses(courses, sortField, sortDirection);
+    if (courseAPI.sortCourses) {
+      return courseAPI.sortCourses(courses, sortField, sortDirection);
+    }
+    
+    return [...courses].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
   };
 
   // Reset to show all courses
@@ -159,7 +172,7 @@ const Courses = () => {
     if (!formData.title.trim()) errors.title = 'Course title is required';
     if (!formData.syllabus.trim()) errors.syllabus = 'Syllabus is required';
     
-    if (!courseAPI.validateLTP(formData.l, formData.t, formData.p)) {
+    if (courseAPI.validateLTP && !courseAPI.validateLTP(formData.l, formData.t, formData.p)) {
       errors.ltp = 'LTP hours must be between 0-9';
     }
 
@@ -288,27 +301,42 @@ const Courses = () => {
   return (
     <div className="courses-management">
       <div className="courses-header">
-        <h1>Course Management</h1>
-        <div className="courses-actions">
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              resetForm();
-              setShowForm(true);
-            }}
-            disabled={loading}
-          >
-            + Add Course
-          </button>
-          {selectedCourses.length > 0 && (
+        <div className="header-left">
+          <h1>Course Management</h1>
+          <div className="courses-stats">
+            <span className="stat-total">Total: {pagination.total}</span>
+            <span className="stat-showing">Showing: {sortedCourses.length}</span>
+            <span className="stat-page">Page: {pagination.page}/{pagination.totalPages}</span>
+          </div>
+        </div>
+        <div className="header-right">
+          <div className="courses-actions">
             <button
-              className="btn btn-danger"
-              onClick={handleBulkDelete}
+              className="btn btn-primary"
+              onClick={() => {
+                resetForm();
+                setShowForm(true);
+              }}
               disabled={loading}
             >
-              Delete Selected ({selectedCourses.length})
+              + Add Course
             </button>
-          )}
+            {selectedCourses.length > 0 && (
+              <button
+                className="btn btn-danger"
+                onClick={handleBulkDelete}
+                disabled={loading}
+              >
+                Delete Selected ({selectedCourses.length})
+              </button>
+            )}
+            <button 
+              onClick={() => navigate('/admin/dashboard')} 
+              className="btn btn-secondary"
+            >
+              ← Dashboard
+            </button>
+          </div>
         </div>
       </div>
 
@@ -348,6 +376,7 @@ const Courses = () => {
 
         {/* Pagination Limit Selector */}
         <div className="pagination-controls">
+          <label>Rows per page:</label>
           <select 
             value={pagination.limit} 
             onChange={(e) => handleLimitChange(e.target.value)}
@@ -369,11 +398,12 @@ const Courses = () => {
             <table className="courses-table">
               <thead>
                 <tr>
-                  <th>
+                  <th className="select-col">
                     <input
                       type="checkbox"
                       onChange={handleSelectAll}
                       checked={selectedCourses.length > 0 && selectedCourses.length === courses.length}
+                      disabled={courses.length === 0}
                     />
                   </th>
                   <th 
@@ -395,13 +425,13 @@ const Courses = () => {
                     L-T-P {sortField === 'l' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th>Syllabus</th>
-                  <th>Actions</th>
+                  <th className="actions-col">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedCourses.map(course => (
                   <tr key={course.course_id} className={selectedCourses.includes(course.course_id) ? 'selected' : ''}>
-                    <td>
+                    <td className="select-col">
                       <input
                         type="checkbox"
                         checked={selectedCourses.includes(course.course_id)}
@@ -410,7 +440,9 @@ const Courses = () => {
                     </td>
                     <td className="course-code">{course.code}</td>
                     <td className="course-title">{course.title}</td>
-                    <td className="course-ltp">{courseAPI.formatLTP(course)}</td>
+                    <td className="course-ltp">
+                      {courseAPI.formatLTP ? courseAPI.formatLTP(course) : `${course.l}-${course.t}-${course.p}`}
+                    </td>
                     <td className="syllabus-cell">
                       {course.syllabus && course.syllabus.length > 100 
                         ? `${course.syllabus.substring(0, 100)}...`
@@ -419,20 +451,23 @@ const Courses = () => {
                     </td>
                     <td className="actions-cell">
                       <button
-                        className="btn btn-sm btn-view"
+                        className="btn btn-view"
                         onClick={() => handleView(course)}
+                        title="View Details"
                       >
                         View
                       </button>
                       <button
-                        className="btn btn-sm btn-edit"
+                        className="btn btn-edit"
                         onClick={() => handleEdit(course)}
+                        title="Edit Course"
                       >
                         Edit
                       </button>
                       <button
-                        className="btn btn-sm btn-delete"
+                        className="btn btn-delete"
                         onClick={() => handleDelete(course.course_id)}
+                        title="Delete Course"
                       >
                         Delete
                       </button>
@@ -444,7 +479,16 @@ const Courses = () => {
 
             {courses.length === 0 && !loading && (
               <div className="no-courses">
-                No courses found
+                <p>No courses found</p>
+                <button 
+                  onClick={() => {
+                    resetForm();
+                    setShowForm(true);
+                  }}
+                  className="btn btn-primary"
+                >
+                  Create your first course
+                </button>
               </div>
             )}
           </div>
@@ -457,20 +501,41 @@ const Courses = () => {
                 disabled={pagination.page === 1 || loading}
                 className="btn btn-pagination"
               >
-                Previous
+                ← Previous
               </button>
               
-              <span className="pagination-info">
-                Page {pagination.page} of {pagination.totalPages} 
-                ({pagination.total} total courses)
-              </span>
+              <div className="pagination-pages">
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 2) {
+                    pageNum = pagination.totalPages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      disabled={pageNum === pagination.page || loading}
+                      className={`btn btn-page ${pageNum === pagination.page ? 'active' : ''}`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
               
               <button
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page === pagination.totalPages || loading}
                 className="btn btn-pagination"
               >
-                Next
+                Next →
               </button>
             </div>
           )}
@@ -481,7 +546,15 @@ const Courses = () => {
       {showForm && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2>{editingCourse ? 'Edit Course' : 'Create New Course'}</h2>
+            <div className="modal-header">
+              <h2>{editingCourse ? 'Edit Course' : 'Create New Course'}</h2>
+              <button 
+                onClick={() => setShowForm(false)} 
+                className="close-modal-btn"
+              >
+                ×
+              </button>
+            </div>
             
             <form onSubmit={handleSubmit}>
               <div className="form-group">
@@ -493,6 +566,7 @@ const Courses = () => {
                   onChange={handleFormChange}
                   className={formErrors.code ? 'error' : ''}
                   placeholder="e.g., CS101"
+                  disabled={editingCourse}
                 />
                 {formErrors.code && <span className="error-text">{formErrors.code}</span>}
               </div>
@@ -564,10 +638,18 @@ const Courses = () => {
               {formErrors.ltp && <span className="error-text">{formErrors.ltp}</span>}
 
               <div className="form-actions">
-                <button type="button" onClick={() => setShowForm(false)}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowForm(false)} 
+                  className="btn btn-secondary"
+                >
                   Cancel
                 </button>
-                <button type="submit" disabled={loading}>
+                <button 
+                  type="submit" 
+                  disabled={loading} 
+                  className="btn btn-primary"
+                >
                   {loading ? 'Saving...' : (editingCourse ? 'Update Course' : 'Create Course')}
                 </button>
               </div>
@@ -580,37 +662,47 @@ const Courses = () => {
       {viewingCourse && (
         <div className="modal-overlay">
           <div className="modal-content view-modal">
-            <h2>Course Details</h2>
+            <div className="modal-header">
+              <h2>Course Details</h2>
+              <button 
+                onClick={() => setViewingCourse(null)} 
+                className="close-modal-btn"
+              >
+                ×
+              </button>
+            </div>
             
             <div className="course-details">
               <div className="detail-row">
                 <label>Course Code:</label>
-                <span>{viewingCourse.code}</span>
+                <span className="detail-value">{viewingCourse.code}</span>
               </div>
               
               <div className="detail-row">
                 <label>Course Title:</label>
-                <span>{viewingCourse.title}</span>
+                <span className="detail-value">{viewingCourse.title}</span>
               </div>
               
               <div className="detail-row">
                 <label>L-T-P Hours:</label>
-                <span className="ltp-badge">{courseAPI.formatLTP(viewingCourse)}</span>
+                <span className="ltp-badge">
+                  {courseAPI.formatLTP ? courseAPI.formatLTP(viewingCourse) : `${viewingCourse.l}-${viewingCourse.t}-${viewingCourse.p}`}
+                </span>
               </div>
               
               <div className="detail-row">
                 <label>Lecture Hours:</label>
-                <span>{viewingCourse.l}</span>
+                <span className="detail-value">{viewingCourse.l}</span>
               </div>
               
               <div className="detail-row">
                 <label>Tutorial Hours:</label>
-                <span>{viewingCourse.t}</span>
+                <span className="detail-value">{viewingCourse.t}</span>
               </div>
               
               <div className="detail-row">
                 <label>Practical Hours:</label>
-                <span>{viewingCourse.p}</span>
+                <span className="detail-value">{viewingCourse.p}</span>
               </div>
               
               <div className="detail-row full-width">
@@ -622,12 +714,12 @@ const Courses = () => {
               
               <div className="detail-row">
                 <label>Created:</label>
-                <span>{new Date(viewingCourse.created_at).toLocaleDateString()}</span>
+                <span className="detail-value">{new Date(viewingCourse.created_at).toLocaleDateString()}</span>
               </div>
               
               <div className="detail-row">
                 <label>Last Updated:</label>
-                <span>{new Date(viewingCourse.updated_at).toLocaleDateString()}</span>
+                <span className="detail-value">{new Date(viewingCourse.updated_at).toLocaleDateString()}</span>
               </div>
             </div>
 

@@ -205,12 +205,6 @@ const LoginPage = () => {
                 </button>
               </p>
             </div>
-
-            <div className="auth-info">
-              <p>
-                <strong>Note:</strong> Your account role is determined by registration
-              </p>
-            </div>
           </>
         ) : (
           <div className="forgot-password-section">

@@ -1,10 +1,10 @@
-// src/frontend/src/pages/moderator/Dashboard.js
+// src/frontend/src/pages/moderator/Dashboard.jsx
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../../components/AuthProvider';
 import ModeratorHeader from '../../components/ModeratorHeader';
 import ModeratorSidebar from '../../components/ModeratorSidebar';
 import ModeratorCourses from './Courses';
-import ModeratorCO from './CO';
+import ModeratorCO from './COs';
 import PaperList from './moderation/PaperList';
 import './Dashboard.css';
 
