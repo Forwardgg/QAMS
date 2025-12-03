@@ -38,39 +38,27 @@ export const AuthProvider = ({ children }) => {
 
   // Keep internal user state synchronized with authService storage.
   useEffect(() => {
-    // on mount, try to populate user from storage (already done by useState)
-    let mounted = true;
-    (async () => {
-      // If token exists but no user stored, try fetching profile from server
-      try {
-        if (mounted && isAuthenticated && !authService.getUser()) {
-          try {
-            const profileRes = await authAPI.getProfile();
-            // some implementations return { data } or user directly. handle both.
-            const profile = profileRes?.data ?? profileRes;
-            authService.setUser(profile);
-            if (mounted) setUser(profile);
-          } catch (err) {
-            // can't fetch profile — leave user null (UI will redirect to login if needed)
-            // console.warn("Could not fetch profile during init", err);
-          }
-        }
-      } finally {
-        if (mounted) setIsInitializing(false);
-      }
-    })();
+  let mounted = true;
+  
+  // Initialize from localStorage (already done by useState)
+  // No profile fetching needed - user is stored during login
+  
+  // Subscribe to auth-change events (authService emits them)
+  const handler = () => {
+    setUser(authService.getUser());
+  };
+  authService.onChange(handler);
 
-    // Subscribe to auth-change events (authService emits them)
-    const handler = () => {
-      setUser(authService.getUser());
-    };
-    authService.onChange(handler);
+  // Mark initialization as complete
+  if (mounted) {
+    setIsInitializing(false);
+  }
 
-    return () => {
-      mounted = false;
-      authService.offChange(handler);
-    };
-  }, []); // run once on mount
+  return () => {
+    mounted = false;
+    authService.offChange(handler);
+  };
+}, []); // run once on mount
 
   /**
    * login:

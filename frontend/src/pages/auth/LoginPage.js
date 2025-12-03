@@ -3,6 +3,7 @@ import React, { useState, useContext } from 'react';
 import './AuthPages.css';
 import { useNavigate } from 'react-router-dom';
 import AuthContext from '../../components/AuthProvider';
+import { getDefaultRoute } from '../../services/roleService';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -53,7 +54,6 @@ const LoginPage = () => {
     }
 
     try {
-      // Use AuthProvider's login method
       const result = await auth.login({
         email: formData.email,
         password: formData.password,
@@ -67,22 +67,14 @@ const LoginPage = () => {
         return;
       }
 
-      // Login successful - AuthProvider handles storage and state
-      // Redirect based on user role from AuthContext
-      const user = auth.user;
+      // Get user from result (backend returns {token, user})
+      const user = result.data?.user;
+      
+      // Navigate based on user role
       if (user?.role) {
-        const role = user.role.toLowerCase();
-        
-        // Navigate to appropriate dashboard
-        const dashboardPaths = {
-          admin: '/admin/dashboard',
-          instructor: '/instructor/dashboard', 
-          moderator: '/moderator/dashboard'
-        };
-        
-        navigate(dashboardPaths[role] || '/');
+        const dashboardPath = getDefaultRoute(user.role);
+        navigate(dashboardPath);
       } else {
-        // Fallback if user role not available
         navigate('/');
       }
 
@@ -107,14 +99,9 @@ const LoginPage = () => {
     }
 
     try {
-      // Use AuthProvider if it has forgotPassword method, otherwise use authAPI directly
-      if (auth.forgotPassword) {
-        await auth.forgotPassword(emailToUse);
-      } else {
-        // Import authAPI here to avoid circular dependency
-        const authAPI = await import('../../api/auth.api');
-        await authAPI.default.forgotPassword(emailToUse);
-      }
+      // Import authAPI dynamically to avoid circular dependency
+      const authAPI = await import('../../api/auth.api');
+      await authAPI.default.forgotPassword(emailToUse);
       setForgotMessage('If that email exists, a reset link has been sent.');
     } catch (err) {
       const serverMsg = err?.response?.data?.error || err?.message || 'Could not send reset link';
