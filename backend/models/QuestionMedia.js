@@ -153,11 +153,10 @@ export class QuestionMedia {
         paper_id,
         media_url,
         media_type,
-        caption,
         is_used,
         created_at
       )
-      VALUES ($1, $2, $3, $4, '', false, NOW())
+      VALUES ($1, $2, $3, $4, false, NOW())
       RETURNING media_id, question_id, paper_id, media_url, media_type, created_at
     `;
 
@@ -220,7 +219,7 @@ export class QuestionMedia {
   static async update(mediaId, updates) {
     this._ensureInteger(mediaId, 'Media ID');
 
-    const allowedFields = ['question_id', 'paper_id', 'caption', 'is_used'];
+    const allowedFields = ['question_id', 'paper_id', 'is_used'];
     const setClauses = [];
     const values = [];
     let paramCount = 0;

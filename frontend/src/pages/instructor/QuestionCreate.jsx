@@ -173,62 +173,95 @@ const QuestionCreatePage = () => {
     };
   }, [editor]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!selectedPaper) {
-      setMessage({ type: 'error', text: 'Please select a paper' });
-      return;
-    }
-
-    if (!content_html.trim()) {
-      setMessage({ type: 'error', text: 'Question content is required' });
-      return;
-    }
-
-    // Validate marks
-    let marksValue = null;
-    if (marks.trim() !== '') {
-      const marksNum = parseInt(marks, 10);
-      if (isNaN(marksNum) || marksNum < 0) {
-        setMessage({ type: 'error', text: 'Marks must be a non-negative number' });
-        return;
-      }
-      marksValue = marksNum;
-    }
-
-    setIsLoading(true);
-    setMessage({ type: '', text: '' });
-
+  const safeEditorClear = () => {
+  if (editor) {
     try {
-      const submissionData = {
-        content_html,
-        paper_id: parseInt(selectedPaper),
-        co_id: selectedCO ? parseInt(selectedCO) : null,
-        marks: marksValue // NEW: Add marks to submission data
-      };
-
-      await questionAPI.create(submissionData);
+      // IMPORTANT: Remove focus from editor first
+      editor.editing.view.focus();
       
-      setMessage({ 
-        type: 'success', 
-        text: 'Question created successfully!' 
-      });
-      
-      // Reset form
-      setContentHtml('');
-      setMarks(''); // NEW: Reset marks field
-      if (editor) editor.setData('');
-      
+      // Wait a tiny bit before clearing
+      setTimeout(() => {
+        try {
+          // Clear selection first
+          editor.model.change(writer => {
+            const selection = editor.model.document.selection;
+            writer.setSelection(selection.getFirstPosition());
+          });
+          
+          // Then clear data
+          editor.setData('');
+        } catch (err) {
+          console.warn('Error in safe clear:', err);
+        }
+      }, 50);
     } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: error.message || 'Failed to create question' 
-      });
-    } finally {
-      setIsLoading(false);
+      console.warn('Safe editor clear failed:', error);
     }
-  };
+  }
+};
+
+// Update the success part of handleSubmit:
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (!selectedPaper) {
+    setMessage({ type: 'error', text: 'Please select a paper' });
+    return;
+  }
+
+  if (!content_html.trim()) {
+    setMessage({ type: 'error', text: 'Question content is required' });
+    return;
+  }
+
+  // Validate marks
+  let marksValue = null;
+  if (marks.trim() !== '') {
+    const marksNum = parseInt(marks, 10);
+    if (isNaN(marksNum) || marksNum < 0) {
+      setMessage({ type: 'error', text: 'Marks must be a non-negative number' });
+      return;
+    }
+    marksValue = marksNum;
+  }
+
+  setIsLoading(true);
+  setMessage({ type: '', text: '' });
+
+  try {
+    const submissionData = {
+      content_html,
+      paper_id: parseInt(selectedPaper),
+      co_id: selectedCO ? parseInt(selectedCO) : null,
+      marks: marksValue
+    };
+
+    await questionAPI.create(submissionData);
+    
+    setMessage({ 
+      type: 'success', 
+      text: 'Question created successfully!' 
+    });
+    
+    // FIX: Use safe clear for images
+    setContentHtml('');
+    setMarks('');
+    
+    // Don't clear CO if you want to keep it
+    // setSelectedCO('');
+    
+    // Use safe clear instead of direct editor.setData('')
+    safeEditorClear();
+    
+  } catch (error) {
+    setMessage({ 
+      type: 'error', 
+      text: error.message || 'Failed to create question' 
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleCancel = () => {
     navigate('/instructor/questions');

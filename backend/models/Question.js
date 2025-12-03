@@ -307,7 +307,7 @@ export class Question {
 
   static async getQuestionMedia(questionId) {
     const query = `
-      SELECT media_id, media_url, media_type, caption, is_used, created_at
+      SELECT media_id, media_url, media_type, is_used, created_at
       FROM question_media
       WHERE question_id = $1 AND deleted_at IS NULL
       ORDER BY created_at
