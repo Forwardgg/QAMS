@@ -1,7 +1,7 @@
 // controllers/PDFController.js
 import Joi from 'joi';
 import { pool } from '../config/db.js';
-import PDFGenerationService from '../services/PdfGenerationService.js';
+import PDFGenerationService from '../services/PDFGenerationService.js';
 
 const pdfService = new PDFGenerationService({
   baseUrl: process.env.APP_BASE_URL || null,

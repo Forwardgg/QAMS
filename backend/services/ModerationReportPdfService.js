@@ -1,4 +1,4 @@
-import PDFGenerationService from './PdfGenerationService.js';
+import PDFGenerationService from './PDFGenerationService.js';
 
 class ModerationReportPdfService {
   constructor(config = {}) {
