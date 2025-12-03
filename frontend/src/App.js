@@ -1,4 +1,5 @@
 // src/App.js
+import AuthContext from "./components/AuthProvider";
 import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./components/AuthProvider";
@@ -215,6 +216,3 @@ function InnerDashboardRedirect() {
       return <Navigate to="/" replace />;
   }
 }
-
-// Import AuthContext if not already imported at the top
-import AuthContext from "./components/AuthProvider";

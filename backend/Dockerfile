@@ -6,13 +6,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci --only=production
 
 # Copy source code
 COPY . .
 
-# Create uploads directory if it doesn't exist
-RUN mkdir -p uploads
+# Create uploads directory
+RUN mkdir -p uploads/images/papers uploads/images/questions uploads/temp
 
 # Expose port
 EXPOSE 5000
