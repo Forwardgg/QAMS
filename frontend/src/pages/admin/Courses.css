@@ -26,16 +26,21 @@
 
 .courses-stats {
   display: flex;
-  gap: 20px;
-  color: #6c757d;
+  gap: 12px;
   font-size: 14px;
 }
 
 .courses-stats span {
-  padding: 4px 12px;
-  background: white;
-  border-radius: 4px;
-  border: 1px solid #dee2e6;
+  padding: 6px 12px;
+  background: #1976d2;
+  color: white;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.courses-stats span:hover {
+  background: #1565c0;
 }
 
 .courses-actions {
@@ -180,6 +185,14 @@
   font-family: 'Courier New', monospace;
   font-weight: 500;
   color: #495057;
+}
+
+/* Credit Column Styles */
+.course-credit {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: center;
 }
 
 .syllabus-cell {
@@ -527,6 +540,18 @@
   font-weight: 500;
   font-size: 14px;
   font-family: 'Courier New', monospace;
+}
+
+/* Credit badge in view modal */
+.credit-badge {
+  background: #c9ecfc;
+  color: #294973;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid #e2e2ea;
+  display: inline-block;
 }
 
 .syllabus-content {

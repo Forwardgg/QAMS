@@ -12,7 +12,6 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  // Removed: const [showCO, setShowCO] = useState(false);
 
   useEffect(() => {
     if (paperId) {
@@ -20,64 +19,63 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
     }
   }, [paperId]);
 
-  // Replace the loadPaperDetails function with this corrected version:
-const loadPaperDetails = async () => {
-  setLoading(true);
-  try {
-    const response = await moderatorAPI.getPaperDetails(paperId);
-    const data = response.data;
-    
-    setPaper(data.paper);
-    
-    // Check if main response has CO data
-    const hasCO = data.questions?.some(q => q.co_number || q.co_id);
-    console.log('Has CO data in main response?', hasCO);
-    
-    if (hasCO) {
-      // Use CO data from main response
-      setQuestions(data.questions || []);
-    } else {
-      // Try to get CO data from breakdown
-      try {
-        const coResponse = await moderatorAPI.getCOBreakdown(paperId);
-        console.log('CO Breakdown response:', coResponse);
-        
-        if (coResponse.success && coResponse.data) {
-          // Create a mapping of question_id to CO data
-          const questionToCOMap = {};
-          coResponse.data.forEach(co => {
-            if (co.questions) {
-              co.questions.forEach(q => {
-                questionToCOMap[q.question_id] = {
-                  co_number: co.co_number,
-                  co_description: co.co_description
-                };
-              });
-            }
-          });
+  const loadPaperDetails = async () => {
+    setLoading(true);
+    try {
+      const response = await moderatorAPI.getPaperDetails(paperId);
+      const data = response.data;
+      
+      setPaper(data.paper);
+      
+      // Check if main response has CO data
+      const hasCO = data.questions?.some(q => q.co_number || q.co_id);
+      console.log('Has CO data in main response?', hasCO);
+      
+      if (hasCO) {
+        // Use CO data from main response
+        setQuestions(data.questions || []);
+      } else {
+        // Try to get CO data from breakdown
+        try {
+          const coResponse = await moderatorAPI.getCOBreakdown(paperId);
+          console.log('CO Breakdown response:', coResponse);
           
-          // Map CO data to questions
-          const questionsWithCO = data.questions.map(question => {
-            const coData = questionToCOMap[question.question_id];
-            return coData ? { ...question, ...coData } : question;
-          });
-          
-          console.log('Questions with CO mapped:', questionsWithCO);
-          setQuestions(questionsWithCO);
-        } else {
+          if (coResponse.success && coResponse.data) {
+            // Create a mapping of question_id to CO data
+            const questionToCOMap = {};
+            coResponse.data.forEach(co => {
+              if (co.questions) {
+                co.questions.forEach(q => {
+                  questionToCOMap[q.question_id] = {
+                    co_number: co.co_number,
+                    co_description: co.co_description
+                  };
+                });
+              }
+            });
+            
+            // Map CO data to questions
+            const questionsWithCO = data.questions.map(question => {
+              const coData = questionToCOMap[question.question_id];
+              return coData ? { ...question, ...coData } : question;
+            });
+            
+            console.log('Questions with CO mapped:', questionsWithCO);
+            setQuestions(questionsWithCO);
+          } else {
+            setQuestions(data.questions || []);
+          }
+        } catch (coError) {
+          console.log('CO breakdown failed, using questions without CO data');
           setQuestions(data.questions || []);
         }
-      } catch (coError) {
-        console.log('CO breakdown failed, using questions without CO data');
-        setQuestions(data.questions || []);
       }
+    } catch (error) {
+      console.error('Failed to load paper details:', error);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Failed to load paper details:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleQuestionStatusChange = async (questionId, newStatus) => {
     try {
@@ -149,8 +147,6 @@ const loadPaperDetails = async () => {
         </div>
         
         <div className="header-actions">
-          {/* REMOVED: The Show/Hide CO button */}
-          
           {paper.status === 'submitted' && (
             <button className="btn btn-start" onClick={handleStartModeration} disabled={saving}>
               {saving ? 'Starting...' : 'Start Moderation'}
@@ -178,7 +174,8 @@ const loadPaperDetails = async () => {
         <h3>Questions Review</h3>
         <p className="instructions">
           Review each question and mark as ✅ Approved or ❌ Change Requested
-          {hasCOData && ' • CO badges show Course Outcomes'} {/* Updated this line */}
+          {hasCOData && ' • CO badges show Course Outcomes'}
+          {' • Marks show question weightage'}
         </p>
 
         <div className="questions-container">
@@ -190,6 +187,12 @@ const loadPaperDetails = async () => {
                 <div className="question-header">
                   <div className="question-meta">
                     <span className="question-number">Q{index + 1}</span>
+                    {/* NEW: Add marks display */}
+                    {question.marks !== null && question.marks !== undefined && (
+                      <span className="marks-badge" title={`Marks: ${question.marks}`}>
+                        [{question.marks} marks]
+                      </span>
+                    )}
                     {/* ALWAYS show CO badge if available */}
                     {coNumber && <span className="co-badge">CO{coNumber}</span>}
                     <span className={`question-status ${getStatusBadgeClass(question.status)}`}>

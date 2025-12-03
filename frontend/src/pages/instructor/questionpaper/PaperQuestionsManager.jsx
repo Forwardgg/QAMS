@@ -1,4 +1,3 @@
-// frontend/src/pages/instructor/questionpaper/PaperQuestionsManager.jsx
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -17,6 +16,37 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+// Import MUI Icons
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  ArrowBack as ArrowBackIcon,
+  Description as DescriptionIcon,
+  Warning as WarningIcon,
+  Add as AddIcon,
+  ContentCopy as ContentCopyIcon,
+  Refresh as RefreshIcon,
+  Download as DownloadIcon,
+  Visibility as VisibilityIcon,
+  Close as CloseIcon,
+  DragIndicator as DragIndicatorIcon,
+  CheckCircle as CheckCircleIcon,
+  Circle as CircleIcon,
+  KeyboardDoubleArrowLeft as KeyboardDoubleArrowLeftIcon,
+  KeyboardDoubleArrowRight as KeyboardDoubleArrowRightIcon,
+  FirstPage as FirstPageIcon,
+  LastPage as LastPageIcon,
+  ArrowForwardIos as ArrowForwardIosIcon,
+  ArrowBackIos as ArrowBackIosIcon,
+  Search as SearchIcon,
+  Sort as SortIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  FileCopy as FileCopyIcon,
+  Report as ReportIcon
+} from '@mui/icons-material';
+
 import questionAPI from '../../../api/question.api';
 import questionPaperAPI from '../../../api/questionPaper.api';
 import moderatorAPI from '../../../api/moderator.api';
@@ -25,16 +55,8 @@ import ModerationReportModal from './ModerationReportModal';
 import authService from '../../../services/authService';
 import './PaperQuestionsManager.css';
 
-/**
- * Notes:
- * - Uses DB-consistent status string 'change_requested'
- * - actionsAllowed controls full editing surface:
- *    - when true: sortable UI (drag/drop), edit/delete/add enabled
- *    - when false: non-sortable UI, edit/delete/add disabled
- */
-
 /* ---------------------------
-   Sortable Question Item (uses dnd-kit)
+   Sortable Question Item
    --------------------------- */
 const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging, actionsAllowed }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: question.question_id });
@@ -70,13 +92,24 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging, a
           title={actionsAllowed ? 'Drag to reorder' : 'Reordering disabled for this paper status'}
           aria-hidden={!actionsAllowed}
         >
-          ⋮⋮
+          <DragIndicatorIcon sx={{ fontSize: 20, color: actionsAllowed ? '#6c757d' : '#adb5bd' }} />
         </div>
 
         <strong className="question-number">Q{question.sequence_number ?? (index + 1)}.</strong>
 
         <div className="question-actions">
-          {needsChanges && <span className="change-indicator" title="Changes requested by moderator">🔄</span>}
+          {/* NEW: Display marks if available */}
+          {question.marks !== null && question.marks !== undefined && (
+  <span className="question-marks-indicator" title={`Marks: ${question.marks}`}>
+    [{question.marks} marks]
+  </span>
+)}
+
+          {needsChanges && (
+            <span className="change-indicator" title="Changes requested by moderator">
+              <WarningIcon sx={{ fontSize: 18, color: '#ffc107' }} />
+            </span>
+          )}
 
           <button
             type="button"
@@ -86,7 +119,8 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging, a
             aria-disabled={!actionsAllowed}
             disabled={!actionsAllowed}
           >
-            ✏️ Edit
+            <EditIcon sx={{ fontSize: 16, marginRight: 1 }} />
+            Edit
           </button>
 
           <button
@@ -97,7 +131,8 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging, a
             aria-disabled={!actionsAllowed}
             disabled={!actionsAllowed}
           >
-            🗑️ Delete
+            <DeleteIcon sx={{ fontSize: 16, marginRight: 1 }} />
+            Delete
           </button>
         </div>
       </div>
@@ -114,7 +149,7 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging, a
 };
 
 /* ---------------------------
-   Non-sortable Question Item (no dnd-kit usage)
+   Non-sortable Question Item
    --------------------------- */
 const NonSortableQuestionItem = ({ question, index, onEdit, onDelete, actionsAllowed }) => {
   const needsChanges = String(question.status || '').toLowerCase() === 'change_requested';
@@ -133,13 +168,24 @@ const NonSortableQuestionItem = ({ question, index, onEdit, onDelete, actionsAll
     <div className={`print-preview-question ${needsChanges ? 'question-needs-changes' : ''}`}>
       <div className="question-header">
         <div className="question-drag-handle drag-disabled" title="Reordering disabled for this paper status" aria-hidden="true">
-          ⋮⋮
+          <DragIndicatorIcon sx={{ fontSize: 20, color: '#adb5bd' }} />
         </div>
 
         <strong className="question-number">Q{question.sequence_number ?? (index + 1)}.</strong>
 
         <div className="question-actions">
-          {needsChanges && <span className="change-indicator" title="Changes requested by moderator">🔄</span>}
+          {/* NEW: Display marks if available */}
+          {question.marks !== null && question.marks !== undefined && (
+  <span className="question-marks-indicator" title={`Marks: ${question.marks}`}>
+    [{question.marks} marks]
+  </span>
+)}
+
+          {needsChanges && (
+            <span className="change-indicator" title="Changes requested by moderator">
+              <WarningIcon sx={{ fontSize: 18, color: '#ffc107' }} />
+            </span>
+          )}
 
           <button
             type="button"
@@ -149,7 +195,8 @@ const NonSortableQuestionItem = ({ question, index, onEdit, onDelete, actionsAll
             aria-disabled={!actionsAllowed}
             disabled={!actionsAllowed}
           >
-            ✏️ Edit
+            <EditIcon sx={{ fontSize: 16, marginRight: 1 }} />
+            Edit
           </button>
 
           <button
@@ -160,7 +207,8 @@ const NonSortableQuestionItem = ({ question, index, onEdit, onDelete, actionsAll
             aria-disabled={!actionsAllowed}
             disabled={!actionsAllowed}
           >
-            🗑️ Delete
+            <DeleteIcon sx={{ fontSize: 16, marginRight: 1 }} />
+            Delete
           </button>
         </div>
       </div>
@@ -222,9 +270,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
-  /* ---------------------------
-     Load moderation data
-     --------------------------- */
   const loadModerationData = async () => {
     try {
       const paperReport = await moderatorAPI.getPaperReport(paperId);
@@ -240,9 +285,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     }
   };
 
-  /* ---------------------------
-     Utility: normalize API array shapes
-     --------------------------- */
   const normalizeArrayResponse = (resp) => {
     if (!resp) return [];
     if (Array.isArray(resp)) return resp;
@@ -258,9 +300,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     return arr.find(p => String(p.paper_id) === String(pid));
   };
 
-  /* ---------------------------
-     Load paper & questions
-     --------------------------- */
   const loadPaperAndQuestions = async () => {
     setIsLoading(true);
     setMessage({ type: '', text: '' });
@@ -313,19 +352,13 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     }
   };
 
-  /* ---------------------------
-     actionsAllowed (DB-consistent)
-     Only allow actions when paper.status is 'submitted' OR 'change_requested'
-     --------------------------- */
+  // FIXED: Changed from 'submitted' to 'draft' to match backend validation
   const actionsAllowed = React.useMemo(() => {
     if (!paper || !paper.status) return false;
     const s = String(paper.status).toLowerCase();
-    return s === 'submitted' || s === 'change_requested';
+    return s === 'draft' || s === 'change_requested';
   }, [paper]);
 
-  /* ---------------------------
-     needsResubmission calculation (DB-consistent)
-     --------------------------- */
   const needsResubmission = React.useMemo(() => {
     return questions.some(q => String(q.status || '').toLowerCase() === 'change_requested');
   }, [questions]);
@@ -334,9 +367,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     return questions.filter(q => String(q.status || '').toLowerCase() === 'change_requested').length;
   }, [questions]);
 
-  /* ---------------------------
-     Resubmit handler
-     --------------------------- */
   const handleResubmitForModeration = async () => {
     if (!needsResubmission) {
       setMessage({ type: 'error', text: 'No changes requested. Paper does not need resubmission.' });
@@ -363,9 +393,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     }
   };
 
-  /* ---------------------------
-     Drag handlers (only used when actionsAllowed)
-     --------------------------- */
   const handleDragStart = (event) => {
     setActiveId(event.active.id);
   };
@@ -414,9 +441,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     }
   };
 
-  /* ---------------------------
-     Update question (edit) - guarded
-     --------------------------- */
   const handleUpdateQuestion = async (updatedQuestion) => {
     if (!actionsAllowed) {
       setMessage({ type: 'error', text: 'Editing questions is disabled for the current paper status.' });
@@ -431,22 +455,39 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         content_html: updatedQuestion.content_html,
         paper_id: updatedQuestion.paper_id,
         co_id: updatedQuestion.co_id ?? null,
+        marks: updatedQuestion.marks ?? null, // NEW: Add marks to payload
       };
 
-      await questionAPI.update(qid, payload);
-
-      setQuestions(prev => prev.map(q => (String(q.question_id) === String(qid) ? { ...q, ...updatedQuestion } : q)));
+      // 1. Update the question
+      const apiResponse = await questionAPI.update(qid, payload);
+      
+      // 2. Get the saved question from response (it might have more data)
+      const savedQuestion = apiResponse?.question || apiResponse;
+      
+      // 3. FETCH FRESH DATA to get complete CO info
+      const freshQuestion = await questionAPI.getById(qid);
+      
+      // 4. Update state with complete question data
+      setQuestions(prev => prev.map(q => 
+        String(q.question_id) === String(qid) 
+          ? { ...q, ...savedQuestion, ...freshQuestion.question }
+          : q
+      ));
+      
       setEditingQuestion(null);
       setMessage({ type: 'success', text: 'Question updated successfully!' });
+      
+      // 5. Optional: Force refresh after a short delay
+      setTimeout(() => {
+        loadPaperAndQuestions();
+      }, 500);
+      
     } catch (err) {
       console.error('Error updating question:', err);
       setMessage({ type: 'error', text: err?.message || 'Failed to update question' });
     }
   };
 
-  /* ---------------------------
-     Delete question (guarded)
-     --------------------------- */
   const handleDeleteQuestion = async (questionId) => {
     if (!actionsAllowed) {
       setMessage({ type: 'error', text: 'Deleting questions is disabled for the current paper status.' });
@@ -467,11 +508,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     }
   };
 
-  /* ---------------------------
-     Navigation helpers
-     --------------------------- */
   const handleAddNewQuestion = () => {
-    // Block add if actions disallowed
     if (!actionsAllowed) {
       setMessage({ type: 'error', text: 'Adding questions is disabled for the current paper status.' });
       return;
@@ -485,9 +522,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     navigate('/instructor/papers');
   };
 
-  /* ---------------------------
-     Export PDF (unchanged)
-     --------------------------- */
   const exportPdf = async () => {
     if (!paperId) return;
 
@@ -585,9 +619,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     }
   };
 
-  /* ---------------------------
-     Render
-     --------------------------- */
   if (isLoading) {
     return (
       <div className="paper-questions-manager">
@@ -609,26 +640,32 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       {/* Header */}
       <div className="manager-header">
         <div className="header-left">
-          <button type="button" onClick={handleBackToPapers} className="btn-back">← Back to Papers</button>
+          <button type="button" onClick={handleBackToPapers} className="btn-back">
+            <ArrowBackIcon sx={{ fontSize: 18, marginRight: 1 }} />
+            Back to Papers
+          </button>
           <h1>{paper.title} - Questions</h1>
           <p className="paper-info">
             Course: {paper.course_code} | Status: {paper.status} | Questions: {questions.length}
             {isReordering && <span className="reordering-indicator"> • Updating order...</span>}
           </p>
-          {!actionsAllowed && (
-            <p className="readonly-note" aria-live="polite" style={{ color: '#6b7280', marginTop: 6 }}>
-              Editing, deleting, adding and reordering are disabled for this paper status.
-              (Allowed only when paper is <strong>submitted</strong> or <strong>change_requested</strong>)
+          {!actionsAllowed && paper?.status && (
+            <p className="readonly-note" aria-live="polite">
+              {paper.status === 'submitted' && 'Paper is submitted for moderation. Editing is disabled until moderator review is complete.'}
+              {paper.status === 'under_review' && 'Paper is under review by moderators. Editing is disabled during review.'}
+              {paper.status === 'approved' && 'Paper is approved. Editing is disabled for approved papers.'}
             </p>
           )}
         </div>
 
         <div className="header-actions">
           <button type="button" onClick={handleAddNewQuestion} className="btn-primary" disabled={isLoading || !actionsAllowed}>
-            + Add New Question
+            <AddIcon sx={{ fontSize: 18, marginRight: 1 }} />
+            Add New Question
           </button>
           <button type="button" onClick={exportPdf} className="btn-secondary" disabled={isGeneratingPdf}>
-            {isGeneratingPdf ? 'Generating PDF…' : '📄 Export PDF'}
+            <DownloadIcon sx={{ fontSize: 18, marginRight: 1 }} />
+            {isGeneratingPdf ? 'Generating PDF…' : 'Export PDF'}
           </button>
         </div>
       </div>
@@ -636,10 +673,13 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       {/* Messages */}
       {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
-      {/* Moderation report btn */}
+      {/* Moderation report button */}
       {moderationData && (
         <div className="moderation-report-section">
-          <button className="btn-moderation-report" onClick={() => setShowModerationReport(true)}>📋 View Moderation Report</button>
+          <button className="btn-moderation-report" onClick={() => setShowModerationReport(true)}>
+            <ReportIcon sx={{ fontSize: 18, marginRight: 1 }} />
+            View Moderation Report
+          </button>
         </div>
       )}
 
@@ -647,13 +687,16 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       {needsResubmission && (
         <div className="moderation-alert">
           <div className="alert-content">
-            <div className="alert-icon">⚠️</div>
             <div className="alert-text">
-              <strong>Moderation Required</strong>
-              <p>{rejectedQuestionsCount} question(s) need changes. Please review and correct them before resubmitting.</p>
+              <strong>
+                <WarningIcon sx={{ fontSize: 18, color: '#856404', marginRight: 1, verticalAlign: 'middle' }} />
+                Moderation Required
+              </strong>
+              <p>{rejectedQuestionsCount} question(s) need changes.</p>
             </div>
             <button className="btn-resubmit" onClick={handleResubmitForModeration} disabled={isResubmitting}>
-              {isResubmitting ? 'Resubmitting...' : '📤 Resubmit for Moderation'}
+              <RefreshIcon sx={{ fontSize: 18, marginRight: 1 }} />
+              {isResubmitting ? 'Resubmitting...' : 'Resubmit for Moderation'}
             </button>
           </div>
         </div>
@@ -681,6 +724,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
           <div className="no-questions">
             <p>No questions added to this paper yet.</p>
             <button type="button" onClick={handleAddNewQuestion} className="btn-primary" disabled={isLoading || !actionsAllowed}>
+              <AddIcon sx={{ fontSize: 18, marginRight: 1 }} />
               Create First Question
             </button>
           </div>

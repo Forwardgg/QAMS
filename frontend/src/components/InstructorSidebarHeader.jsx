@@ -3,6 +3,21 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthContext } from './AuthProvider';
 import './AdminSidebarHeader.css';
 
+// Import MUI Icons
+import {
+  Dashboard as DashboardIcon,
+  MenuBook as MenuBookIcon,
+  Flag as FlagIcon,
+  Description as DescriptionIcon,
+  Add as AddIcon,
+  ChevronLeft,
+  ChevronRight,
+  KeyboardArrowUp,
+  KeyboardArrowDown,
+  Logout as LogoutIcon,
+  School
+} from '@mui/icons-material';
+
 const InstructorSidebarHeader = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -11,13 +26,38 @@ const InstructorSidebarHeader = () => {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // INSTRUCTOR menu items configuration
+  // INSTRUCTOR menu items configuration with MUI Icons
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/instructor/dashboard' },
-    { id: 'courses', label: 'My Courses', icon: '📘', path: '/instructor/courses' },
-    { id: 'CO', label: 'Course Outcomes', icon: '🎯', path: '/instructor/cos' },
-    { id: 'questionCreate', label: 'Create Question', icon: '➕', path: '/instructor/questions/create' },
-    { id: 'questionPaper', label: 'Question Papers', icon: '📝', path: '/instructor/question-papers' }
+    { 
+      id: 'dashboard', 
+      label: 'Dashboard', 
+      icon: <DashboardIcon sx={{ fontSize: 20 }} />, 
+      path: '/instructor/dashboard' 
+    },
+    { 
+      id: 'courses', 
+      label: 'My Courses', 
+      icon: <MenuBookIcon sx={{ fontSize: 20 }} />, 
+      path: '/instructor/courses' 
+    },
+    { 
+      id: 'CO', 
+      label: 'Course Outcomes', 
+      icon: <FlagIcon sx={{ fontSize: 20 }} />, 
+      path: '/instructor/cos' 
+    },
+    { 
+      id: 'questionPaper', 
+      label: 'Question Papers', 
+      icon: <DescriptionIcon sx={{ fontSize: 20 }} />, 
+      path: '/instructor/question-papers' 
+    },
+    { 
+      id: 'questionCreate', 
+      label: 'Create Question', 
+      icon: <AddIcon sx={{ fontSize: 20 }} />, 
+      path: '/instructor/questions/create' 
+    }
   ];
 
   // Close dropdown when clicking outside
@@ -87,7 +127,7 @@ const InstructorSidebarHeader = () => {
             onClick={toggleSidebar}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? '→' : '←'}
+            {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
           </button>
         </div>
 
@@ -101,7 +141,9 @@ const InstructorSidebarHeader = () => {
                   onClick={() => handleNavigation(item.path)}
                   title={isCollapsed ? item.label : ''}
                 >
-                  <span className="sidebar-icon">{item.icon}</span>
+                  <span className="sidebar-icon">
+                    {item.icon}
+                  </span>
                   {!isCollapsed && (
                     <span className="sidebar-label">{item.label}</span>
                   )}
@@ -125,11 +167,11 @@ const InstructorSidebarHeader = () => {
                 {menuItems.find(item => item.id === activePage)?.label || 'Dashboard'}
               </h1>
               <p className="page-description">
-                {activePage === 'dashboard' && 'Your teaching overview and recent activities'}
-                {activePage === 'courses' && 'View and manage your assigned courses'}
-                {activePage === 'CO' && 'Manage course outcomes for your courses'}
-                {activePage === 'questionCreate' && 'Create new questions for your courses'}
-                {activePage === 'questionPaper' && 'Create and manage question papers'}
+                {activePage === 'dashboard' && ''}
+                {activePage === 'courses' && ''}
+                {activePage === 'CO' && ''}
+                {activePage === 'questionCreate' && ''}
+                {activePage === 'questionPaper' && ''}
               </p>
             </div>
           </div>
@@ -149,7 +191,7 @@ const InstructorSidebarHeader = () => {
                   <div className="header-user-email">{user?.email || 'instructor@example.com'}</div>
                 </div>
                 <div className="dropdown-arrow">
-                  {isUserDropdownOpen ? '▲' : '▼'}
+                  {isUserDropdownOpen ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
                 </div>
               </button>
               
@@ -157,6 +199,9 @@ const InstructorSidebarHeader = () => {
               {isUserDropdownOpen && (
                 <div className="user-dropdown-menu">
                   <button className="dropdown-item logout-item" onClick={handleLogout}>
+                    <span className="dropdown-item-icon">
+                      <LogoutIcon />
+                    </span>
                     <span className="dropdown-item-text">Logout</span>
                   </button>
                 </div>

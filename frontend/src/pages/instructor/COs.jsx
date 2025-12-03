@@ -78,7 +78,7 @@ const InstructorCO = () => {
   };
 
   const getSortIcon = (field) => {
-    if (sortField !== field) return '↕️';
+    if (sortField !== field) return '↕';
     return sortDirection === 'asc' ? '↑' : '↓';
   };
 
@@ -131,7 +131,7 @@ const InstructorCO = () => {
         
         <div className="co-actions">
           <button onClick={loadAllData} className="refresh-btn">
-            🔄 Refresh
+            Refresh
           </button>
         </div>
       </div>
@@ -227,11 +227,10 @@ const InstructorCO = () => {
                     className="btn btn-view"
                     title="View details"
                   >
-                    👁️ View
+                    View
                   </button>
                   {canEditCO(co) && (
                     <span className="edit-badge" title="You can edit this CO">
-                      ✏️
                     </span>
                   )}
                 </td>
@@ -314,7 +313,7 @@ const InstructorCO = () => {
 
                 {canEditCO(viewingCO) && (
                   <div className="permission-badge">
-                    ✅ You have editing permissions for this course outcome
+                    You have editing permissions for this course outcome
                   </div>
                 )}
               </div>

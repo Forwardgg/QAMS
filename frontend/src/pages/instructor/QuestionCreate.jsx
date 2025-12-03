@@ -10,7 +10,7 @@ import './QuestionCreate.css';
 const QuestionCreatePage = () => {
   const navigate = useNavigate();
   const editorRef = useRef();
-  const isInitializedRef = useRef(false); // ADDED: Prevention flag
+  const isInitializedRef = useRef(false);
   const [editor, setEditor] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -24,6 +24,7 @@ const QuestionCreatePage = () => {
   const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedPaper, setSelectedPaper] = useState('');
   const [selectedCO, setSelectedCO] = useState('');
+  const [marks, setMarks] = useState(''); // NEW: Add marks state
   const [content_html, setContentHtml] = useState('');
 
   // Load courses on mount
@@ -49,11 +50,11 @@ const QuestionCreatePage = () => {
       const response = await courseAPI.getAll();
       // Handle different response structures
       if (response.rows) {
-        setCourses(response.rows); // Your API structure
+        setCourses(response.rows);
       } else if (Array.isArray(response)) {
-        setCourses(response); // Direct array
+        setCourses(response);
       } else if (response.data) {
-        setCourses(response.data.rows || response.data); // Nested structure
+        setCourses(response.data.rows || response.data);
       } else {
         setCourses([]);
       }
@@ -101,12 +102,11 @@ const QuestionCreatePage = () => {
     }
   };
 
-  // CKEditor initialization - FIXED VERSION
+  // CKEditor initialization
   useEffect(() => {
     const initEditor = async () => {
-      // Prevent double initialization with ref
       if (editorRef.current && !editor && !isInitializedRef.current) {
-        isInitializedRef.current = true; // Set flag immediately
+        isInitializedRef.current = true;
         
         try {
           const ClassicEditor = (await import('@ckeditor/ckeditor5-build-classic')).default;
@@ -157,7 +157,7 @@ const QuestionCreatePage = () => {
         } catch (error) {
           console.error('Error initializing CKEditor:', error);
           setMessage({ type: 'error', text: 'Failed to load editor' });
-          isInitializedRef.current = false; // Reset on error
+          isInitializedRef.current = false;
         }
       }
     };
@@ -168,10 +168,10 @@ const QuestionCreatePage = () => {
       if (editor) {
         editor.destroy();
         setEditor(null);
-        isInitializedRef.current = false; // Reset on cleanup
+        isInitializedRef.current = false;
       }
     };
-  }, [editor]); // Only depend on editor
+  }, [editor]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -186,6 +186,17 @@ const QuestionCreatePage = () => {
       return;
     }
 
+    // Validate marks
+    let marksValue = null;
+    if (marks.trim() !== '') {
+      const marksNum = parseInt(marks, 10);
+      if (isNaN(marksNum) || marksNum < 0) {
+        setMessage({ type: 'error', text: 'Marks must be a non-negative number' });
+        return;
+      }
+      marksValue = marksNum;
+    }
+
     setIsLoading(true);
     setMessage({ type: '', text: '' });
 
@@ -193,8 +204,8 @@ const QuestionCreatePage = () => {
       const submissionData = {
         content_html,
         paper_id: parseInt(selectedPaper),
-        co_id: selectedCO ? parseInt(selectedCO) : null
-        // status and sequence_number handled by backend
+        co_id: selectedCO ? parseInt(selectedCO) : null,
+        marks: marksValue // NEW: Add marks to submission data
       };
 
       await questionAPI.create(submissionData);
@@ -206,6 +217,7 @@ const QuestionCreatePage = () => {
       
       // Reset form
       setContentHtml('');
+      setMarks(''); // NEW: Reset marks field
       if (editor) editor.setData('');
       
     } catch (error) {
@@ -290,6 +302,21 @@ const QuestionCreatePage = () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* NEW: Marks input field */}
+            <div className="form-group">
+              <label htmlFor="marks">Marks</label>
+              <input
+                type="number"
+                id="marks"
+                value={marks}
+                onChange={(e) => setMarks(e.target.value)}
+                min="0"
+                placeholder="Enter marks (optional)"
+                step="1"
+              />
+              <small className="form-hint">Leave blank if not applicable</small>
             </div>
           </div>
         </div>

@@ -24,7 +24,7 @@ export class QuestionPaper {
     }
   }
 
-  // Create a question paper (instructor) - YOU'RE MISSING THIS METHOD!
+  // Create a question paper (instructor)
   static async create({
     courseId,
     createdBy,
@@ -90,7 +90,7 @@ export class QuestionPaper {
     const query = `
       SELECT p.paper_id, p.course_id, p.created_by, p.title, p.status, p.version,
              p.exam_type, p.semester, p.academic_year, p.full_marks, p.duration,
-             p.assembled_html, p.rendered_pdf_url, p.created_at, p.updated_at,
+             p.created_at, p.updated_at,
              c.code AS course_code, c.title AS course_title,
              u.name AS creator_name
       FROM question_papers p
@@ -121,7 +121,7 @@ export class QuestionPaper {
     return rows;
   }
 
-  // will change later. it will be searched  by course and CO of questions. the QP is linked to questions and questions to COs.(all)
+  // Get papers by course and CO
   static async getByCourseAndCO(courseCode, coNumber) {
     const query = `
       SELECT DISTINCT p.paper_id, p.course_id, p.created_by, p.title, p.status, p.version,
@@ -141,7 +141,7 @@ export class QuestionPaper {
     return rows;
   }
 
-  // Update paper (admin, instructor - their own paper) - SINGLE VERSION WITH VALIDATION
+  // Update paper (admin, instructor - their own paper)
   static async update(
     paperId,
     { title, examType, semester, academicYear, fullMarks, duration, status },
@@ -203,7 +203,7 @@ export class QuestionPaper {
     return rows[0];
   }
 
-  // Delete paper (admin, instructor - their own paper) - WITH VALIDATION
+  // Delete paper (admin, instructor - their own paper)
   static async delete(paperId) {
     // First check if paper can be deleted
     const paper = await this.findById(paperId);
@@ -272,7 +272,7 @@ export class QuestionPaper {
       queryParams.push(courseId);
     }
 
-    // If moderatorId provided, exclude papers that are being moderated by OTHER moderators (but keep ones this moderator is moderating)
+    // If moderatorId provided, exclude papers that are being moderated by OTHER moderators
     if (moderatorId) {
       paramCount++;
       whereConditions.push(`
@@ -298,6 +298,7 @@ export class QuestionPaper {
         c.code AS course_code, c.title AS course_title,
         u.name AS creator_name,
         (SELECT COUNT(*) FROM questions q WHERE q.paper_id = p.paper_id) as question_count,
+        (SELECT COALESCE(SUM(q.marks), 0) FROM questions q WHERE q.paper_id = p.paper_id AND q.status != 'draft') as total_marks, -- NEW
         (SELECT COUNT(*) FROM qp_moderations m WHERE m.paper_id = p.paper_id) as moderation_count
       FROM question_papers p
       LEFT JOIN courses c ON p.course_id = c.course_id
@@ -440,6 +441,7 @@ export class QuestionPaper {
         c.code AS course_code, c.title AS course_title,
         u.name AS creator_name,
         (SELECT COUNT(*) FROM questions q WHERE q.paper_id = p.paper_id) as question_count,
+        (SELECT COALESCE(SUM(q.marks), 0) FROM questions q WHERE q.paper_id = p.paper_id AND q.status != 'draft') as total_marks, -- NEW
         (SELECT COUNT(*) FROM qp_moderations m WHERE m.paper_id = p.paper_id) as moderation_count,
         (SELECT status FROM qp_moderations m WHERE m.paper_id = p.paper_id ORDER BY m.created_at DESC LIMIT 1) as latest_moderation_status
       FROM question_papers p
@@ -451,5 +453,190 @@ export class QuestionPaper {
 
     const { rows } = await pool.query(query, queryParams);
     return rows;
+  }
+
+  // NEW METHODS FOR MARKS MANAGEMENT
+
+  /**
+   * Get total marks for a paper
+   */
+  static async getTotalMarks(paperId) {
+    const query = `
+      SELECT COALESCE(SUM(marks), 0) as total_marks
+      FROM questions
+      WHERE paper_id = $1 AND status != 'draft'
+    `;
+    
+    const { rows } = await pool.query(query, [paperId]);
+    return parseInt(rows[0].total_marks) || 0;
+  }
+
+  /**
+   * Get marks breakdown by CO for a paper
+   */
+  static async getMarksBreakdown(paperId) {
+    const query = `
+      SELECT 
+        co.co_number,
+        co.description,
+        COALESCE(SUM(q.marks), 0) as total_marks,
+        COUNT(q.question_id) as question_count,
+        COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_count,
+        COUNT(CASE WHEN q.status = 'change_requested' THEN 1 END) as change_requested_count
+      FROM course_outcomes co
+      LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
+      WHERE co.course_id = (SELECT course_id FROM question_papers WHERE paper_id = $1)
+      GROUP BY co.co_id, co.co_number, co.description
+      ORDER BY co.co_number
+    `;
+    
+    const { rows } = await pool.query(query, [paperId]);
+    return rows;
+  }
+
+  /**
+   * Validate if total marks match paper's full_marks
+   */
+  static async validateMarks(paperId) {
+    const paper = await this.findById(paperId);
+    if (!paper) {
+      throw new Error('Paper not found');
+    }
+
+    const totalMarks = await this.getTotalMarks(paperId);
+    
+    return {
+      paperFullMarks: paper.full_marks,
+      totalQuestionMarks: totalMarks,
+      isValid: paper.full_marks === null || totalMarks === paper.full_marks,
+      difference: paper.full_marks !== null ? totalMarks - paper.full_marks : null
+    };
+  }
+
+  /**
+   * Search papers with comprehensive filters including marks
+   */
+  static async searchPapers(filters = {}) {
+    const {
+      courseCode = '',
+      status = '',
+      examType = '',
+      semester = '',
+      academicYear = '',
+      minMarks = null,
+      maxMarks = null,
+      page = 1,
+      limit = 50
+    } = filters;
+
+    let whereConditions = [];
+    let queryParams = [];
+    let paramCount = 0;
+
+    if (courseCode) {
+      paramCount++;
+      whereConditions.push(`c.code ILIKE $${paramCount}`);
+      queryParams.push(`%${courseCode}%`);
+    }
+
+    if (status) {
+      paramCount++;
+      whereConditions.push(`p.status = $${paramCount}`);
+      queryParams.push(status);
+    }
+
+    if (examType) {
+      paramCount++;
+      whereConditions.push(`p.exam_type ILIKE $${paramCount}`);
+      queryParams.push(`%${examType}%`);
+    }
+
+    if (semester) {
+      paramCount++;
+      whereConditions.push(`p.semester ILIKE $${paramCount}`);
+      queryParams.push(`%${semester}%`);
+    }
+
+    if (academicYear) {
+      paramCount++;
+      whereConditions.push(`p.academic_year = $${paramCount}`);
+      queryParams.push(academicYear);
+    }
+
+    const whereClause = whereConditions.length > 0 
+      ? `WHERE ${whereConditions.join(' AND ')}` 
+      : '';
+
+    // Subquery for marks filtering
+    let havingClause = '';
+    if (minMarks !== null || maxMarks !== null) {
+      const havingConditions = [];
+      if (minMarks !== null) {
+        paramCount++;
+        havingConditions.push(`total_question_marks >= $${paramCount}`);
+        queryParams.push(minMarks);
+      }
+      if (maxMarks !== null) {
+        paramCount++;
+        havingConditions.push(`total_question_marks <= $${paramCount}`);
+        queryParams.push(maxMarks);
+      }
+      havingClause = `HAVING ${havingConditions.join(' AND ')}`;
+    }
+
+    // Count query for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total_count
+      FROM (
+        SELECT p.paper_id
+        FROM question_papers p
+        LEFT JOIN courses c ON p.course_id = c.course_id
+        LEFT JOIN users u ON p.created_by = u.user_id
+        ${whereClause}
+        GROUP BY p.paper_id
+        ${havingClause}
+      ) subquery
+    `;
+
+    // Main data query
+    const dataQuery = `
+      SELECT 
+        p.paper_id, p.course_id, p.created_by, p.title, p.status, p.version,
+        p.exam_type, p.semester, p.academic_year, p.full_marks, p.duration,
+        p.created_at, p.updated_at,
+        c.code AS course_code, c.title AS course_title,
+        u.name AS creator_name,
+        (SELECT COUNT(*) FROM questions q WHERE q.paper_id = p.paper_id) as question_count,
+        (SELECT COALESCE(SUM(q.marks), 0) FROM questions q WHERE q.paper_id = p.paper_id AND q.status != 'draft') as total_question_marks
+      FROM question_papers p
+      LEFT JOIN courses c ON p.course_id = c.course_id
+      LEFT JOIN users u ON p.created_by = u.user_id
+      ${whereClause}
+      GROUP BY p.paper_id, c.course_id, u.user_id
+      ${havingClause}
+      ORDER BY p.created_at DESC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+    `;
+
+    // Calculate pagination
+    const offset = (page - 1) * limit;
+    queryParams.push(limit, offset);
+
+    try {
+      const countResult = await pool.query(countQuery, queryParams.slice(0, paramCount));
+      const dataResult = await pool.query(dataQuery, queryParams);
+
+      return {
+        papers: dataResult.rows,
+        totalCount: parseInt(countResult.rows[0].total_count),
+        currentPage: page,
+        totalPages: Math.ceil(countResult.rows[0].total_count / limit),
+        hasNext: page < Math.ceil(countResult.rows[0].total_count / limit),
+        hasPrev: page > 1
+      };
+    } catch (error) {
+      console.error('Error in searchPapers:', error);
+      throw error;
+    }
   }
 }

@@ -30,7 +30,8 @@ const Courses = () => {
     syllabus: '',
     l: 0,
     t: 0,
-    p: 0
+    p: 0,
+    credit: 3
   });
   const [formErrors, setFormErrors] = useState({});
 
@@ -157,7 +158,7 @@ const Courses = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'l' || name === 't' || name === 'p' ? parseInt(value) || 0 : value
+      [name]: name === 'l' || name === 't' || name === 'p' || name === 'credit' ? parseInt(value) || 0 : value
     }));
     
     if (formErrors[name]) {
@@ -174,6 +175,10 @@ const Courses = () => {
     
     if (courseAPI.validateLTP && !courseAPI.validateLTP(formData.l, formData.t, formData.p)) {
       errors.ltp = 'LTP hours must be between 0-9';
+    }
+    
+    if (courseAPI.validateCredit && !courseAPI.validateCredit(formData.credit)) {
+      errors.credit = 'Credit must be between 0-9';
     }
 
     setFormErrors(errors);
@@ -220,7 +225,8 @@ const Courses = () => {
       syllabus: '',
       l: 0,
       t: 0,
-      p: 0
+      p: 0,
+      credit: 3
     });
     setEditingCourse(null);
     setFormErrors({});
@@ -233,7 +239,8 @@ const Courses = () => {
       syllabus: course.syllabus,
       l: course.l,
       t: course.t,
-      p: course.p
+      p: course.p,
+      credit: course.credit || 3
     });
     setEditingCourse(course);
     setShowForm(true);
@@ -424,6 +431,12 @@ const Courses = () => {
                   >
                     L-T-P {sortField === 'l' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
+                  <th 
+                    className="sortable" 
+                    onClick={() => handleSort('credit')}
+                  >
+                    Credits {sortField === 'credit' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th>Syllabus</th>
                   <th className="actions-col">Actions</th>
                 </tr>
@@ -442,6 +455,12 @@ const Courses = () => {
                     <td className="course-title">{course.title}</td>
                     <td className="course-ltp">
                       {courseAPI.formatLTP ? courseAPI.formatLTP(course) : `${course.l}-${course.t}-${course.p}`}
+                    </td>
+                    <td className="course-credit">
+                      {course.credit !== undefined && course.credit !== null 
+                        ? course.credit
+                        : '-'
+                      }
                     </td>
                     <td className="syllabus-cell">
                       {course.syllabus && course.syllabus.length > 100 
@@ -635,6 +654,22 @@ const Courses = () => {
                 </div>
               </div>
 
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Credits (0-9) *</label>
+                  <input
+                    type="number"
+                    name="credit"
+                    min="0"
+                    max="9"
+                    value={formData.credit}
+                    onChange={handleFormChange}
+                    className={formErrors.credit ? 'error' : ''}
+                  />
+                  {formErrors.credit && <span className="error-text">{formErrors.credit}</span>}
+                </div>
+              </div>
+
               {formErrors.ltp && <span className="error-text">{formErrors.ltp}</span>}
 
               <div className="form-actions">
@@ -703,6 +738,16 @@ const Courses = () => {
               <div className="detail-row">
                 <label>Practical Hours:</label>
                 <span className="detail-value">{viewingCourse.p}</span>
+              </div>
+              
+              <div className="detail-row">
+                <label>Credits:</label>
+                <span className="detail-value credit-badge">
+                  {viewingCourse.credit !== undefined && viewingCourse.credit !== null 
+                    ? `${viewingCourse.credit} credit${viewingCourse.credit === 1 ? '' : 's'}`
+                    : 'Not set'
+                  }
+                </span>
               </div>
               
               <div className="detail-row full-width">

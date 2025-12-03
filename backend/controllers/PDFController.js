@@ -42,11 +42,11 @@ const bodySchema = Joi.object({
 async function fetchPaperDataFromDb(paperId) {
   const client = await pool.connect();
   try {
-    // UPDATED QUERY: Get all needed fields including course code and title
+    // UPDATED QUERY: Removed assembled_html (field no longer exists)
     const paperRes = await client.query(
       `SELECT 
          qp.paper_id, qp.title, qp.course_id, qp.created_by, 
-         qp.assembled_html, qp.academic_year, qp.exam_type, 
+         qp.academic_year, qp.exam_type, 
          qp.full_marks, qp.duration, qp.semester,
          c.code as course_code, c.title as course_title
        FROM question_papers qp
@@ -63,9 +63,9 @@ async function fetchPaperDataFromDb(paperId) {
 
     const paper = paperRes.rows[0];
 
-    // Fetch questions ordered by sequence_number
+    // UPDATED: Fetch questions with marks field
     const qRes = await client.query(
-      `SELECT question_id, sequence_number, content_html
+      `SELECT question_id, sequence_number, content_html, marks
        FROM questions
        WHERE paper_id = $1
        ORDER BY COALESCE(sequence_number, 2147483647), created_at ASC`,
@@ -76,6 +76,7 @@ async function fetchPaperDataFromDb(paperId) {
       question_id: r.question_id,
       sequence_number: r.sequence_number,
       content_html: r.content_html,
+      marks: r.marks, // ADDED: Include marks field
     }));
 
     return {

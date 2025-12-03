@@ -521,6 +521,7 @@ export const viewQuestionReport = async (req, res) => {
       co_id: q.co_id,
       co_number: q.co_number,
       co_description: q.co_description,
+      marks: q.marks, // ADD THIS LINE
       updated_at: q.updated_at
     }));
 
@@ -591,10 +592,11 @@ export const viewPaperReport = async (req, res) => {
       sequence_number: q.sequence_number,
       status: q.status,
       content_html: q.content_html, // Add full content
-content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
+      content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
       co_id: q.co_id,
       co_number: q.co_number,
       co_description: q.co_description,
+      marks: q.marks, // ADD THIS LINE
       updated_at: q.updated_at
     }));
 

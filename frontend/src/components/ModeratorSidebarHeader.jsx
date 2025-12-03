@@ -1,8 +1,21 @@
-// components/ModeratorSidebarHeader.jsx
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthContext } from './AuthProvider';
 import './AdminSidebarHeader.css';
+
+// Import MUI Icons
+import {
+  Dashboard as DashboardIcon,
+  MenuBook as MenuBookIcon,
+  Flag as FlagIcon,
+  Search as SearchIcon,
+  ChevronLeft,
+  ChevronRight,
+  KeyboardArrowUp,
+  KeyboardArrowDown,
+  Logout as LogoutIcon,
+  Gavel
+} from '@mui/icons-material';
 
 const ModeratorSidebarHeader = () => {
   const { user, logout } = useContext(AuthContext);
@@ -12,15 +25,30 @@ const ModeratorSidebarHeader = () => {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // MODERATOR menu items configuration
+  // MODERATOR menu items configuration with MUI Icons
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/moderator/dashboard' },
-    { id: 'courses', label: 'Courses', icon: '📘', path: '/moderator/courses' },
-    { id: 'CO', label: 'Course Outcomes', icon: '🎯', path: '/moderator/cos' },
+    { 
+      id: 'dashboard', 
+      label: 'Dashboard', 
+      icon: <DashboardIcon sx={{ fontSize: 20 }} />, 
+      path: '/moderator/dashboard' 
+    },
+    { 
+      id: 'courses', 
+      label: 'Courses', 
+      icon: <MenuBookIcon sx={{ fontSize: 20 }} />, 
+      path: '/moderator/courses' 
+    },
+    { 
+      id: 'CO', 
+      label: 'Course Outcomes', 
+      icon: <FlagIcon sx={{ fontSize: 20 }} />, 
+      path: '/moderator/cos' 
+    },
     { 
       id: 'moderation', 
       label: 'Moderation', 
-      icon: '🔍', 
+      icon: <SearchIcon sx={{ fontSize: 20 }} />,  // Changed from 🔍 to SearchIcon
       path: '/moderator/moderation/papers',
       subPaths: [
         '/moderator/moderation/',
@@ -104,7 +132,7 @@ const ModeratorSidebarHeader = () => {
             onClick={toggleSidebar}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? '→' : '←'}
+            {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
           </button>
         </div>
 
@@ -118,7 +146,9 @@ const ModeratorSidebarHeader = () => {
                   onClick={() => handleNavigation(item.path)}
                   title={isCollapsed ? item.label : ''}
                 >
-                  <span className="sidebar-icon">{item.icon}</span>
+                  <span className="sidebar-icon">
+                    {item.icon}
+                  </span>
                   {!isCollapsed && (
                     <span className="sidebar-label">{item.label}</span>
                   )}
@@ -142,10 +172,10 @@ const ModeratorSidebarHeader = () => {
                 {menuItems.find(item => item.id === activePage)?.label || 'Dashboard'}
               </h1>
               <p className="page-description">
-                {activePage === 'dashboard' && 'Your moderation overview and recent activities'}
-                {activePage === 'courses' && 'View courses available for moderation'}
-                {activePage === 'CO' && 'View course outcomes for moderation'}
-                {activePage === 'moderation' && 'Review and moderate question papers'}
+                {activePage === 'dashboard' && ''}
+                {activePage === 'courses' && ''}
+                {activePage === 'CO' && ''}
+                {activePage === 'moderation' && ''}
               </p>
             </div>
           </div>
@@ -165,7 +195,7 @@ const ModeratorSidebarHeader = () => {
                   <div className="header-user-email">{user?.email || 'moderator@example.com'}</div>
                 </div>
                 <div className="dropdown-arrow">
-                  {isUserDropdownOpen ? '▲' : '▼'}
+                  {isUserDropdownOpen ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
                 </div>
               </button>
               
@@ -173,6 +203,9 @@ const ModeratorSidebarHeader = () => {
               {isUserDropdownOpen && (
                 <div className="user-dropdown-menu">
                   <button className="dropdown-item logout-item" onClick={handleLogout}>
+                    <span className="dropdown-item-icon">
+                      <LogoutIcon />
+                    </span>
                     <span className="dropdown-item-text">Logout</span>
                   </button>
                 </div>

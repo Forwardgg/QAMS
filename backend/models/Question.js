@@ -6,11 +6,25 @@ export class Question {
 
   static async create(questionData, client = null) {
     const executor = client || pool;
-    const { paper_id, content_html, co_id, status = 'draft', sequence_number = null } = questionData;
+    const { 
+      paper_id, 
+      content_html, 
+      co_id, 
+      marks = null, // NEW FIELD
+      status = 'draft', 
+      sequence_number = null 
+    } = questionData;
 
     // Basic validation
     if (!content_html) {
       throw new Error('content_html is required');
+    }
+
+    // Validate marks if provided
+    if (marks !== null && marks !== undefined) {
+      if (typeof marks !== 'number' || marks < 0) {
+        throw new Error('marks must be a non-negative number');
+      }
     }
 
     if (paper_id) {
@@ -31,12 +45,12 @@ export class Question {
     }
 
     const query = `
-      INSERT INTO questions (paper_id, content_html, co_id, status, sequence_number, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+      INSERT INTO questions (paper_id, content_html, co_id, marks, status, sequence_number, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING question_id, paper_id, content_html, co_id, marks, status, sequence_number, created_at, updated_at
     `;
 
-    const values = [paper_id || null, content_html, co_id || null, status, sequence_number];
+    const values = [paper_id || null, content_html, co_id || null, marks, status, sequence_number];
     const result = await executor.query(query, values);
     return result.rows[0];
   }
@@ -71,6 +85,15 @@ export class Question {
       }
     }
 
+    // Validate marks if provided
+    if (Object.prototype.hasOwnProperty.call(questionData, 'marks')) {
+      if (questionData.marks !== null && questionData.marks !== undefined) {
+        if (typeof questionData.marks !== 'number' || questionData.marks < 0) {
+          throw new Error('marks must be a non-negative number or null');
+        }
+      }
+    }
+
     // Validate status if provided
     if (Object.prototype.hasOwnProperty.call(questionData, 'status')) {
       const allowedStatuses = ['draft', 'submitted', 'under_review', 'change_requested', 'approved'];
@@ -79,8 +102,8 @@ export class Question {
       }
     }
 
-    // Allowed updatable fields
-    const allowed = ['paper_id', 'content_html', 'co_id', 'status', 'sequence_number'];
+    // Allowed updatable fields (added marks)
+    const allowed = ['paper_id', 'content_html', 'co_id', 'marks', 'status', 'sequence_number'];
 
     const setClauses = [];
     const values = [];
@@ -102,7 +125,7 @@ export class Question {
       UPDATE questions
       SET ${setClauses.join(', ')}
       WHERE question_id = $${idx}
-      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
+      RETURNING question_id, paper_id, content_html, co_id, marks, status, sequence_number, created_at, updated_at
     `;
     values.push(questionId);
 
@@ -436,7 +459,7 @@ export class Question {
   static async getQuestionsForModeration(paperId) {
     const query = `
       SELECT 
-        q.question_id, q.paper_id, q.content_html, q.status, q.sequence_number,
+        q.question_id, q.paper_id, q.content_html, q.marks, q.status, q.sequence_number,
         q.created_at, q.updated_at,
         co.co_id, co.co_number, co.description as co_description,
         c.course_id, c.code as course_code, c.title as course_title
@@ -520,10 +543,12 @@ export class Question {
         COUNT(q.question_id) as total_questions,
         COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_questions,
         COUNT(CASE WHEN q.status = 'change_requested' THEN 1 END) as change_requested_questions,
+        SUM(q.marks) as total_marks, -- NEW: Calculate total marks per CO
         json_agg(
           jsonb_build_object(
             'question_id', q.question_id,
             'sequence_number', q.sequence_number,
+            'marks', q.marks, -- NEW: Include marks in JSON
             'content_preview', SUBSTRING(q.content_html FROM 1 FOR 100),
             'status', q.status,
             'created_at', q.created_at
@@ -539,5 +564,50 @@ export class Question {
 
     const { rows } = await pool.query(query, [paperId]);
     return rows;
+  }
+
+  static async getCOsForPaper(paperId) {
+    if (!paperId) throw new Error('paper_id is required');
+    
+    const query = `
+      SELECT co.co_id, co.co_number, co.description
+      FROM course_outcomes co
+      JOIN question_papers qp ON co.course_id = qp.course_id
+      WHERE qp.paper_id = $1
+      ORDER BY co.co_number
+    `;
+    
+    const result = await pool.query(query, [paperId]);
+    return result.rows;
+  }
+
+  // NEW METHOD: Calculate total marks for a paper
+  static async getTotalMarksForPaper(paperId) {
+    const query = `
+      SELECT COALESCE(SUM(marks), 0) as total_marks
+      FROM questions
+      WHERE paper_id = $1 AND status != 'draft'
+    `;
+    
+    const result = await pool.query(query, [paperId]);
+    return parseInt(result.rows[0].total_marks) || 0;
+  }
+
+  // NEW METHOD: Get marks distribution by CO
+  static async getMarksDistribution(paperId) {
+    const query = `
+      SELECT 
+        co.co_number,
+        COALESCE(SUM(q.marks), 0) as total_marks,
+        COUNT(q.question_id) as question_count
+      FROM course_outcomes co
+      LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
+      WHERE co.course_id = (SELECT course_id FROM question_papers WHERE paper_id = $1)
+      GROUP BY co.co_id, co.co_number
+      ORDER BY co.co_number
+    `;
+    
+    const result = await pool.query(query, [paperId]);
+    return result.rows;
   }
 }

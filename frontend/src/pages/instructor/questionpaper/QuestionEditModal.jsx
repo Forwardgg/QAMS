@@ -3,35 +3,51 @@ import questionAPI from '../../../api/question.api';
 import { setupUploadAdapter } from '../../../utils/UploadAdapter';
 import './QuestionEditModal.css';
 
-/**
- * Props:
- * - question: object { question_id, content_html, co_id, paper_id, ... }
- * - onSave: optional async function(updatedQuestion) => returns updated question (should return the saved object)
- * - onClose: function to close modal
- *
- * Behavior:
- * - If onSave is provided: modal calls API, passes the server result to onSave, awaits it, then closes.
- * - If onSave is not provided: modal calls questionAPI.update itself and closes on success.
- */
 export default function QuestionEditModal({ question = {}, onSave, onClose }) {
-  const mountRef = useRef(null);          // DOM mount for CKEditor
-  const editorRef = useRef(null);         // CKEditor instance
-  const isInitRef = useRef(false);        // guard to prevent duplicate inits
-  const changeHandlerRef = useRef(null);  // store handler to remove later
+  const mountRef = useRef(null);
+  const editorRef = useRef(null);
+  const isInitRef = useRef(false);
+  const changeHandlerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [contentHtml, setContentHtml] = useState(question?.content_html || '');
   const [coId, setCoId] = useState(question?.co_id ?? '');
+  const [marks, setMarks] = useState(question?.marks ?? ''); // NEW: Add marks state
+  const [coOptions, setCoOptions] = useState([]);
+  const [isLoadingCOs, setIsLoadingCOs] = useState(false);
+
+  // Fetch COs for this paper's course when modal opens
+  useEffect(() => {
+    const fetchCOsForPaper = async () => {
+      if (!question?.paper_id) {
+        setCoOptions([]);
+        return;
+      }
+      
+      setIsLoadingCOs(true);
+      try {
+        const result = await questionAPI.getPaperCOs(question.paper_id);
+        setCoOptions(result.cos || []);
+      } catch (err) {
+        console.error('Error fetching COs:', err);
+        setCoOptions([]);
+      } finally {
+        setIsLoadingCOs(false);
+      }
+    };
+    
+    fetchCOsForPaper();
+  }, [question?.paper_id]);
 
   // Keep local state when question prop changes
   useEffect(() => {
     setContentHtml(question?.content_html || '');
     setCoId(question?.co_id ?? '');
+    setMarks(question?.marks ?? ''); // NEW: Update marks state
 
-    // If editor exists, update its content instead of re-creating
+    // If editor exists, update its content
     if (editorRef.current && typeof editorRef.current.setData === 'function') {
       try {
         const data = question?.content_html || '';
-        // Only set if different to avoid extra change events
         if (editorRef.current.getData() !== data) {
           editorRef.current.setData(data);
         }
@@ -41,20 +57,18 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
     }
   }, [question]);
 
-  // CKEditor init (single-run + defensive)
+  // CKEditor init
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
       if (!mountRef.current || isInitRef.current || editorRef.current) return;
 
-      // Prevent duplicate initialization while we're attempting init
       isInitRef.current = true;
 
       try {
         const ClassicEditor = (await import('@ckeditor/ckeditor5-build-classic')).default;
 
-        // clear mount node if any stray content remains
         if (mountRef.current) mountRef.current.innerHTML = '';
 
         const inst = await ClassicEditor.create(mountRef.current, {
@@ -76,26 +90,21 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
           placeholder: 'Edit question content...'
         });
 
-        // wire upload adapter (your util should register FileRepository.createUploadAdapter)
         try {
           setupUploadAdapter(inst, '/api/uploads');
         } catch (err) {
-          // don't block init if adapter registration fails
           console.warn('Upload adapter setup failed', err);
         }
 
-        // sync editor -> local state
         const handler = () => {
           try {
             setContentHtml(inst.getData());
           } catch (_) {}
         };
-        // store handler so we can remove it on destroy
         changeHandlerRef.current = handler;
         inst.model.document.on('change:data', handler);
 
         if (mounted) {
-          // set initial content safely
           try { inst.setData(question?.content_html || ''); } catch (_) {}
           editorRef.current = inst;
         } else {
@@ -103,7 +112,6 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
         }
       } catch (err) {
         console.error('CKEditor init error', err);
-        // allow retries on next mount/open by resetting the init guard
         isInitRef.current = false;
       }
     };
@@ -112,10 +120,8 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
 
     return () => {
       mounted = false;
-      // destroy editor if present when component unmounts
       if (editorRef.current) {
         try {
-          // remove change handler if present before destroy
           if (changeHandlerRef.current && editorRef.current.model?.document?.off) {
             try { editorRef.current.model.document.off('change:data', changeHandlerRef.current); } catch (_) {}
             changeHandlerRef.current = null;
@@ -126,11 +132,8 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
       }
       isInitRef.current = false;
     };
-    // run only on mount/unmount
   }, []);
 
-
-  // helper: close and cleanup
   const cleanupAndClose = async () => {
     if (editorRef.current) {
       try {
@@ -146,7 +149,7 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
     if (typeof onClose === 'function') onClose();
   };
 
-  // submit: validate -> call API (or parent) -> handle result
+  // FIXED SUBMIT FUNCTION - Fetches fresh question data
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!contentHtml || !contentHtml.trim()) {
@@ -160,25 +163,38 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
       return;
     }
 
+    // Validate marks
+    let marksValue = null;
+    if (marks !== '' && marks !== null && marks !== undefined) {
+      const marksNum = parseInt(marks, 10);
+      if (isNaN(marksNum) || marksNum < 0) {
+        alert('Marks must be a non-negative number or empty');
+        return;
+      }
+      marksValue = marksNum;
+    }
+
     setIsLoading(true);
     try {
       const payload = {
         content_html: contentHtml,
         co_id: coId === '' ? null : (Number.isNaN(Number(coId)) ? coId : Number(coId)),
+        marks: marksValue, // NEW: Add marks to payload
         paper_id: question?.paper_id
       };
 
-      // Call API first to get canonical saved object
-      const apiResp = await questionAPI.update(qid, payload);
-      // questionAPI.handle normally returns res.data — be defensive here
-      const saved = apiResp?.question ?? apiResp?.data ?? apiResp;
-
-      // If parent provided onSave, give it the saved object and await it
+      // 1. Update the question
+      await questionAPI.update(qid, payload);
+      
+      // 2. FETCH FRESH QUESTION DATA with CO info
+      const freshQuestion = await questionAPI.getById(qid);
+      
+      // 3. Pass the complete question data to parent
       if (typeof onSave === 'function') {
-        await onSave(saved);
+        await onSave(freshQuestion.question || freshQuestion);
       }
 
-      // close and cleanup
+      // 4. Close modal
       await cleanupAndClose();
     } catch (err) {
       console.error('Error updating question:', err);
@@ -189,11 +205,9 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
   };
 
   const handleCancel = async () => {
-    // destroy editor and call parent close
     await cleanupAndClose();
   };
 
-  // overlay click handler: only close when clicking the overlay itself
   const onOverlayMouseDown = (e) => {
     if (e.target === e.currentTarget) {
       handleCancel();
@@ -223,23 +237,61 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
               </div>
             </div>
 
-            {/* Small optional CO display/edit */}
-            <div className="form-group">
-              <label>Course Outcome</label>
-              <input
-                type="text"
-                className="input"
-                value={coId ?? ''}
-                onChange={(e) => setCoId(e.target.value)}
-                placeholder="CO id (optional)"
-                aria-label="Course outcome id"
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label>Course Outcome</label>
+                <select
+                  className="input"
+                  value={coId || ''}
+                  onChange={(e) => setCoId(e.target.value === '' ? null : e.target.value)}
+                  disabled={isLoadingCOs}
+                  aria-label="Course outcome"
+                >
+                  <option value="">No CO selected</option>
+                  {coOptions.map(co => (
+                    <option key={co.co_id} value={co.co_id}>
+                      CO{co.co_number}: {co.description.substring(0, 50)}
+                      {co.description.length > 50 ? '...' : ''}
+                    </option>
+                  ))}
+                </select>
+                {isLoadingCOs && <small className="help-text">Loading COs...</small>}
+                {!isLoadingCOs && coOptions.length === 0 && question?.paper_id && (
+                  <small className="help-text">No COs found for this paper's course</small>
+                )}
+                {!isLoadingCOs && !question?.paper_id && (
+                  <small className="help-text">Question is not linked to a paper</small>
+                )}
+              </div>
+
+              {/* NEW: Marks input field */}
+              <div className="form-group">
+                <label>Marks</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={marks || ''}
+                  onChange={(e) => setMarks(e.target.value === '' ? '' : e.target.value)}
+                  min="0"
+                  step="1"
+                  placeholder="Enter marks (optional)"
+                  aria-label="Question marks"
+                />
+                <small className="help-text">Leave empty for no marks</small>
+              </div>
             </div>
           </div>
 
           <div className="modal-actions">
-            <button type="button" onClick={handleCancel} className="btn-secondary" aria-label="Cancel">Cancel</button>
-            <button type="submit" disabled={isLoading} className="btn-primary" aria-label="Save changes">
+            <button type="button" onClick={handleCancel} className="btn-secondary" aria-label="Cancel">
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={isLoading || isLoadingCOs} 
+              className="btn-primary" 
+              aria-label="Save changes"
+            >
               {isLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>

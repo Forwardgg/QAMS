@@ -68,22 +68,7 @@ const ModeratorCourses = () => {
 
   // Get sorted courses
   const getSortedCourses = () => {
-    return [...courses].sort((a, b) => {
-      let aValue = a[sortField];
-      let bValue = b[sortField];
-      
-      if (sortField === 'code') {
-        aValue = a.code;
-        bValue = b.code;
-      } else if (sortField === 'title') {
-        aValue = a.title;
-        bValue = b.title;
-      }
-      
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
+    return courseAPI.sortCourses(courses, sortField, sortDirection);
   };
 
   // Pagination handlers
@@ -104,15 +89,15 @@ const ModeratorCourses = () => {
     setViewingCourse(course);
   };
 
-  // Format LTP hours
-  const formatLTP = (course) => {
-    return `${course.l || 0}-${course.t || 0}-${course.p || 0}`;
+  // Check if user can edit course (for display purposes)
+  const canEditCourse = (course) => {
+    return courseAPI.canEditCourse(course, auth.user);
   };
 
   const sortedCourses = getSortedCourses();
 
   return (
-    <div className="moderator-courses">
+    <div className="instructor-courses">
       <div className="courses-header">
         <h1>Course Catalog</h1>
         <p>Browse and view all available courses</p>
@@ -131,16 +116,6 @@ const ModeratorCourses = () => {
           <button type="submit" className="btn btn-search">
             Search
           </button>
-          <button 
-            type="button" 
-            onClick={() => {
-              setSearchQuery('');
-              setPagination(prev => ({ ...prev, page: 1 }));
-            }}
-            className="btn btn-clear"
-          >
-            Clear
-          </button>
         </form>
 
         {/* Pagination Limit Selector */}
@@ -151,9 +126,9 @@ const ModeratorCourses = () => {
             className="limit-select"
             disabled={loading}
           >
-            <option value={10}>10 per page</option>
             <option value={20}>20 per page</option>
             <option value={50}>50 per page</option>
+            <option value={100}>100 per page</option>
           </select>
         </div>
       </div>
@@ -184,7 +159,12 @@ const ModeratorCourses = () => {
                   >
                     L-T-P {sortField === 'l' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th>Status</th>
+                  <th 
+                    className="sortable" 
+                    onClick={() => handleSort('credit')}
+                  >
+                    Credits {sortField === 'credit' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th>Syllabus Preview</th>
                   <th>Actions</th>
                 </tr>
@@ -197,14 +177,13 @@ const ModeratorCourses = () => {
                     </td>
                     <td className="course-title">{course.title}</td>
                     <td className="course-ltp">
-                      {formatLTP(course)}
+                      {courseAPI.formatLTP(course)}
                     </td>
-                    <td className="status-cell">
-                      <span className={`status-badge ${course.status || 'active'}`}>
-                        {course.status === 'active' ? 'Active' : 
-                         course.status === 'inactive' ? 'Inactive' : 
-                         'Active'}
-                      </span>
+                    <td className="course-credit">
+                      {course.credit !== undefined && course.credit !== null 
+                        ? course.credit
+                        : '-'
+                      }
                     </td>
                     <td className="syllabus-cell">
                       {course.syllabus ? (
@@ -226,6 +205,11 @@ const ModeratorCourses = () => {
                       >
                         View
                       </button>
+                      {canEditCourse(course) && (
+                        <span className="edit-badge" title="You can edit this course">
+                          
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -293,32 +277,34 @@ const ModeratorCourses = () => {
               </div>
               
               <div className="detail-row">
-                <label>Status:</label>
-                <span className={`status-badge large ${viewingCourse.status || 'active'}`}>
-                  {viewingCourse.status === 'active' ? 'Active' : 
-                   viewingCourse.status === 'inactive' ? 'Inactive' : 
-                   'Active'}
-                </span>
-              </div>
-              
-              <div className="detail-row">
                 <label>L-T-P Hours:</label>
-                <span className="ltp-badge">{formatLTP(viewingCourse)}</span>
+                <span className="ltp-badge">{courseAPI.formatLTP(viewingCourse)}</span>
               </div>
               
               <div className="ltp-breakdown">
                 <div className="ltp-item">
                   <span className="ltp-label">Lecture:</span>
-                  <span className="ltp-value">{viewingCourse.l || 0} hours</span>
+                  <span className="ltp-value">{viewingCourse.l} hours</span>
                 </div>
                 <div className="ltp-item">
                   <span className="ltp-label">Tutorial:</span>
-                  <span className="ltp-value">{viewingCourse.t || 0} hours</span>
+                  <span className="ltp-value">{viewingCourse.t} hours</span>
                 </div>
                 <div className="ltp-item">
                   <span className="ltp-label">Practical:</span>
-                  <span className="ltp-value">{viewingCourse.p || 0} hours</span>
+                  <span className="ltp-value">{viewingCourse.p} hours</span>
                 </div>
+              </div>
+              
+              {/* Added credit row */}
+              <div className="detail-row">
+                <label>Credits:</label>
+                <span className="detail-value credit-badge">
+                  {viewingCourse.credit !== undefined && viewingCourse.credit !== null 
+                    ? `${viewingCourse.credit} credit${viewingCourse.credit === 1 ? '' : 's'}`
+                    : 'Not set'
+                  }
+                </span>
               </div>
               
               <div className="detail-row full-width">
@@ -332,7 +318,7 @@ const ModeratorCourses = () => {
                 <div className="meta-item">
                   <span className="meta-label">Created:</span>
                   <span className="meta-value">
-                    {viewingCourse.created_at ? new Date(viewingCourse.created_at).toLocaleDateString() : 'N/A'}
+                    {new Date(viewingCourse.created_at).toLocaleDateString()}
                   </span>
                 </div>
                 
@@ -342,6 +328,12 @@ const ModeratorCourses = () => {
                     <span className="meta-value">
                       {new Date(viewingCourse.updated_at).toLocaleDateString()}
                     </span>
+                  </div>
+                )}
+
+                {canEditCourse(viewingCourse) && (
+                  <div className="permission-badge">
+                    you have editing permissions for this course
                   </div>
                 )}
               </div>

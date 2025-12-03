@@ -66,25 +66,8 @@ const ModeratorCO = () => {
       return matchesSearch && matchesCourse;
     });
 
-  const sortedCOs = [...filteredCOs].sort((a, b) => {
-    let aValue = a[sortField];
-    let bValue = b[sortField];
-    
-    if (sortField === 'course_code') {
-      aValue = a.course_code;
-      bValue = b.course_code;
-    } else if (sortField === 'course_title') {
-      aValue = a.course_title;
-      bValue = b.course_title;
-    } else if (sortField === 'co_number') {
-      aValue = a.co_number;
-      bValue = b.co_number;
-    }
-    
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+  // Use the same sorting method as instructor
+  const sortedCOs = coAPI.sortCOs(filteredCOs, sortField, sortDirection);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -96,7 +79,7 @@ const ModeratorCO = () => {
   };
 
   const getSortIcon = (field) => {
-    if (sortField !== field) return '↕️';
+    if (sortField !== field) return '↕';
     return sortDirection === 'asc' ? '↑' : '↓';
   };
 
@@ -112,7 +95,7 @@ const ModeratorCO = () => {
 
   if (loading) {
     return (
-      <div className="co-page">
+      <div className="instructor-co-page">
         <div className="loading">Loading course outcomes...</div>
       </div>
     );
@@ -120,7 +103,7 @@ const ModeratorCO = () => {
 
   if (error) {
     return (
-      <div className="co-page">
+      <div className="instructor-co-page">
         <div className="error">{error}</div>
         <button onClick={loadAllData} className="retry-btn">
           Try Again
@@ -130,7 +113,7 @@ const ModeratorCO = () => {
   }
 
   return (
-    <div className="moderator-co-page">
+    <div className="instructor-co-page">
       <div className="co-header">
         <div className="header-main">
           <h1>Course Outcomes</h1>
@@ -228,9 +211,9 @@ const ModeratorCO = () => {
                 </td>
                 <td className="co-description">
                   <div className="description-text" title={co.description}>
-                    {co.description && co.description.length > 150 
+                    {co.description.length > 150 
                       ? `${co.description.substring(0, 150)}...` 
-                      : co.description || 'No description available'
+                      : co.description
                     }
                   </div>
                 </td>
@@ -299,7 +282,7 @@ const ModeratorCO = () => {
               <div className="detail-row full-width">
                 <label>Description:</label>
                 <div className="description-content">
-                  {viewingCO.description || 'No description available'}
+                  {viewingCO.description}
                 </div>
               </div>
               
@@ -307,7 +290,7 @@ const ModeratorCO = () => {
                 <div className="meta-item">
                   <span className="meta-label">Created:</span>
                   <span className="meta-value">
-                    {viewingCO.created_at ? new Date(viewingCO.created_at).toLocaleDateString() : 'N/A'}
+                    {new Date(viewingCO.created_at).toLocaleDateString()}
                   </span>
                 </div>
                 

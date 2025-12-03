@@ -6,40 +6,35 @@ import './ModerationList.css';
 
 const ModerationList = () => {
   const navigate = useNavigate();
-  const [moderations, setModerations] = useState([]);
+  const [allModerations, setAllModerations] = useState([]); // Store ALL data
+  const [filteredModerations, setFilteredModerations] = useState([]); // Client-side filtered
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Only for display filters, not triggering API calls
   const [filters, setFilters] = useState({
     search: '',
     status: '',
     courseCode: '',
     moderatorName: '',
-    page: 1,
-    limit: 20
   });
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    totalPages: 1,
-    hasNext: false,
-    hasPrev: false
-  });
+  
   const [sortConfig, setSortConfig] = useState({ key: 'updated_at', direction: 'desc' });
   const auth = useContext(AuthContext);
 
-  const fetchModerations = async () => {
+  // Fetch all data once
+  const fetchAllModerations = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await moderatorAPI.getAllModerations(filters);
-      setModerations(response.data || []);
-      setPagination(response.pagination || {
-        total: 0,
+      // Fetch all data without pagination initially
+      const response = await moderatorAPI.getAllModerations({
         page: 1,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: false
+        limit: 1000 // Get large amount for client-side filtering
       });
+      
+      setAllModerations(response.data || []);
+      setFilteredModerations(response.data || []);
     } catch (error) {
       console.error('Error fetching moderations:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch moderation records';
@@ -49,17 +44,56 @@ const ModerationList = () => {
     }
   };
 
+  // Apply filters client-side
+  const applyFilters = () => {
+    let filtered = [...allModerations];
+
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(mod =>
+        (mod.paper_title?.toLowerCase().includes(searchLower)) ||
+        (mod.course_code?.toLowerCase().includes(searchLower)) ||
+        (mod.course_title?.toLowerCase().includes(searchLower)) ||
+        (mod.moderator_name?.toLowerCase().includes(searchLower)) ||
+        (mod.creator_name?.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Status filter
+    if (filters.status) {
+      filtered = filtered.filter(mod => mod.status === filters.status);
+    }
+
+    // Course filter
+    if (filters.courseCode) {
+      filtered = filtered.filter(mod => mod.course_code === filters.courseCode);
+    }
+
+    // Moderator filter
+    if (filters.moderatorName) {
+      filtered = filtered.filter(mod => mod.moderator_name === filters.moderatorName);
+    }
+
+    setFilteredModerations(filtered);
+  };
+
+  // Handle filter changes (client-side only)
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
-      [key]: value,
-      page: 1
+      [key]: value
     }));
   };
 
+  // Apply filters when filter values change
+  useEffect(() => {
+    applyFilters();
+  }, [filters, allModerations]);
+
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchModerations();
+    // Already applied via useEffect
   };
 
   const handleSort = (key) => {
@@ -69,39 +103,33 @@ const ModerationList = () => {
     });
   };
 
-  const handlePageChange = (newPage) => {
-    setFilters(prev => ({ ...prev, page: newPage }));
-  };
-
   const handleResetFilters = () => {
     setFilters({
       search: '',
       status: '',
       courseCode: '',
       moderatorName: '',
-      page: 1,
-      limit: 20
     });
   };
 
-  // Navigate to ModReport with moderation details
   const handleViewReport = (moderation) => {
     navigate(`/admin/moderation/report?moderationId=${moderation.moderation_id}&paperId=${moderation.paper_id}`);
   };
 
-  // Navigate to QuestionList
   const handleViewQuestions = (moderation) => {
     navigate(`/admin/moderation/questions?moderationId=${moderation.moderation_id}&paperId=${moderation.paper_id}`);
   };
 
+  // Get unique values from ALL data
   const getUniqueValues = (key) => {
-    return [...new Set(moderations.map(mod => mod[key]).filter(Boolean))].sort();
+    return [...new Set(allModerations.map(mod => mod[key]).filter(Boolean))].sort();
   };
 
+  // Sort filtered moderations
   const getSortedModerations = () => {
-    if (!sortConfig.key) return moderations;
+    if (!sortConfig.key) return filteredModerations;
 
-    return [...moderations].sort((a, b) => {
+    return [...filteredModerations].sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
       
@@ -109,6 +137,15 @@ const ModerationList = () => {
       if (aValue == null) return 1;
       if (bValue == null) return -1;
       
+      // Handle date sorting
+      if (sortConfig.key.includes('_at')) {
+        const aDate = new Date(aValue);
+        const bDate = new Date(bValue);
+        if (sortConfig.direction === 'asc') return aDate - bDate;
+        return bDate - aDate;
+      }
+      
+      // String/other sorting
       if (aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1;
       }
@@ -119,9 +156,10 @@ const ModerationList = () => {
     });
   };
 
+  // Initial fetch
   useEffect(() => {
-    fetchModerations();
-  }, [filters]);
+    fetchAllModerations();
+  }, []);
 
   const sortedModerations = getSortedModerations();
   const uniqueStatuses = ['pending', 'approved', 'rejected'];
@@ -129,7 +167,7 @@ const ModerationList = () => {
   const uniqueModerators = getUniqueValues('moderator_name');
 
   const SortIcon = ({ columnKey }) => {
-    if (sortConfig.key !== columnKey) return '↕️';
+    if (sortConfig.key !== columnKey) return '↕';
     return sortConfig.direction === 'asc' ? '↑' : '↓';
   };
 
@@ -150,7 +188,7 @@ const ModerationList = () => {
             ← Dashboard
           </button>
           <button 
-            onClick={fetchModerations} 
+            onClick={fetchAllModerations} 
             className="btn btn-secondary"
             disabled={loading}
           >
@@ -162,9 +200,8 @@ const ModerationList = () => {
       <div className="page-subtitle">
         <p>View and manage all moderation activities</p>
         <div className="quick-stats">
-          <span className="stat-item">Total: {pagination.total}</span>
-          <span className="stat-item">Showing: {moderations.length}</span>
-          <span className="stat-item">Page: {pagination.page}/{pagination.totalPages}</span>
+          <span className="stat-item">Total: {allModerations.length}</span>
+          <span className="stat-item">Showing: {filteredModerations.length}</span>
         </div>
       </div>
 
@@ -172,7 +209,7 @@ const ModerationList = () => {
         <div className="error-message">
           <strong>Error:</strong> {error}
           <button onClick={() => setError(null)} className="close-error">×</button>
-          <button onClick={fetchModerations} className="retry-btn">Retry</button>
+          <button onClick={fetchAllModerations} className="retry-btn">Retry</button>
         </div>
       )}
 
@@ -180,7 +217,7 @@ const ModerationList = () => {
         <div className="section-header">
           <h3>Filters</h3>
           <button 
-            onClick={fetchModerations} 
+            onClick={fetchAllModerations} 
             className="btn btn-refresh"
             disabled={loading}
           >
@@ -247,14 +284,11 @@ const ModerationList = () => {
           </div>
 
           <div className="filter-actions">
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              Apply Filters
-            </button>
             <button type="button" className="btn btn-outline" onClick={handleResetFilters} disabled={loading}>
               Reset
             </button>
             <span className="result-count">
-              {loading ? 'Loading...' : `${pagination.total} records found`}
+              {loading ? 'Loading...' : `${filteredModerations.length} of ${allModerations.length} records`}
             </span>
           </div>
         </form>
@@ -263,16 +297,16 @@ const ModerationList = () => {
       <div className="moderation-table-container">
         {loading ? (
           <div className="loading">Loading moderation records...</div>
-        ) : moderations.length === 0 ? (
+        ) : filteredModerations.length === 0 ? (
           <div className="no-data">
-            {Object.values(filters).some(val => val && val !== 1 && val !== 20) 
+            {Object.values(filters).some(val => val) 
               ? "No records found matching your criteria" 
               : "No moderation records found"
             }
             {!filters.search && !filters.status && !filters.courseCode && !filters.moderatorName && (
               <div className="no-data-actions">
                 <p>It looks like there are no moderation records yet.</p>
-                <button className="btn btn-primary" onClick={fetchModerations}>
+                <button className="btn btn-primary" onClick={fetchAllModerations}>
                   Refresh
                 </button>
               </div>
@@ -359,56 +393,6 @@ const ModerationList = () => {
                 </tbody>
               </table>
             </div>
-
-            {pagination.totalPages > 1 && (
-              <div className="pagination">
-                <button
-                  className="btn btn-outline"
-                  disabled={!pagination.hasPrev || loading}
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                >
-                  ← Previous
-                </button>
-                
-                <div className="page-numbers">
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (pagination.totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (pagination.page <= 3) {
-                      pageNum = i + 1;
-                    } else if (pagination.page >= pagination.totalPages - 2) {
-                      pageNum = pagination.totalPages - 4 + i;
-                    } else {
-                      pageNum = pagination.page - 2 + i;
-                    }
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        className={`btn btn-page ${pageNum === pagination.page ? 'active' : ''}`}
-                        onClick={() => handlePageChange(pageNum)}
-                        disabled={loading}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                
-                <span className="page-info">
-                  Page {pagination.page} of {pagination.totalPages}
-                </span>
-                
-                <button
-                  className="btn btn-outline"
-                  disabled={!pagination.hasNext || loading}
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
           </>
         )}
       </div>

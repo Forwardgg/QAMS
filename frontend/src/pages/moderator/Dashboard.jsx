@@ -1,6 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import moderatorAPI from '../../api/moderator.api';
+
+// Import MUI Icons
+import {
+  Description as DescriptionIcon,
+  Assessment as AssessmentIcon,
+  CheckCircle as CheckCircleIcon,
+  Refresh as RefreshIcon,
+  Warning as WarningIcon,
+  Close as CloseIcon,
+  PlayArrow as PlayArrowIcon,
+  MenuBook as MenuBookIcon,
+  TrendingUp as TrendingUpIcon,
+  Download as DownloadIcon,
+  Circle as CircleIcon,
+  Check as CheckIcon,
+  Close as CloseIconSmall,
+  History as HistoryIcon,
+  Visibility as VisibilityIcon
+} from '@mui/icons-material';
+
 import './Dashboard.css';
 
 const ModeratorDashboard = () => {
@@ -108,10 +128,10 @@ const ModeratorDashboard = () => {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'approved': return '✓';
-      case 'pending': return '●';
-      case 'rejected': return '✗';
-      default: return '●';
+      case 'approved': return <CheckIcon sx={{ fontSize: 14 }} />;
+      case 'pending': return <CircleIcon sx={{ fontSize: 10 }} />;
+      case 'rejected': return <CloseIconSmall sx={{ fontSize: 14 }} />;
+      default: return <CircleIcon sx={{ fontSize: 10 }} />;
     }
   };
 
@@ -135,22 +155,28 @@ const ModeratorDashboard = () => {
           <p className="dashboard-subtitle">Welcome back! Here's your moderation overview</p>
         </div>
         <button className="refresh-btn" onClick={fetchDashboardData} title="Refresh">
-          ↻
+          <RefreshIcon sx={{ fontSize: 20 }} />
         </button>
       </div>
 
       {error && (
         <div className="error-alert">
-          <span className="error-icon">⚠</span>
+          <span className="error-icon">
+            <WarningIcon sx={{ fontSize: 18 }} />
+          </span>
           <span className="error-message">{error}</span>
-          <button className="error-close" onClick={() => setError(null)}>×</button>
+          <button className="error-close" onClick={() => setError(null)}>
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </button>
         </div>
       )}
 
       {/* Stats Cards */}
       <div className="stats-grid">
         <div className="stats-card">
-          <div className="stats-icon">📄</div>
+          <div className="stats-icon">
+            <DescriptionIcon sx={{ fontSize: 32, color: '#4f46e5' }} />
+          </div>
           <div className="stats-content">
             <h3 className="stats-number">{dashboardData.pendingPapers}</h3>
             <p className="stats-label">PENDING PAPERS</p>
@@ -159,7 +185,9 @@ const ModeratorDashboard = () => {
         </div>
 
         <div className="stats-card">
-          <div className="stats-icon">📋</div>
+          <div className="stats-icon">
+            <AssessmentIcon sx={{ fontSize: 32, color: '#f59e0b' }} />
+          </div>
           <div className="stats-content">
             <h3 className="stats-number">{dashboardData.activeModerations}</h3>
             <p className="stats-label">ACTIVE MODERATIONS</p>
@@ -168,7 +196,9 @@ const ModeratorDashboard = () => {
         </div>
 
         <div className="stats-card">
-          <div className="stats-icon">✅</div>
+          <div className="stats-icon">
+            <CheckCircleIcon sx={{ fontSize: 32, color: '#10b981' }} />
+          </div>
           <div className="stats-content">
             <h3 className="stats-number">{dashboardData.completedReviews}</h3>
             <p className="stats-label">COMPLETED REVIEWS</p>
@@ -208,7 +238,9 @@ const ModeratorDashboard = () => {
             className="action-btn action-btn-primary" 
             onClick={handleStartNewModeration}
           >
-            <span className="action-icon">▶</span>
+            <span className="action-icon">
+              <PlayArrowIcon sx={{ fontSize: 24 }} />
+            </span>
             <span className="action-title">Start New Moderation</span>
             {dashboardData.pendingPapers > 0 && (
               <span className="action-badge">{dashboardData.pendingPapers}</span>
@@ -219,7 +251,9 @@ const ModeratorDashboard = () => {
             className="action-btn" 
             onClick={handleViewCourses}
           >
-            <span className="action-icon">📚</span>
+            <span className="action-icon">
+              <MenuBookIcon sx={{ fontSize: 24 }} />
+            </span>
             <span className="action-title">View Courses</span>
           </button>
 
@@ -227,7 +261,9 @@ const ModeratorDashboard = () => {
             className="action-btn" 
             onClick={handleViewCOs}
           >
-            <span className="action-icon">📊</span>
+            <span className="action-icon">
+              <TrendingUpIcon sx={{ fontSize: 24 }} />
+            </span>
             <span className="action-title">View COs</span>
           </button>
 
@@ -235,7 +271,9 @@ const ModeratorDashboard = () => {
             className="action-btn" 
             onClick={handleDownloadReports}
           >
-            <span className="action-icon">📥</span>
+            <span className="action-icon">
+              <DownloadIcon sx={{ fontSize: 24 }} />
+            </span>
             <span className="action-title">Download Reports</span>
           </button>
         </div>
@@ -249,13 +287,16 @@ const ModeratorDashboard = () => {
             className="view-all-btn"
             onClick={() => navigate('/moderator/moderation/papers')}
           >
+            <VisibilityIcon sx={{ fontSize: 16, marginRight: 1 }} />
             View All
           </button>
         </div>
         
         {dashboardData.recentActivity.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📭</div>
+            <div className="empty-icon">
+              <HistoryIcon sx={{ fontSize: 48, color: '#94a3b8' }} />
+            </div>
             <p className="empty-text">No recent moderation activity found.</p>
           </div>
         ) : (

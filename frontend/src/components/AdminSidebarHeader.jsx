@@ -3,6 +3,21 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthContext } from './AuthProvider';
 import './AdminSidebarHeader.css';
 
+// Import MUI Icons
+import {
+  Dashboard as DashboardIcon,
+  Build as BuildIcon,
+  MenuBook as MenuBookIcon,
+  Flag as FlagIcon,
+  Description as DescriptionIcon,
+  ChevronLeft,
+  ChevronRight,
+  KeyboardArrowUp,
+  KeyboardArrowDown,
+  Logout as LogoutIcon,
+  AdminPanelSettings
+} from '@mui/icons-material';
+
 const AdminSidebarHeader = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -11,13 +26,38 @@ const AdminSidebarHeader = () => {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Menu items configuration
+  // Menu items configuration with MUI Icons
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/admin/dashboard' },
-    { id: 'moderation', label: 'Moderation', icon: '🧰', path: '/admin/moderation' },
-    { id: 'courses', label: 'Course Management', icon: '📘', path: '/admin/courses' },
-    { id: 'CO', label: 'CO Management', icon: '🎯', path: '/admin/cos' },
-    { id: 'questionPaper', label: 'Question Papers', icon: '📝', path: '/admin/question-papers' }
+    { 
+      id: 'dashboard', 
+      label: 'Dashboard', 
+      icon: <DashboardIcon sx={{ fontSize: 20 }} />, 
+      path: '/admin/dashboard' 
+    },
+    { 
+      id: 'moderation', 
+      label: 'Moderation', 
+      icon: <BuildIcon sx={{ fontSize: 20 }} />, 
+      path: '/admin/moderation' 
+    },
+    { 
+      id: 'courses', 
+      label: 'Courses', 
+      icon: <MenuBookIcon sx={{ fontSize: 20 }} />, 
+      path: '/admin/courses' 
+    },
+    { 
+      id: 'CO', 
+      label: 'CO Management', 
+      icon: <FlagIcon sx={{ fontSize: 20 }} />,
+      path: '/admin/cos' 
+    },
+    { 
+      id: 'questionPaper', 
+      label: 'Question Papers', 
+      icon: <DescriptionIcon sx={{ fontSize: 20 }} />, 
+      path: '/admin/question-papers' 
+    }
   ];
 
   // Close dropdown when clicking outside
@@ -75,19 +115,23 @@ const AdminSidebarHeader = () => {
         {/* Sidebar Header */}
         <div className="sidebar-header">
           {!isCollapsed && (
-            <>
-              <div className="sidebar-logo">ADMIN</div>
-              <div className="sidebar-title">Dashboard</div>
-            </>
+            <div className="sidebar-logo-container">
+              <AdminPanelSettings className="admin-icon" />
+              <span className="sidebar-logo">Admin</span>
+            </div>
           )}
-          {isCollapsed && <div className="sidebar-collapsed-logo">A</div>}
+          {isCollapsed && (
+            <div className="sidebar-collapsed-logo">
+              <AdminPanelSettings />
+            </div>
+          )}
           
           <button 
             className="sidebar-toggle" 
             onClick={toggleSidebar}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? '→' : '←'}
+            {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
           </button>
         </div>
 
@@ -101,12 +145,11 @@ const AdminSidebarHeader = () => {
                   onClick={() => handleNavigation(item.path)}
                   title={isCollapsed ? item.label : ''}
                 >
-                  <span className="sidebar-icon">{item.icon}</span>
+                  <span className="sidebar-icon">
+                    {item.icon}
+                  </span>
                   {!isCollapsed && (
                     <span className="sidebar-label">{item.label}</span>
-                  )}
-                  {!isCollapsed && activePage === item.id && (
-                    <span className="active-indicator"></span>
                   )}
                 </button>
               </li>
@@ -122,15 +165,8 @@ const AdminSidebarHeader = () => {
           <div className="header-left">
             <div className="page-info">
               <h1 className="page-title">
-                {menuItems.find(item => item.id === activePage)?.label || 'Dashboard'}
+                {menuItems.find(item => item.id === activePage)?.label || 'Admin Dashboard'}
               </h1>
-              <p className="page-description">
-                {activePage === 'dashboard' && 'System overview and quick actions'}
-                {activePage === 'moderation' && 'Manage and review moderation activities'}
-                {activePage === 'courses' && 'Create and manage courses'}
-                {activePage === 'CO' && 'Manage course outcomes and mappings'}
-                {activePage === 'questionPaper' && 'View and manage question papers'}
-              </p>
             </div>
           </div>
           
@@ -141,23 +177,31 @@ const AdminSidebarHeader = () => {
                 onClick={toggleUserDropdown}
               >
                 <div className="header-avatar">
-                  {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                  {user?.name?.charAt(0) || user?.email?.charAt(0) || 'A'}
                 </div>
-                <div className="header-user-details">
-                  <div className="header-user-name">{user?.name || 'Administrator'}</div>
-                  <div className="header-user-email">{user?.email || 'admin@example.com'}</div>
-                </div>
+                {!isCollapsed && (
+                  <div className="header-user-details">
+                    <div className="header-user-name">{user?.name || 'Administrator'}</div>
+                    <div className="header-user-role">Admin</div>
+                  </div>
+                )}
                 <div className="dropdown-arrow">
-                  {isUserDropdownOpen ? '▲' : '▼'}
+                  {isUserDropdownOpen ? 
+                    <KeyboardArrowUp /> : 
+                    <KeyboardArrowDown />
+                  }
                 </div>
               </button>
               
-              {/* Dropdown Menu - Minimal */}
+              {/* Dropdown Menu */}
               {isUserDropdownOpen && (
                 <div className="user-dropdown-menu">
                   <button className="dropdown-item logout-item" onClick={handleLogout}>
-  <span className="dropdown-item-text">Logout</span>
-</button>
+                    <span className="dropdown-item-icon">
+                      <LogoutIcon />
+                    </span>
+                    <span className="dropdown-item-text">Logout</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -168,19 +212,6 @@ const AdminSidebarHeader = () => {
         <main className="admin-content">
           <Outlet />
         </main>
-
-        {/* Footer */}
-        <footer className="admin-footer">
-          <div className="footer-content">
-            <p>© {new Date().getFullYear()} Learning Management System • v1.0</p>
-            <div className="footer-links">
-              <a href="/admin/help" className="footer-link">Help</a>
-              <a href="/admin/support" className="footer-link">Support</a>
-              <a href="/admin/privacy" className="footer-link">Privacy</a>
-              <a href="/admin/terms" className="footer-link">Terms</a>
-            </div>
-          </div>
-        </footer>
       </div>
     </div>
   );

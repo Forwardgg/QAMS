@@ -16,16 +16,18 @@ export class Course {
     if (val < min || val > max) throw new Error(`${name} must be between ${min} and ${max}`);
   }
 
-  static async createCourse({ code, title, syllabus, l = 0, t = 0, p = 0 }) {
+  // Updated: Added credit parameter with default value
+  static async createCourse({ code, title, syllabus, l = 0, t = 0, p = 0, credit = 3 }) {
     this._ensureRequiredString(code, "code");
     this._ensureRequiredString(title, "title");
     this._ensureRequiredString(syllabus, "syllabus");
     this._ensureIntRange(l, "l");
     this._ensureIntRange(t, "t");
     this._ensureIntRange(p, "p");
+    this._ensureIntRange(credit, "credit"); // Added validation for credit
 
-    const query = `INSERT INTO courses (code, title, syllabus, l, t, p) VALUES ($1,$2,$3,$4,$5,$6) RETURNING course_id, code, title, syllabus, l, t, p, created_at, updated_at`;
-    const values = [String(code).trim(), String(title).trim(), syllabus, l, t, p];
+    const query = `INSERT INTO courses (code, title, syllabus, l, t, p, credit) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING course_id, code, title, syllabus, l, t, p, credit, created_at, updated_at`;
+    const values = [String(code).trim(), String(title).trim(), syllabus, l, t, p, credit];
 
     try {
       const { rows } = await pool.query(query, values);
@@ -40,7 +42,8 @@ export class Course {
     page = Number(page) || 1;
     limit = Number(limit) || Course.DEFAULT_LIMIT;
     const offset = (page - 1) * limit;
-    const allowedOrderBy = new Set(["created_at", "updated_at", "title", "code"]);
+    // Updated: Added 'credit' to allowed order by columns
+    const allowedOrderBy = new Set(["created_at", "updated_at", "title", "code", "credit"]);
     if (!allowedOrderBy.has(orderBy)) orderBy = "created_at";
     order = String(order).toLowerCase() === "asc" ? "ASC" : "DESC";
 
@@ -54,7 +57,8 @@ export class Course {
 
     const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
     const countQuery = `SELECT COUNT(*)::int AS total FROM courses ${whereClause}`;
-    const dataQuery = `SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at FROM courses ${whereClause} ORDER BY ${orderBy} ${order} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    // Updated: Added credit to SELECT fields
+    const dataQuery = `SELECT course_id, code, title, syllabus, l, t, p, credit, created_at, updated_at FROM courses ${whereClause} ORDER BY ${orderBy} ${order} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
 
     values.push(limit, offset);
 
@@ -71,19 +75,22 @@ export class Course {
 
   static async getCourseById(courseId) {
     if (!Number.isInteger(courseId)) throw new Error("courseId must be an integer");
-    const query = `SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at FROM courses WHERE course_id = $1`;
+    // Updated: Added credit to SELECT fields
+    const query = `SELECT course_id, code, title, syllabus, l, t, p, credit, created_at, updated_at FROM courses WHERE course_id = $1`;
     const { rows } = await pool.query(query, [courseId]);
     return rows[0] || null;
   }
 
   static async getCourseByCode(code) {
     if (!code || String(code).trim() === "") throw new Error("code is required");
-    const query = `SELECT course_id, code, title, syllabus, l, t, p, created_at, updated_at FROM courses WHERE code = $1`;
+    // Updated: Added credit to SELECT fields
+    const query = `SELECT course_id, code, title, syllabus, l, t, p, credit, created_at, updated_at FROM courses WHERE code = $1`;
     const { rows } = await pool.query(query, [String(code).trim()]);
     return rows[0] || null;
   }
 
-  static async updateCourse(courseId, { code, title, syllabus, l, t, p } = {}) {
+  // Updated: Added credit parameter to update method
+  static async updateCourse(courseId, { code, title, syllabus, l, t, p, credit } = {}) {
     if (!Number.isInteger(courseId)) throw new Error("courseId must be an integer");
     this._ensureString(code, "code");
     this._ensureString(title, "title");
@@ -91,6 +98,7 @@ export class Course {
     this._ensureIntRange(l, "l");
     this._ensureIntRange(t, "t");
     this._ensureIntRange(p, "p");
+    if (credit !== undefined) this._ensureIntRange(credit, "credit"); // Added credit validation
 
     const sets = [];
     const values = [];
@@ -102,10 +110,12 @@ export class Course {
     if (l !== undefined) { sets.push(`l = $${idx++}`); values.push(l); }
     if (t !== undefined) { sets.push(`t = $${idx++}`); values.push(t); }
     if (p !== undefined) { sets.push(`p = $${idx++}`); values.push(p); }
+    if (credit !== undefined) { sets.push(`credit = $${idx++}`); values.push(credit); } // Added credit update
 
     if (sets.length === 0) return this.getCourseById(courseId);
 
-    const query = `UPDATE courses SET ${sets.join(", ")} WHERE course_id = $${idx} RETURNING course_id, code, title, syllabus, l, t, p, created_at, updated_at`;
+    // Updated: Added credit to RETURNING fields
+    const query = `UPDATE courses SET ${sets.join(", ")} WHERE course_id = $${idx} RETURNING course_id, code, title, syllabus, l, t, p, credit, created_at, updated_at`;
     values.push(courseId);
 
     try {
@@ -119,7 +129,8 @@ export class Course {
 
   static async deleteCourse(courseId) {
     if (!Number.isInteger(courseId)) throw new Error("courseId must be an integer");
-    const query = `DELETE FROM courses WHERE course_id = $1 RETURNING course_id, code, title`;
+    // Updated: Added credit to RETURNING fields
+    const query = `DELETE FROM courses WHERE course_id = $1 RETURNING course_id, code, title, credit`;
     const { rows } = await pool.query(query, [courseId]);
     return rows[0] || null;
   }

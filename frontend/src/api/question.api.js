@@ -1,11 +1,5 @@
-// src/api/question.api.js
 import api from "./axios";
 
-/**
- * Helper to unwrap axios responses safely.
- * Returns res.data on success.
- * Throws a normalized Error(message) on failure for easier UI handling.
- */
 async function handle(promise) {
   try {
     const res = await promise;
@@ -36,10 +30,10 @@ const questionAPI = {
   getByPaper: (paperId, config = {}) =>
     handle(api.get(`/questions/paper/${encodeURIComponent(paperId)}`, config)),
 
-  /**
-   * Search questions. `filters` is an object (paper_id, co_id, status, course_id, page, limit)
-   * We pass through only non-empty values using axios `params`.
-   */
+  // NEW METHOD: Get COs for a paper
+  getPaperCOs: (paperId, config = {}) =>
+    handle(api.get(`/questions/paper/${encodeURIComponent(paperId)}/cos`, config)),
+
   search: (filters = {}, config = {}) => {
     const params = {};
     Object.entries(filters).forEach(([k, v]) => {
@@ -57,7 +51,6 @@ const questionAPI = {
     handle(api.get("/uploads/config", config)),
 
   uploadFile: (formData, config = {}) =>
-    // DO NOT set Content-Type manually; axios/browser will set the boundary.
     handle(api.post("/uploads", formData, { ...config }))
 };
 

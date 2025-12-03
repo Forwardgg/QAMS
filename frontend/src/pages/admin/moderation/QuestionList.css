@@ -479,4 +479,30 @@
     font-size: 12px;
     padding: 6px 12px;
   }
+  .question-marks-right {
+  margin-left: auto;
+  padding-left: 10px;
+  font-weight: bold;
+  color: #2c5282;
+  font-family: "Times New Roman", serif;
+  font-size: 11pt;
+  white-space: nowrap;
+}
+
+/* Adjust question layout to accommodate marks */
+.question-number-content {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  justify-content: space-between;
+}
+
+.question-content {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  line-height: 1.2;
+  font-family: "Times New Roman", serif;
+  max-width: 90%; /* Ensure space for marks */
+}
 }

@@ -285,21 +285,30 @@ class PDFGenerationService {
   const semester = this.escapeHtml(metadata.semester || '');
   const examType = this.escapeHtml(metadata.exam_type || 'End Term Examination');
   const academicYear = this.escapeHtml(metadata.academic_year || '');
-  // REMOVED the duplicate 'course' declaration
   const duration = metadata.duration ? `${metadata.duration} mins` : '';
   const fullMarks = metadata.full_marks ? `${metadata.full_marks}` : '';
 
   // Build the header lines in your exact format
   const headerLine1 = institution;
   const headerLine2 = `${semester} Semester ${examType}, ${academicYear}`;
-  const headerLine3 = `${course}`; // This should be "CS343: COMPUTER NETWORKS"
+  const headerLine3 = `${course}`;
   
   const questions = (paper.questions || []).sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0));
+  
+  // NEW: Calculate total marks
+  const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+  
   const questionsHtml = questions
     .map((q, idx) => {
+      // NEW: Add marks display at the end of each question
+      const marksDisplay = q.marks ? `<span class="question-marks">[${q.marks} marks]</span>` : '';
+      
       return `<div class="question" data-qid="${q.question_id || ''}">
-        <div class="qnum"><strong>${q.sequence_number || idx + 1}.</strong></div>
-        <div class="qcontent">${q.content_html || ''}</div>
+        <div class="question-row">
+          <div class="qnum"><strong>${q.sequence_number || idx + 1}.</strong></div>
+          <div class="qcontent">${q.content_html || ''}</div>
+          ${marksDisplay}
+        </div>
       </div>`;
     })
     .join('\n');
@@ -307,7 +316,7 @@ class PDFGenerationService {
   const css = `
     @page { 
       size: A4; 
-      margin: 10mm 15mm 10mm 15mm;
+      margin: 5mm 10mm 5mm 10mm;
     }
     html,body { 
       font-family: "Times New Roman", "Georgia", serif; 
@@ -316,7 +325,7 @@ class PDFGenerationService {
     body { 
       margin:0; 
       padding:0; 
-      font-size:12pt; 
+      font-size:10pt; 
       line-height:1.2;
     }
     .container { 
@@ -356,13 +365,18 @@ class PDFGenerationService {
       text-align: right;
     }
     
-    /* Question layout */
+    /* NEW: Question row layout for marks at the end */
+    .question-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      width: 100%;
+    }
+    
     .question { 
       margin-bottom: 2mm;
       page-break-inside: avoid;
-      display: flex;
-      align-items: baseline;
-      gap: 3px;
+      width: 100%;
     }
     .qnum { 
       font-weight: bold;
@@ -370,12 +384,23 @@ class PDFGenerationService {
       margin: 0;
       padding: 0;
       line-height: 1.2;
+      margin-right: 3px;
     }
     .qcontent { 
       flex: 1;
       margin: 0;
       padding: 0;
       line-height: 1.2;
+    }
+    
+    /* NEW: Marks display at the end */
+    .question-marks {
+      font-weight: bold;
+      color: #111;
+      margin-left: 8px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      font-size: 8pt;
     }
     
     .qcontent p {
@@ -392,26 +417,26 @@ class PDFGenerationService {
       display:block; 
       margin:2px 0;
     }
-       img, .question-content img, figure img, figure.image img, .image img {
-    max-width: 100% !important;
-    max-height: 300px !important;
-    width: auto !important;
-    height: auto !important;
-    display: block !important;
-    margin: 4px auto !important;
-    object-fit: contain !important;
-  }
+    img, .question-content img, figure img, figure.image img, .image img {
+      max-width: 100% !important;
+      max-height: 250px !important;
+      width: auto !important;
+      height: auto !important;
+      display: block !important;
+      margin: 4px auto !important;
+      object-fit: contain !important;
+    }
     figure.image {
-    max-width: 100% !important;
-  }
-      .question-content img {
-    max-width: 100% !important;
-    height: auto !important;
-    display: block;
-    margin: 2px 0;
-    max-height: 400px !important; /* ADD THIS LINE */
-    object-fit: contain !important;
-  } 
+      max-width: 100% !important;
+    }
+    .question-content img {
+      max-width: 100% !important;
+      height: auto !important;
+      display: block;
+      margin: 2px 0;
+      max-height: 400px !important;
+      object-fit: contain !important;
+    } 
     .footer { 
       display: none !important;
     }

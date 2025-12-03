@@ -41,11 +41,19 @@
     ]
   },
   "devDependencies": {
+    "eslint": "^8.57.1",
     "eslint-plugin-react-hooks": "^7.0.1"
   },
   "eslintConfig": {
-    "rules": {
-      "react-hooks/exhaustive-deps": "off"
-    }
+  "extends": [
+    "react-app",
+    "plugin:react-hooks/recommended"
+  ],
+  "plugins": [
+    "react-hooks"
+  ],
+  "rules": {
+    "react-hooks/exhaustive-deps": "off"
   }
+}
 }

@@ -52,15 +52,16 @@ export const getCourseByCode = async (req, res) => {
   }
 };
 
+// Updated: Added credit to createCourse
 export const createCourse = async (req, res) => {
-  const { code, title, syllabus, l, t, p } = req.body ?? {};
+  const { code, title, syllabus, l, t, p, credit } = req.body ?? {};
 
   if (!code || !title || !syllabus) {
     return res.status(400).json({ error: "code, title and syllabus are required" });
   }
 
   try {
-    const course = await Course.createCourse({ code, title, syllabus, l, t, p });
+    const course = await Course.createCourse({ code, title, syllabus, l, t, p, credit });
     return res.status(201).json(course);
   } catch (err) {
     // handle unique code conflict from model
@@ -72,6 +73,7 @@ export const createCourse = async (req, res) => {
   }
 };
 
+// Updated: Added credit to updateCourse
 export const updateCourse = async (req, res) => {
   const idRaw = req.params?.id;
   const id = Number.parseInt(idRaw, 10);

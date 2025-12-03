@@ -336,27 +336,33 @@ const QuestionList = () => {
           </header>
 
           <main className="print-preview-body">
-            {sortedQuestions.map((question, index) => (
-              <div key={question.question_id} className="print-preview-question">
-                <div className="question-number-content">
-                  <strong className="question-number">
-                    {question.sequence_number || index + 1}.
-                  </strong>
-                  <div 
-                    className="question-content" 
-                    dangerouslySetInnerHTML={{ 
-                      __html: question.content_html || question.content_preview || 'No content available' 
-                  }} 
-                  />
-                </div>
-                {showCO && question.co_number && (
-                  <div className="question-co">
-                    Course Outcome: CO{question.co_number}
-                  </div>
-                )}
-              </div>
-            ))}
-          </main>
+  {sortedQuestions.map((question, index) => (
+    <div key={question.question_id} className="print-preview-question">
+      <div className="question-number-content">
+        <strong className="question-number">
+          {question.sequence_number || index + 1}.
+        </strong>
+        <div 
+          className="question-content" 
+          dangerouslySetInnerHTML={{ 
+            __html: question.content_html || question.content_preview || 'No content available' 
+          }} 
+        />
+        {/* Add marks display on the right side */}
+        {question.marks !== null && question.marks !== undefined && (
+          <div className="question-marks-right">
+            [{question.marks}]
+          </div>
+        )}
+      </div>
+      {showCO && question.co_number && (
+        <div className="question-co">
+          Course Outcome: CO{question.co_number}
+        </div>
+      )}
+    </div>
+  ))}
+</main>
         </div>
       </div>
     </div>

@@ -1,5 +1,4 @@
 // backend/controllers/QuestionController.js
-import { pool } from "../config/db.js";
 import { Question } from "../models/Question.js";
 
 /**
@@ -20,7 +19,7 @@ const logRequest = (req) => {
 export const createQuestion = async (req, res) => {
   logRequest(req);
   try {
-    const { content_html, paper_id: paperIdRaw, co_id: coIdRaw } = req.body;
+    const { content_html, paper_id: paperIdRaw, co_id: coIdRaw, marks: marksRaw } = req.body;
     const userId = req.user?.user_id;
 
     if (!content_html || !paperIdRaw) {
@@ -30,6 +29,16 @@ export const createQuestion = async (req, res) => {
     const paperId = Number.isInteger(Number(paperIdRaw)) ? parseInt(paperIdRaw, 10) : NaN;
     if (Number.isNaN(paperId)) {
       return res.status(400).json({ error: "Invalid paper_id" });
+    }
+
+    // Validate marks if provided
+    let marks = null;
+    if (marksRaw !== undefined && marksRaw !== null && marksRaw !== '') {
+      const marksParsed = Number.isInteger(Number(marksRaw)) ? parseInt(marksRaw, 10) : NaN;
+      if (Number.isNaN(marksParsed) || marksParsed < 0) {
+        return res.status(400).json({ error: "marks must be a non-negative integer" });
+      }
+      marks = marksParsed;
     }
 
     // Validate paper access (model helper uses pool)
@@ -55,40 +64,22 @@ export const createQuestion = async (req, res) => {
     // Get next sequence number (model helper)
     const sequence_number = await Question.getNextSequenceNumber(paperId);
 
-    // Insert question in DB
-    const insertQuery = `
-      INSERT INTO questions (paper_id, content_html, co_id, status, sequence_number, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
-    `;
-    const insertValues = [paperId, content_html, coId, 'draft', sequence_number];
+    // Use the Question.create() method which validates paper status
+    const questionData = {
+      paper_id: paperId,
+      content_html,
+      co_id: coId,
+      marks, // NEW: Add marks to question data
+      status: 'draft',
+      sequence_number
+    };
 
-    const insertResult = await pool.query(insertQuery, insertValues);
-    const question = insertResult.rows[0];
+    const question = await Question.create(questionData);
 
-    // Extract and link media (best-effort). Use model helper to detect URLs.
+    // Extract and link media
     const mediaUrls = Question.extractMediaUrls(content_html || '');
     if (mediaUrls.length > 0) {
-      // Update media rows to link them to this question
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-
-        for (const mediaUrl of mediaUrls) {
-  await client.query(
-    `UPDATE question_media
-     SET question_id = $1, is_used = TRUE
-     WHERE media_url = $2 AND (question_id IS NULL OR question_id = $1)`,
-    [question.question_id, mediaUrl]
-  );
-}
-        await client.query('COMMIT');
-      } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('Failed to link media during createQuestion:', err);
-      } finally {
-        client.release();
-      }
+      await Question.linkMedia(question.question_id, mediaUrls);
     }
 
     res.status(201).json({
@@ -99,6 +90,13 @@ export const createQuestion = async (req, res) => {
 
   } catch (err) {
     console.error("createQuestion error:", err?.stack ?? err?.message ?? err);
+    
+    // Handle specific validation errors
+    if (err.message.includes('Questions cannot be added') || 
+        err.message.includes('Paper status:')) {
+      return res.status(400).json({ error: err.message });
+    }
+    
     return res.status(500).json({ error: "Server error while creating question" });
   }
 };
@@ -109,7 +107,6 @@ export const createQuestion = async (req, res) => {
 export const updateQuestion = async (req, res) => {
   logRequest(req);
 
-  const client = await pool.connect();
   try {
     const questionIdRaw = req.params.id;
     const questionId = Number.isInteger(Number(questionIdRaw)) ? parseInt(questionIdRaw, 10) : NaN;
@@ -121,6 +118,7 @@ export const updateQuestion = async (req, res) => {
       content_html,
       paper_id: incomingPaperIdRaw,
       co_id: incomingCoIdRaw,
+      marks: incomingMarksRaw, // NEW: Add marks to destructuring
       status: incomingStatus,
       sequence_number: incomingSequenceNumberRaw
     } = req.body;
@@ -129,149 +127,107 @@ export const updateQuestion = async (req, res) => {
       return res.status(400).json({ error: "content_html is required" });
     }
 
-    // Load existing question
-    const existingRes = await Question.findById(questionId);
-    if (!existingRes) {
+    // Load existing question to validate ownership/access
+    const existingQuestion = await Question.findById(questionId);
+    if (!existingQuestion) {
       return res.status(404).json({ error: "Question not found" });
     }
 
-    await client.query('BEGIN');
-
-    // Validate and determine paper_id to use
-    let paperIdToUse = existingRes.paper_id;
+    // Validate paper access if changing paper_id
     if (incomingPaperIdRaw !== undefined && incomingPaperIdRaw !== null && incomingPaperIdRaw !== '') {
       const pid = Number.isInteger(Number(incomingPaperIdRaw)) ? parseInt(incomingPaperIdRaw, 10) : NaN;
       if (Number.isNaN(pid)) {
-        await client.query('ROLLBACK');
         return res.status(400).json({ error: "Invalid paper_id" });
       }
-      // Validate access using model helper
       const hasAccess = await Question.validatePaperAccess(pid, req.user.user_id);
       if (!hasAccess) {
-        await client.query('ROLLBACK');
         return res.status(403).json({ error: "Invalid paper or access denied" });
       }
-      paperIdToUse = pid;
     }
 
     // Validate co_id if provided
-    let coIdToUse = existingRes.co_id;
+    let coIdToUse = existingQuestion.co_id;
     if (incomingCoIdRaw !== undefined) {
       if (incomingCoIdRaw === '' || incomingCoIdRaw === null) {
         coIdToUse = null;
       } else {
         const coid = Number.isInteger(Number(incomingCoIdRaw)) ? parseInt(incomingCoIdRaw, 10) : NaN;
         if (Number.isNaN(coid)) {
-          await client.query('ROLLBACK');
           return res.status(400).json({ error: "Invalid co_id" });
         }
-        const isValid = await Question.validateCOForPaper(coid, paperIdToUse);
+        const paperIdForValidation = incomingPaperIdRaw ? parseInt(incomingPaperIdRaw, 10) : existingQuestion.paper_id;
+        const isValid = await Question.validateCOForPaper(coid, paperIdForValidation);
         if (!isValid) {
-          await client.query('ROLLBACK');
           return res.status(400).json({ error: "Invalid CO for this paper's course" });
         }
         coIdToUse = coid;
       }
     }
 
+    // Validate marks if provided
+    let marksToUse = existingQuestion.marks;
+    if (incomingMarksRaw !== undefined) {
+      if (incomingMarksRaw === '' || incomingMarksRaw === null) {
+        marksToUse = null;
+      } else {
+        const marksParsed = Number.isInteger(Number(incomingMarksRaw)) ? parseInt(incomingMarksRaw, 10) : NaN;
+        if (Number.isNaN(marksParsed) || marksParsed < 0) {
+          return res.status(400).json({ error: "marks must be a non-negative integer or null" });
+        }
+        marksToUse = marksParsed;
+      }
+    }
+
     // Determine sequence number
-    let seqToUse = existingRes.sequence_number;
+    let seqToUse = existingQuestion.sequence_number;
     const incomingSeqIsProvided = incomingSequenceNumberRaw !== undefined && incomingSequenceNumberRaw !== null && incomingSequenceNumberRaw !== '';
     if (incomingSeqIsProvided) {
       const seqParsed = Number.isInteger(Number(incomingSequenceNumberRaw)) ? parseInt(incomingSequenceNumberRaw, 10) : NaN;
       if (Number.isNaN(seqParsed) || seqParsed < 0) {
-        await client.query('ROLLBACK');
         return res.status(400).json({ error: "Invalid sequence_number" });
       }
       seqToUse = seqParsed;
-    } else {
-      if (paperIdToUse !== existingRes.paper_id) {
-        seqToUse = await Question.getNextSequenceNumber(paperIdToUse);
-      }
     }
 
     // Validate status if provided
     const allowedQuestionStatuses = ['draft', 'submitted', 'under_review', 'change_requested', 'approved'];
-    let statusToUse = existingRes.status;
+    let statusToUse = existingQuestion.status;
     if (incomingStatus !== undefined && incomingStatus !== null && incomingStatus !== '') {
       if (!allowedQuestionStatuses.includes(incomingStatus)) {
-        await client.query('ROLLBACK');
         return res.status(400).json({ error: `Invalid status. Allowed: ${allowedQuestionStatuses.join(', ')}` });
       }
       statusToUse = incomingStatus;
     }
 
-    // Build update query (use client)
-    const setClauses = [];
-    const values = [];
-    let idx = 1;
+    // Prepare update data
+    const updateData = {
+      content_html,
+      co_id: coIdToUse,
+      marks: marksToUse, // NEW: Add marks to update data
+      status: statusToUse,
+      sequence_number: seqToUse
+    };
 
-    setClauses.push(`content_html = $${idx++}`);
-    values.push(content_html);
-
-    if (paperIdToUse !== undefined) {
-      setClauses.push(`paper_id = $${idx++}`);
-      values.push(paperIdToUse);
-    }
-
-    setClauses.push(`co_id = $${idx++}`);
-    values.push(coIdToUse);
-
-    setClauses.push(`status = $${idx++}`);
-    values.push(statusToUse);
-
-    setClauses.push(`sequence_number = $${idx++}`);
-    values.push(seqToUse);
-
-    setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
-
-    const updateSql = `
-      UPDATE questions
-      SET ${setClauses.join(', ')}
-      WHERE question_id = $${idx}
-      RETURNING question_id, paper_id, content_html, co_id, status, sequence_number, created_at, updated_at
-    `;
-    values.push(questionId);
-
-    const updateResult = await client.query(updateSql, values);
-    if (!updateResult.rows.length) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: "Question not found when updating" });
-    }
-    const updatedQuestion = updateResult.rows[0];
-
-    // Reconcile media - FIXED: Removed updated_at from question_media queries
-    const mediaUrls = Question.extractMediaUrls(content_html || '');
-
-    if (mediaUrls.length > 0) {
-      for (const mediaUrl of mediaUrls) {
-        await client.query(
-          `UPDATE question_media
-           SET question_id = $1, is_used = TRUE
-           WHERE media_url = $2 AND (question_id IS NULL OR question_id = $1)`,
-          [questionId, mediaUrl]
-        );
+    // Add paper_id if changing
+    if (incomingPaperIdRaw !== undefined && incomingPaperIdRaw !== null && incomingPaperIdRaw !== '') {
+      const pid = Number.isInteger(Number(incomingPaperIdRaw)) ? parseInt(incomingPaperIdRaw, 10) : NaN;
+      if (!Number.isNaN(pid)) {
+        updateData.paper_id = pid;
       }
     }
 
-    if (mediaUrls.length > 0) {
-      const placeholders = mediaUrls.map((_, i) => `$${i + 2}`).join(',');
-      const unlinkSql = `
-        UPDATE question_media
-        SET question_id = NULL, is_used = FALSE
-        WHERE question_id = $1 AND media_url NOT IN (${placeholders})
-      `;
-      await client.query(unlinkSql, [questionId, ...mediaUrls]);
-    } else {
-      await client.query(
-        `UPDATE question_media
-         SET question_id = NULL, is_used = FALSE
-         WHERE question_id = $1`,
-        [questionId]
-      );
-    }
+    // Use Question.update() method which validates paper status
+    const updatedQuestion = await Question.update(questionId, updateData);
 
-    await client.query('COMMIT');
+    // Handle media linking/unlinking
+    const mediaUrls = Question.extractMediaUrls(content_html || '');
+    
+    if (mediaUrls.length > 0) {
+      await Question.linkMedia(questionId, mediaUrls);
+    }
+    
+    // Unlink media not in current content
+    await Question.unlinkUnusedMedia(questionId, mediaUrls);
 
     console.log('Question updated:', {
       questionId: updatedQuestion.question_id,
@@ -286,14 +242,19 @@ export const updateQuestion = async (req, res) => {
     });
 
   } catch (err) {
-    try { await client.query('ROLLBACK'); } catch (e) {}
     console.error("updateQuestion error:", err?.stack ?? err?.message ?? err);
+    
+    // Handle specific validation errors
+    if (err.message.includes('Questions cannot be edited') || 
+        err.message.includes('Paper status:')) {
+      return res.status(400).json({ error: err.message });
+    }
+    
     if (err.message === 'Question not found') {
       return res.status(404).json({ error: "Question not found" });
     }
+    
     return res.status(500).json({ error: "Server error while updating question" });
-  } finally {
-    client.release();
   }
 };
 
@@ -473,5 +434,37 @@ export const updateQuestionSequence = async (req, res) => {
   } catch (err) {
     console.error("updateQuestionSequence error:", err?.stack ?? err?.message ?? err);
     return res.status(500).json({ error: "Server error while updating question sequence" });
+  }
+};
+
+export const getPaperCOs = async (req, res) => {
+  logRequest(req);
+  try {
+    const paperIdRaw = req.params.paperId;
+    const paperId = Number.isInteger(Number(paperIdRaw)) ? parseInt(paperIdRaw, 10) : NaN;
+    
+    if (Number.isNaN(paperId)) {
+      return res.status(400).json({ error: "Invalid paper ID" });
+    }
+
+    // Optional: Validate user has access to this paper
+    if (req.user?.user_id) {
+      const hasAccess = await Question.validatePaperAccess(paperId, req.user.user_id);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Access denied to this paper" });
+      }
+    }
+
+    const cos = await Question.getCOsForPaper(paperId);
+    
+    return res.json({
+      success: true,
+      cos,
+      count: cos.length
+    });
+
+  } catch (err) {
+    console.error("getPaperCOs error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while fetching course outcomes" });
   }
 };

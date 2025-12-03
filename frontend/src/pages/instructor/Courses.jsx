@@ -159,6 +159,12 @@ const InstructorCourses = () => {
                   >
                     L-T-P {sortField === 'l' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
+                  <th 
+                    className="sortable" 
+                    onClick={() => handleSort('credit')}
+                  >
+                    Credits {sortField === 'credit' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th>Syllabus Preview</th>
                   <th>Actions</th>
                 </tr>
@@ -172,6 +178,12 @@ const InstructorCourses = () => {
                     <td className="course-title">{course.title}</td>
                     <td className="course-ltp">
                       {courseAPI.formatLTP(course)}
+                    </td>
+                    <td className="course-credit">
+                      {course.credit !== undefined && course.credit !== null 
+                        ? course.credit
+                        : '-'
+                      }
                     </td>
                     <td className="syllabus-cell">
                       {course.syllabus ? (
@@ -191,7 +203,7 @@ const InstructorCourses = () => {
                         onClick={() => handleView(course)}
                         title="View course details"
                       >
-                        👁️ View
+                        View
                       </button>
                       {canEditCourse(course) && (
                         <span className="edit-badge" title="You can edit this course">
@@ -282,6 +294,17 @@ const InstructorCourses = () => {
                   <span className="ltp-label">Practical:</span>
                   <span className="ltp-value">{viewingCourse.p} hours</span>
                 </div>
+              </div>
+              
+              {/* Added credit row */}
+              <div className="detail-row">
+                <label>Credits:</label>
+                <span className="detail-value credit-badge">
+                  {viewingCourse.credit !== undefined && viewingCourse.credit !== null 
+                    ? `${viewingCourse.credit} credit${viewingCourse.credit === 1 ? '' : 's'}`
+                    : 'Not set'
+                  }
+                </span>
               </div>
               
               <div className="detail-row full-width">

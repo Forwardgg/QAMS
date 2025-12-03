@@ -4,8 +4,8 @@ import api from "./axios";
  * --- COURSE API ---
  * Backend response structures:
  * - getAll/search: { rows: [], total: number, page: number, limit: number }
- * - getById/getByCode: { course_id, code, title, syllabus, l, t, p, created_at, updated_at }
- * - create: { course_id, code, title, syllabus, l, t, p, created_at, updated_at }
+ * - getById/getByCode: { course_id, code, title, syllabus, l, t, p, credit, created_at, updated_at } // Updated
+ * - create: { course_id, code, title, syllabus, l, t, p, credit, created_at, updated_at } // Updated
  * - update: { course: {...}, actor: { actorId } }
  * - delete: { message: "Course deleted", course: {...}, actor: { actorId } }
  */
@@ -66,11 +66,26 @@ const courseAPI = {
   },
 
   /**
+   * Format credit display
+   */
+  formatCredit: (course) => {
+    if (!course) return "";
+    return course.credit !== undefined ? `${course.credit} credit${course.credit === 1 ? '' : 's'}` : "Not set";
+  },
+
+  /**
    * Validate LTP values
    */
   validateLTP: (l, t, p) => {
     const isValid = (v) => Number.isInteger(v) && v >= 0 && v <= 9;
     return isValid(l) && isValid(t) && isValid(p);
+  },
+
+  /**
+   * Validate credit value
+   */
+  validateCredit: (credit) => {
+    return Number.isInteger(credit) && credit >= 0 && credit <= 9;
   },
 
   /**
@@ -101,7 +116,9 @@ const courseAPI = {
       l: course.l,
       t: course.t,
       p: course.p,
+      credit: course.credit, // Added
       ltp: courseAPI.formatLTP(course),
+      creditDisplay: courseAPI.formatCredit(course), // Added
     };
   },
 
@@ -132,7 +149,7 @@ const courseAPI = {
    */
   filterByLTP: (courses, filters = {}) => {
     return courses.filter((course) => {
-      const { minL, maxL, minT, maxT, minP, maxP } = filters;
+      const { minL, maxL, minT, maxT, minP, maxP, minCredit, maxCredit } = filters; // Updated
 
       if (minL !== undefined && course.l < minL) return false;
       if (maxL !== undefined && course.l > maxL) return false;
@@ -140,9 +157,80 @@ const courseAPI = {
       if (maxT !== undefined && course.t > maxT) return false;
       if (minP !== undefined && course.p < minP) return false;
       if (maxP !== undefined && course.p > maxP) return false;
+      
+      // Credit filtering
+      if (minCredit !== undefined && course.credit < minCredit) return false;
+      if (maxCredit !== undefined && course.credit > maxCredit) return false;
 
       return true;
     });
+  },
+
+  /**
+   * Get course summary statistics
+   */
+  getStatistics: (courses) => {
+    if (!courses || !Array.isArray(courses)) return null;
+    
+    const stats = {
+      total: courses.length,
+      totalCredits: 0,
+      averageCredit: 0,
+      creditDistribution: {},
+    };
+
+    courses.forEach(course => {
+      if (course.credit !== undefined) {
+        stats.totalCredits += course.credit;
+        stats.creditDistribution[course.credit] = (stats.creditDistribution[course.credit] || 0) + 1;
+      }
+    });
+
+    if (courses.length > 0) {
+      stats.averageCredit = (stats.totalCredits / courses.length).toFixed(1);
+    }
+
+    return stats;
+  },
+
+  /**
+   * Validate course data before submission
+   */
+  validateCourseData: (data) => {
+    const errors = {};
+    
+    if (!data.code || data.code.trim() === '') {
+      errors.code = 'Course code is required';
+    }
+    
+    if (!data.title || data.title.trim() === '') {
+      errors.title = 'Course title is required';
+    }
+    
+    if (!data.syllabus || data.syllabus.trim() === '') {
+      errors.syllabus = 'Syllabus is required';
+    }
+    
+    if (data.l !== undefined && !courseAPI.validateLTP(data.l, 0, 0)) {
+      errors.l = 'L must be between 0-9';
+    }
+    
+    if (data.t !== undefined && !courseAPI.validateLTP(0, data.t, 0)) {
+      errors.t = 'T must be between 0-9';
+    }
+    
+    if (data.p !== undefined && !courseAPI.validateLTP(0, 0, data.p)) {
+      errors.p = 'P must be between 0-9';
+    }
+    
+    if (data.credit !== undefined && !courseAPI.validateCredit(data.credit)) {
+      errors.credit = 'Credit must be between 0-9';
+    }
+    
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors
+    };
   },
 };
 

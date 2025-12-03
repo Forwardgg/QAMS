@@ -7,8 +7,9 @@ import {
   getQuestionsByPaper,
   deleteQuestion,
   searchQuestions,
-  updateQuestionSequence
-} from "../controllers/QuestionController.js"; // FIX: Use correct filename
+  updateQuestionSequence,
+  getPaperCOs  // ADD THIS IMPORT
+} from "../controllers/QuestionController.js";
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.get("/:id", authenticate, getQuestion);
 router.put("/:id", authenticate, authorizeRoles("instructor", "admin"), updateQuestion);
 router.delete("/:id", authenticate, authorizeRoles("instructor", "admin"), deleteQuestion);
 router.patch("/paper/:paperId/sequence", authenticate, authorizeRoles("instructor", "admin"), updateQuestionSequence);
+router.get("/paper/:paperId/cos", authenticate, getPaperCOs);
 
 export default router;
