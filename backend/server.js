@@ -36,7 +36,9 @@ const corsOptions = {
   origin: [
     'http://localhost:3000', 
     'http://frontend:3000',
-    process.env.FRONTEND_URL
+     process.env.FRONTEND_URL,
+    'https://qams-front.netlify.app',  // ← YOUR NETLIFY URL
+    'https://*.netlify.app'  // ← WILDCARD FOR ALL NETLIFY
   ].filter(Boolean),
   credentials: true,
 };
