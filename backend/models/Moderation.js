@@ -9,7 +9,6 @@ export class Moderation {
    * - Accepts an optional client to participate in transactions.
    * - Prevents creating duplicate moderation for same moderator & paper.
    */
-  // In backend/models/Moderation.js - replace the entire create() method
 static async create(paperId, moderatorId, client = null) {
   const executor = client || pool;
 
@@ -23,36 +22,31 @@ static async create(paperId, moderatorId, client = null) {
   }
   const paperVersion = pv.rows[0].version ?? 1;
 
-  // FIX: Only prevent if same moderator already has active moderation for this paper
+  // Check if same moderator already has active moderation for this paper
   const existing = await executor.query(
     `SELECT moderation_id, status FROM qp_moderations
      WHERE paper_id = $1 AND moderator_id = $2 AND status = 'pending' LIMIT 1`,
-    [paperId, moderatorId]  // Only check for same moderator
+    [paperId, moderatorId]
   );
   if (existing.rows.length) {
     throw new Error("You are already moderating this paper");
   }
 
+  // SIMPLE VERSION - Omit boolean fields to use defaults
   const query = `
     INSERT INTO qp_moderations (
       paper_id, moderator_id, paper_version, status,
-      questions_set_per_co, questions_set_per_co_comment,
-      meets_level_standard, meets_level_standard_comment,
-      covers_syllabus, covers_syllabus_comment,
-      technically_accurate, technically_accurate_comment,
-      edited_formatted_accurately, edited_formatted_comment,
-      linguistically_accurate, linguistically_accurate_comment,
-      verbatim_copy_check, verbatim_copy_comment
+      questions_set_per_co_comment,
+      meets_level_standard_comment,
+      covers_syllabus_comment,
+      technically_accurate_comment,
+      edited_formatted_comment,
+      linguistically_accurate_comment,
+      verbatim_copy_comment
     )
     VALUES (
       $1, $2, $3, 'pending',
-      NULL, 'N/A',
-      NULL, 'N/A',
-      NULL, 'N/A',
-      NULL, 'N/A',
-      NULL, 'N/A',
-      NULL, 'N/A',
-      NULL, 'N/A'
+      'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A'
     )
     RETURNING *
   `;

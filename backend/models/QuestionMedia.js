@@ -139,16 +139,28 @@ export class QuestionMedia {
   }
 
   /**
-   * Create media record
-   */
-  static async create({ filename, mimetype, uploadResult, question_id = null, paper_id = null }) {
+ * Create media record
+ */
+static async create({ filename, mimetype, uploadResult, question_id = null, paper_id = null }) {
   this._ensureNonEmptyString(filename, 'Filename');
   this._ensureNonEmptyString(mimetype, 'MIME type');
 
   const safeFilename = this.sanitizeFilename(filename);
   
   // Use URL from uploadResult if available, otherwise generate local URL
-  const mediaUrl = uploadResult?.url || `/uploads/images/questions/${safeFilename}`;
+  let mediaUrl;
+  if (uploadResult && uploadResult.url) {
+    mediaUrl = uploadResult.url; // Cloudinary URL or fallback URL
+  } else {
+    mediaUrl = `/uploads/images/questions/${safeFilename}`;
+  }
+
+  console.log('Creating media record:', {
+    mediaUrl,
+    isCloudinary: uploadResult?.isCloudinary || false,
+    question_id,
+    paper_id
+  });
 
   const query = `
     INSERT INTO question_media (
@@ -348,33 +360,60 @@ export class QuestionMedia {
     const result = await pool.query(query, urls);
     return result.rows;
   }
-  static async saveFileHybrid(buffer, filename, mimetype) {
+  /**
+ * Hybrid save - tries Cloudinary first, falls back to local
+ */
+static async saveFileHybrid(buffer, filename, mimetype) {
   this._ensureBuffer(buffer, 'File buffer');
   this._ensureNonEmptyString(filename, 'Filename');
   
   const safeFilename = this.sanitizeFilename(filename);
   const isProduction = process.env.NODE_ENV === 'production';
   
-  // Try Cloudinary in production if configured
-  if (isProduction && CloudinaryService.isConfigured()) {
+  console.log('Cloudinary Debug:', {
+    isProduction,
+    hasCloudinaryConfig: CloudinaryService.isConfigured(),
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'NOT SET',
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? 'SET' : 'NOT SET',
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'NOT SET',
+    NODE_ENV: process.env.NODE_ENV,
+    BACKEND_URL: process.env.BACKEND_URL || 'NOT SET'
+  });
+  
+  // Try Cloudinary if configured (always, not just in production)
+  if (CloudinaryService.isConfigured()) {
+    console.log('Attempting Cloudinary upload...');
     try {
       const result = await CloudinaryService.uploadImage(buffer, safeFilename);
+      console.log('Cloudinary upload successful:', result.secure_url);
       return {
         url: result.secure_url,
         isCloudinary: true,
         cloudinaryId: result.public_id
       };
     } catch (cloudinaryError) {
-      console.warn('Cloudinary upload failed, using local storage:', cloudinaryError.message);
+      console.error('Cloudinary upload failed:', cloudinaryError.message);
       // Fall through to local storage
     }
+  } else {
+    console.log('Cloudinary not configured - using fallback');
   }
   
   // Local storage (works for both dev and prod fallback)
+  console.log('Using local storage fallback');
   const filePath = await this.saveFileToDisk(buffer, safeFilename, 'images/questions');
   
+  // Get proper URL for the environment
+  let url;
+  if (isProduction) {
+    const backendUrl = process.env.BACKEND_URL || 'https://qams.onrender.com';
+    url = `${backendUrl}/uploads/images/questions/${safeFilename}`;
+  } else {
+    url = `/uploads/images/questions/${safeFilename}`;
+  }
+  
   return {
-    url: CloudinaryService.getFallbackUrl(safeFilename, isProduction),
+    url: url,
     isCloudinary: false,
     filePath
   };
@@ -386,5 +425,41 @@ export class QuestionMedia {
 static getPublicUrl(uploadResult) {
   if (!uploadResult || !uploadResult.url) return '';
   return uploadResult.url;
+}
+/**
+ * Link media to question by URLs extracted from HTML
+ */
+static async linkMediaToQuestion(questionId, htmlContent) {
+  this._ensureInteger(questionId, 'Question ID');
+  
+  if (!htmlContent) {
+    console.log('No HTML content to extract images from');
+    return [];
+  }
+  
+  // Extract image URLs from HTML
+  const imageUrls = this.extractMediaUrls(htmlContent);
+  console.log('Extracted image URLs from HTML:', imageUrls);
+  
+  if (imageUrls.length === 0) {
+    console.log('No images found in HTML content');
+    return [];
+  }
+  
+  // Find media records by URLs
+  const mediaRecords = await this.findByUrls(imageUrls);
+  console.log('Found media records:', mediaRecords.map(m => ({ id: m.media_id, url: m.media_url })));
+  
+  // Link each media to the question
+  const linkedMedia = [];
+  for (const media of mediaRecords) {
+    if (!media.question_id) { // Only link if not already linked
+      const updatedMedia = await this.linkToQuestion(media.media_id, questionId);
+      linkedMedia.push(updatedMedia);
+      console.log(`Linked media ${media.media_id} to question ${questionId}`);
+    }
+  }
+  
+  return linkedMedia;
 }
 }

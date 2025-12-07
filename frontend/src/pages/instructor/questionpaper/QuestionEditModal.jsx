@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import questionAPI from '../../../api/question.api';
-import { setupUploadAdapter } from '../../../utils/UploadAdapter';
 import './QuestionEditModal.css';
 
 export default function QuestionEditModal({ question = {}, onSave, onClose }) {
@@ -11,9 +10,11 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
   const [isLoading, setIsLoading] = useState(false);
   const [contentHtml, setContentHtml] = useState(question?.content_html || '');
   const [coId, setCoId] = useState(question?.co_id ?? '');
-  const [marks, setMarks] = useState(question?.marks ?? ''); // NEW: Add marks state
+  const [marks, setMarks] = useState(question?.marks ?? '');
   const [coOptions, setCoOptions] = useState([]);
   const [isLoadingCOs, setIsLoadingCOs] = useState(false);
+  const [isUploading, setIsUploading] = useState(false); // NEW: Track upload status
+  const [uploadQueue, setUploadQueue] = useState(0); // NEW: Track number of active uploads
 
   // Fetch COs for this paper's course when modal opens
   useEffect(() => {
@@ -42,7 +43,7 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
   useEffect(() => {
     setContentHtml(question?.content_html || '');
     setCoId(question?.co_id ?? '');
-    setMarks(question?.marks ?? ''); // NEW: Update marks state
+    setMarks(question?.marks ?? '');
 
     // If editor exists, update its content
     if (editorRef.current && typeof editorRef.current.setData === 'function') {
@@ -57,7 +58,7 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
     }
   }, [question]);
 
-  // CKEditor init
+  // CKEditor init with upload tracking
   useEffect(() => {
     let mounted = true;
 
@@ -90,11 +91,99 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
           placeholder: 'Edit question content...'
         });
 
-        try {
-          setupUploadAdapter(inst, '/api/uploads');
-        } catch (err) {
-          console.warn('Upload adapter setup failed', err);
-        }
+        // Enhanced upload adapter with upload tracking
+        const fileRepository = inst.plugins.get('FileRepository');
+        
+        fileRepository.createUploadAdapter = (loader) => {
+          const token = localStorage.getItem('token');
+          const baseUrl = process.env.REACT_APP_API_URL || '';
+          let uploadUrl;
+          
+          // Build correct upload URL
+          if (baseUrl.includes('localhost') || baseUrl.startsWith('http')) {
+            uploadUrl = `${baseUrl.replace(/\/api\/?$/, '')}/api/uploads`;
+          } else if (!baseUrl) {
+            uploadUrl = '/api/uploads';
+          } else {
+            uploadUrl = `${baseUrl}/api/uploads`;
+          }
+          
+          console.log('CKEditor upload URL:', uploadUrl);
+          
+          return {
+            upload: () => {
+              // Increment upload queue when upload starts
+              setUploadQueue(prev => prev + 1);
+              setIsUploading(true);
+              
+              return loader.file.then(file => {
+                return new Promise((resolve, reject) => {
+                  const xhr = new XMLHttpRequest();
+                  xhr.open('POST', uploadUrl, true);
+                  xhr.responseType = 'json';
+                  xhr.setRequestHeader('Accept', 'application/json');
+                  
+                  if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                  }
+                  
+                  xhr.addEventListener('load', () => {
+                    // Decrement upload queue when upload completes
+                    setUploadQueue(prev => prev - 1);
+                    
+                    if (uploadQueue <= 1) {
+                      setIsUploading(false);
+                    }
+                    
+                    if (xhr.status === 201 || xhr.status === 200) {
+                      const response = xhr.response;
+                      if (response && response.url) {
+                        resolve({ default: response.url });
+                      } else {
+                        reject('Upload succeeded but no URL returned');
+                      }
+                    } else {
+                      reject(`Upload failed: ${xhr.status} ${xhr.statusText}`);
+                    }
+                  });
+                  
+                  xhr.addEventListener('error', () => {
+                    // Decrement upload queue on error
+                    setUploadQueue(prev => prev - 1);
+                    if (uploadQueue <= 1) {
+                      setIsUploading(false);
+                    }
+                    reject('Network error during upload');
+                  });
+                  
+                  xhr.addEventListener('abort', () => {
+                    // Decrement upload queue on abort
+                    setUploadQueue(prev => prev - 1);
+                    if (uploadQueue <= 1) {
+                      setIsUploading(false);
+                    }
+                    reject('Upload cancelled');
+                  });
+                  
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('question_id', question?.question_id || '');
+                  formData.append('paper_id', question?.paper_id || '');
+                  
+                  xhr.send(formData);
+                });
+              });
+            },
+            
+            abort: () => {
+              // Decrement upload queue on abort
+              setUploadQueue(prev => Math.max(0, prev - 1));
+              if (uploadQueue <= 1) {
+                setIsUploading(false);
+              }
+            }
+          };
+        };
 
         const handler = () => {
           try {
@@ -132,26 +221,27 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
       }
       isInitRef.current = false;
     };
-  }, []);
+  }, [question?.question_id, question?.paper_id]);
 
-  const cleanupAndClose = async () => {
-    if (editorRef.current) {
-      try {
-        if (changeHandlerRef.current && editorRef.current.model?.document?.off) {
-          try { editorRef.current.model.document.off('change:data', changeHandlerRef.current); } catch (_) {}
-          changeHandlerRef.current = null;
-        }
-        await editorRef.current.destroy();
-      } catch (_) {}
-      editorRef.current = null;
+  // Watch upload queue to update isUploading state
+  useEffect(() => {
+    if (uploadQueue === 0) {
+      setIsUploading(false);
+    } else {
+      setIsUploading(true);
     }
-    isInitRef.current = false;
-    if (typeof onClose === 'function') onClose();
-  };
+  }, [uploadQueue]);
 
-  // FIXED SUBMIT FUNCTION - Fetches fresh question data
+  // FIXED SUBMIT FUNCTION with upload check
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Check if images are still uploading
+    if (isUploading) {
+      alert('Please wait for image uploads to complete before saving changes.');
+      return;
+    }
+    
     if (!contentHtml || !contentHtml.trim()) {
       alert('Question content is required');
       return;
@@ -179,7 +269,7 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
       const payload = {
         content_html: contentHtml,
         co_id: coId === '' ? null : (Number.isNaN(Number(coId)) ? coId : Number(coId)),
-        marks: marksValue, // NEW: Add marks to payload
+        marks: marksValue,
         paper_id: question?.paper_id
       };
 
@@ -202,6 +292,21 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const cleanupAndClose = async () => {
+    if (editorRef.current) {
+      try {
+        if (changeHandlerRef.current && editorRef.current.model?.document?.off) {
+          try { editorRef.current.model.document.off('change:data', changeHandlerRef.current); } catch (_) {}
+          changeHandlerRef.current = null;
+        }
+        await editorRef.current.destroy();
+      } catch (_) {}
+      editorRef.current = null;
+    }
+    isInitRef.current = false;
+    if (typeof onClose === 'function') onClose();
   };
 
   const handleCancel = async () => {
@@ -228,12 +333,25 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
           <button type="button" onClick={handleCancel} className="btn-close" aria-label="Close">×</button>
         </div>
 
+        {/* Upload status indicator */}
+        {isUploading && (
+          <div className="upload-status-indicator">
+            <div className="uploading-spinner"></div>
+            <span>Uploading images... Please wait before saving</span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-body">
             <div className="form-group">
               <label>Question Content *</label>
               <div className="editor-container" aria-label="Question editor">
                 <div ref={mountRef} />
+                {isUploading && (
+                  <div className="editor-upload-hint">
+                    <small>⏳ Image upload in progress. Please wait before saving.</small>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -244,7 +362,7 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
                   className="input"
                   value={coId || ''}
                   onChange={(e) => setCoId(e.target.value === '' ? null : e.target.value)}
-                  disabled={isLoadingCOs}
+                  disabled={isLoadingCOs || isUploading}
                   aria-label="Course outcome"
                 >
                   <option value="">No CO selected</option>
@@ -264,7 +382,6 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
                 )}
               </div>
 
-              {/* NEW: Marks input field */}
               <div className="form-group">
                 <label>Marks</label>
                 <input
@@ -276,6 +393,7 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
                   step="1"
                   placeholder="Enter marks (optional)"
                   aria-label="Question marks"
+                  disabled={isUploading}
                 />
                 <small className="help-text">Leave empty for no marks</small>
               </div>
@@ -283,16 +401,22 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
           </div>
 
           <div className="modal-actions">
-            <button type="button" onClick={handleCancel} className="btn-secondary" aria-label="Cancel">
+            <button 
+              type="button" 
+              onClick={handleCancel} 
+              className="btn-secondary" 
+              aria-label="Cancel"
+              disabled={isUploading}
+            >
               Cancel
             </button>
             <button 
               type="submit" 
-              disabled={isLoading || isLoadingCOs} 
+              disabled={isLoading || isLoadingCOs || isUploading} 
               className="btn-primary" 
               aria-label="Save changes"
             >
-              {isLoading ? 'Saving...' : 'Save Changes'}
+              {isLoading ? 'Saving...' : isUploading ? 'Waiting for uploads...' : 'Save Changes'}
             </button>
           </div>
         </form>

@@ -15,6 +15,7 @@ const QuestionCreatePage = () => {
   const [editor, setEditor] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [isUploading, setIsUploading] = useState(false);
 
   // Data states
   const [courses, setCourses] = useState([]);
@@ -155,7 +156,72 @@ const QuestionCreatePage = () => {
             return;
           }
 
-          setupUploadAdapter(editorInstance);
+          // Setup upload adapter with tracking
+          const fileRepository = editorInstance.plugins.get('FileRepository');
+          
+          fileRepository.createUploadAdapter = (loader) => {
+            const baseUrl = process.env.REACT_APP_API_URL || '';
+            let uploadUrl;
+            
+            if (baseUrl.endsWith('/api')) {
+              uploadUrl = `${baseUrl}/uploads`;
+            } else if (!baseUrl) {
+              uploadUrl = '/api/uploads';
+            } else {
+              uploadUrl = `${baseUrl}/api/uploads`;
+            }
+            
+            console.log('Creating upload adapter for CKEditor');
+            
+            return {
+              upload: () => {
+                return loader.file.then(file => {
+                  console.log('Starting upload for:', file.name);
+                  setIsUploading(true);
+                  
+                  return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', uploadUrl, true);
+                    xhr.responseType = 'json';
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                    
+                    xhr.addEventListener('load', () => {
+                      console.log('Upload completed, status:', xhr.status);
+                      setIsUploading(false);
+                      
+                      if (xhr.status === 201) {
+                        const response = xhr.response;
+                        console.log('Upload successful, URL:', response?.url);
+                        resolve({ default: response?.url });
+                      } else {
+                        reject('Upload failed');
+                      }
+                    });
+                    
+                    xhr.addEventListener('error', () => {
+                      console.error('Upload error');
+                      setIsUploading(false);
+                      reject('Upload failed');
+                    });
+                    
+                    const data = new FormData();
+                    data.append('file', file);
+                    xhr.send(data);
+                  });
+                });
+              },
+              
+              abort: () => {
+                console.log('Upload aborted');
+                setIsUploading(false);
+              }
+            };
+          };
 
           editorInstance.model.document.on('change:data', () => {
             setContentHtml(editorInstance.getData());
@@ -186,38 +252,25 @@ const QuestionCreatePage = () => {
     };
   }, [editor]);
 
-  const safeEditorClear = () => {
-    if (editor && editor.model) {
-      try {
-        // Method 1: Clear via model change
-        editor.model.change(writer => {
-          const root = editor.model.document.getRoot();
-          const range = writer.createRangeIn(root);
-          writer.remove(range);
-        });
-        
-        // Method 2: Set empty data after delay as backup
-        setTimeout(() => {
-          if (editor && editor.setData) {
-            try {
-              editor.setData('');
-            } catch (setDataError) {
-              console.warn('setData failed:', setDataError);
-            }
-          }
-        }, 100);
-      } catch (err) {
-        console.warn('Safe editor clear failed:', err);
-        // Final fallback
+  // Safe way to clear editor content
+  const clearEditorContent = () => {
+    if (editor) {
+      // Wait a bit to avoid race conditions
+      setTimeout(() => {
         if (editor && editor.setData) {
           try {
             editor.setData('');
-          } catch (finalError) {
-            console.error('All editor clear methods failed:', finalError);
+          } catch (error) {
+            console.warn('Error clearing editor:', error);
+            // Fallback: create new editor instance
+            if (editorRef.current) {
+              editorRef.current.innerHTML = '';
+            }
           }
         }
-      }
+      }, 100);
     }
+    setContentHtml('');
   };
 
   const handleSubmit = async (e) => {
@@ -230,6 +283,15 @@ const QuestionCreatePage = () => {
 
     if (!content_html.trim()) {
       setMessage({ type: 'error', text: 'Question content is required' });
+      return;
+    }
+
+    // Check if images are still uploading
+    if (isUploading) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Please wait for image uploads to complete before submitting' 
+      });
       return;
     }
 
@@ -259,48 +321,18 @@ const QuestionCreatePage = () => {
       
       setMessage({ 
         type: 'success', 
-        text: 'Question created successfully!' 
+        text: 'Question created successfully! You can create another question.' 
       });
       
-      // Reset form state
-      setContentHtml('');
+      // Reset only the question content and marks, keep course/paper/CO selected
       setMarks('');
-      setSelectedCO('');
-      
-      // Clear editor with multiple fallbacks
-      setTimeout(() => {
-        if (editor) {
-          try {
-            // Try the safest method first
-            if (editor.model && editor.model.change) {
-              editor.model.change(writer => {
-                const root = editor.model.document.getRoot();
-                writer.remove(writer.createRangeIn(root));
-              });
-            }
-            
-            // Then set empty data
-            setTimeout(() => {
-              if (editor && editor.setData) {
-                editor.setData('');
-              }
-            }, 50);
-          } catch (clearError) {
-            console.warn('Editor clear error in handleSubmit:', clearError);
-            // Last resort: reload the component
-            if (clearError.message && clearError.message.includes('view-position-before-root')) {
-              setTimeout(() => {
-                window.location.reload();
-              }, 1000);
-            }
-          }
-        }
-      }, 300);
+      clearEditorContent();
       
     } catch (error) {
+      console.error('Create question error:', error);
       setMessage({ 
         type: 'error', 
-        text: error.message || 'Failed to create question' 
+        text: error.response?.data?.error || error.message || 'Failed to create question' 
       });
     } finally {
       setIsLoading(false);
@@ -309,6 +341,16 @@ const QuestionCreatePage = () => {
 
   const handleCancel = () => {
     navigate('/instructor/questions');
+  };
+
+  const handleResetForm = () => {
+    // Reset everything
+    setSelectedCourse('');
+    setSelectedPaper('');
+    setSelectedCO('');
+    setMarks('');
+    clearEditorContent();
+    setMessage({ type: '', text: '' });
   };
 
   return (
@@ -321,6 +363,15 @@ const QuestionCreatePage = () => {
       {message.text && (
         <div className={`message ${message.type}`}>
           {message.text}
+        </div>
+      )}
+
+      {isUploading && (
+        <div className="upload-status">
+          <div className="uploading-indicator">
+            <span className="spinner"></span>
+            <span>Uploading image(s)... Please wait before submitting</span>
+          </div>
         </div>
       )}
 
@@ -395,6 +446,16 @@ const QuestionCreatePage = () => {
               <small className="form-hint">Leave blank if not applicable</small>
             </div>
           </div>
+          
+          <div className="form-actions-top">
+            <button 
+              type="button" 
+              onClick={handleResetForm}
+              className="btn-secondary"
+            >
+              Reset All
+            </button>
+          </div>
         </div>
 
         <div className="form-section">
@@ -402,18 +463,23 @@ const QuestionCreatePage = () => {
           <div className="editor-container">
             <div ref={editorRef}></div>
           </div>
+          {isUploading && (
+            <div className="upload-hint">
+              <small>⏳ Image upload in progress. Please wait...</small>
+            </div>
+          )}
         </div>
 
         <div className="form-actions">
           <button type="button" onClick={handleCancel} className="btn-secondary">
-            Cancel
+            Back to Questions
           </button>
           <button 
             type="submit" 
-            disabled={isLoading || !selectedPaper} 
+            disabled={isLoading || !selectedPaper || isUploading} 
             className="btn-primary"
           >
-            {isLoading ? 'Creating...' : 'Create Question'}
+            {isLoading ? 'Creating...' : isUploading ? 'Waiting for uploads...' : 'Create Question'}
           </button>
         </div>
       </form>

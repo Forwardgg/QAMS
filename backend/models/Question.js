@@ -1,5 +1,6 @@
 // backend/models/Question.js
 import { pool } from '../config/db.js';
+import { QuestionMedia } from './QuestionMedia.js';
 
 export class Question {
   // Static methods for database operations
@@ -610,4 +611,63 @@ export class Question {
     const result = await pool.query(query, [paperId]);
     return result.rows;
   }
+  // Add this method to your Question class in Question.js
+static async deleteQuestionWithMedia(questionId, client = null) {
+  const executor = client || pool;
+
+  // First get all media associated with this question
+  const mediaQuery = `
+    SELECT media_id, media_url, media_type 
+    FROM question_media 
+    WHERE question_id = $1 AND deleted_at IS NULL
+  `;
+  
+  const mediaResult = await executor.query(mediaQuery, [questionId]);
+  const mediaRecords = mediaResult.rows;
+
+  // Delete from Cloudinary if it's a Cloudinary URL
+  for (const media of mediaRecords) {
+    if (media.media_url.includes('cloudinary.com')) {
+      try {
+        // Extract public_id from Cloudinary URL
+        const urlParts = media.media_url.split('/');
+        const uploadIndex = urlParts.indexOf('upload');
+        if (uploadIndex !== -1 && uploadIndex + 1 < urlParts.length) {
+          const publicId = urlParts[uploadIndex + 1];
+          // Import CloudinaryService dynamically to avoid circular dependency
+          const { CloudinaryService } = await import('./CloudinaryService.js');
+          await CloudinaryService.deleteImage(publicId);
+          console.log(`Deleted from Cloudinary: ${publicId}`);
+        }
+      } catch (cloudinaryError) {
+        console.warn(`Failed to delete from Cloudinary for media ${media.media_id}:`, cloudinaryError.message);
+      }
+    } else if (media.media_url.startsWith('/uploads/')) {
+      // Delete local file
+      try {
+        const QuestionMedia = (await import('./QuestionMedia.js')).QuestionMedia;
+        const filename = media.media_url.split('/').pop();
+        await QuestionMedia.deleteFileIfExists(filename, 'images/questions');
+        console.log(`Deleted local file: ${filename}`);
+      } catch (fileError) {
+        console.warn(`Failed to delete local file for media ${media.media_id}:`, fileError.message);
+      }
+    }
+  }
+
+  // Delete media records from database
+  await executor.query(
+    'DELETE FROM question_media WHERE question_id = $1',
+    [questionId]
+  );
+
+  // Finally delete the question
+  const questionQuery = 'DELETE FROM questions WHERE question_id = $1 RETURNING question_id';
+  const result = await executor.query(questionQuery, [questionId]);
+  
+  return {
+    question: result.rows[0],
+    mediaDeleted: mediaRecords.length
+  };
+}
 }

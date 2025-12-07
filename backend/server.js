@@ -82,6 +82,25 @@ app.use("/api/moderation", ModerationRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/pdf", pdfRoutes);
 
+// Add this route to server.js
+app.get("/api/test-cloudinary", async (req, res) => {
+  try {
+    const CloudinaryService = (await import('./services/CloudinaryService.js')).default;
+    
+    const configStatus = {
+      CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'NOT SET',
+      CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? 'SET' : 'NOT SET',
+      CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'NOT SET',
+      BACKEND_URL: process.env.BACKEND_URL,
+      NODE_ENV: process.env.NODE_ENV,
+      isConfigured: CloudinaryService.isConfigured()
+    };
+    
+    res.json(configStatus);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // Health & DB test
 app.get("/api/health", (req, res) => {
   res.status(200).json({ 

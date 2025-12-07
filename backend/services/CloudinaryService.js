@@ -50,6 +50,25 @@ class CloudinaryService {
     }
     return `/uploads/images/questions/${filename}`;
   }
+  // Add this method to your CloudinaryService class
+static async deleteImage(publicId) {
+  if (!this.isConfigured()) {
+    console.warn('Cloudinary not configured, skipping delete');
+    return false;
+  }
+
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.destroy(publicId, (error, result) => {
+      if (error) {
+        console.error('Cloudinary delete error:', error);
+        reject(error);
+      } else {
+        console.log('Cloudinary delete result:', result);
+        resolve(result.result === 'ok');
+      }
+    });
+  });
+}
 }
 
 // Auto-configure if available

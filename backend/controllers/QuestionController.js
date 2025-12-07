@@ -16,6 +16,9 @@ const logRequest = (req) => {
 /**
  * Create a new question
  */
+/**
+ * Create a new question
+ */
 export const createQuestion = async (req, res) => {
   logRequest(req);
   try {
@@ -69,23 +72,42 @@ export const createQuestion = async (req, res) => {
       paper_id: paperId,
       content_html,
       co_id: coId,
-      marks, // NEW: Add marks to question data
+      marks,
       status: 'draft',
       sequence_number
     };
 
     const question = await Question.create(questionData);
 
-    // Extract and link media
-    const mediaUrls = Question.extractMediaUrls(content_html || '');
-    if (mediaUrls.length > 0) {
-      await Question.linkMedia(question.question_id, mediaUrls);
-    }
+    console.log('Question created, linking images...', {
+      questionId: question.question_id,
+      paperId
+    });
+
+    // Extract and link media - IMPORTANT: Use QuestionMedia
+    const QuestionMedia = (await import('../models/QuestionMedia.js')).QuestionMedia;
+    const linkedMedia = await QuestionMedia.linkMediaToQuestion(
+      question.question_id, 
+      content_html || ''
+    );
+
+    console.log('Image linking result:', {
+      questionId: question.question_id,
+      linkedCount: linkedMedia.length,
+      linkedIds: linkedMedia.map(m => m.media_id)
+    });
+
+    // Get all media for this question after linking
+    const questionMedia = await Question.getQuestionMedia(question.question_id);
 
     res.status(201).json({
       success: true,
-      question,
-      message: "Question created successfully"
+      question: {
+        ...question,
+        media: questionMedia
+      },
+      message: "Question created successfully",
+      imagesLinked: linkedMedia.length
     });
 
   } catch (err) {
@@ -104,6 +126,9 @@ export const createQuestion = async (req, res) => {
 /**
  * Update an existing question (transactional)
  */
+/**
+ * Update an existing question (transactional)
+ */
 export const updateQuestion = async (req, res) => {
   logRequest(req);
 
@@ -118,7 +143,7 @@ export const updateQuestion = async (req, res) => {
       content_html,
       paper_id: incomingPaperIdRaw,
       co_id: incomingCoIdRaw,
-      marks: incomingMarksRaw, // NEW: Add marks to destructuring
+      marks: incomingMarksRaw,
       status: incomingStatus,
       sequence_number: incomingSequenceNumberRaw
     } = req.body;
@@ -203,7 +228,7 @@ export const updateQuestion = async (req, res) => {
     const updateData = {
       content_html,
       co_id: coIdToUse,
-      marks: marksToUse, // NEW: Add marks to update data
+      marks: marksToUse,
       status: statusToUse,
       sequence_number: seqToUse
     };
@@ -219,26 +244,30 @@ export const updateQuestion = async (req, res) => {
     // Use Question.update() method which validates paper status
     const updatedQuestion = await Question.update(questionId, updateData);
 
-    // Handle media linking/unlinking
-    const mediaUrls = Question.extractMediaUrls(content_html || '');
-    
-    if (mediaUrls.length > 0) {
-      await Question.linkMedia(questionId, mediaUrls);
-    }
+    // Handle media linking/unlinking - IMPORTANT: Use QuestionMedia
+    const QuestionMedia = (await import('../models/QuestionMedia.js')).QuestionMedia;
+    const linkedMedia = await QuestionMedia.linkMediaToQuestion(questionId, content_html || '');
     
     // Unlink media not in current content
-    await Question.unlinkUnusedMedia(questionId, mediaUrls);
+    await Question.unlinkUnusedMedia(questionId, Question.extractMediaUrls(content_html || ''));
 
     console.log('Question updated:', {
       questionId: updatedQuestion.question_id,
-      mediaUrlsCount: mediaUrls.length,
+      linkedImages: linkedMedia.length,
       userId: req.user.user_id
     });
 
+    // Get updated media for response
+    const questionMedia = await Question.getQuestionMedia(questionId);
+
     return res.json({
       success: true,
-      question: updatedQuestion,
-      message: "Question updated successfully"
+      question: {
+        ...updatedQuestion,
+        media: questionMedia
+      },
+      message: "Question updated successfully",
+      imagesLinked: linkedMedia.length
     });
 
   } catch (err) {
@@ -319,10 +348,14 @@ export const getQuestionsByPaper = async (req, res) => {
 };
 
 /**
- * Delete a question
+ * Delete a question with its associated media
  */
 export const deleteQuestion = async (req, res) => {
   logRequest(req);
+  
+  // Use a database client for transaction
+  const client = await pool.connect();
+  
   try {
     const questionIdRaw = req.params.id;
     const questionId = Number.isInteger(Number(questionIdRaw)) ? parseInt(questionIdRaw, 10) : NaN;
@@ -331,23 +364,74 @@ export const deleteQuestion = async (req, res) => {
       return res.status(400).json({ error: "Invalid question ID" });
     }
 
-    const deletedQuestion = await Question.delete(questionId);
+    // Start transaction
+    await client.query('BEGIN');
 
-    if (!deletedQuestion) {
+    // First, check if user has access to delete this question
+    const questionCheck = await client.query(
+      `SELECT q.question_id, q.paper_id, qp.created_by 
+       FROM questions q
+       JOIN question_papers qp ON q.paper_id = qp.paper_id
+       WHERE q.question_id = $1`,
+      [questionId]
+    );
+
+    if (questionCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
       return res.status(404).json({ error: "Question not found" });
     }
 
-    console.log('Question deleted:', {
+    const paperId = questionCheck.rows[0].paper_id;
+    const createdBy = questionCheck.rows[0].created_by;
+
+    // Validate user has access to delete
+    if (req.user.user_id !== createdBy && req.user.role !== 'admin') {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json({ error: "You don't have permission to delete this question" });
+    }
+
+    // Validate paper status for deleting questions
+    const paperCheck = await client.query(
+      'SELECT status FROM question_papers WHERE paper_id = $1', 
+      [paperId]
+    );
+    
+    if (paperCheck.rows.length) {
+      const paperStatus = paperCheck.rows[0].status;
+      if (!['draft', 'change_requested'].includes(paperStatus)) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json({ 
+          error: `Questions cannot be deleted. Paper status: ${paperStatus}. Only papers in 'draft' or 'change_requested' status can have questions deleted.`
+        });
+      }
+    }
+
+    // Use the new delete method that also removes media
+    const Question = (await import('../models/Question.js')).Question;
+    const deleteResult = await Question.deleteQuestionWithMedia(questionId, client);
+
+    await client.query('COMMIT');
+    client.release();
+
+    console.log('Question deleted with media:', {
       questionId,
-      userId: req.user.user_id
+      userId: req.user.user_id,
+      mediaDeleted: deleteResult.mediaDeleted
     });
 
     return res.json({
       success: true,
-      message: "Question deleted successfully"
+      message: "Question and associated images deleted successfully",
+      mediaDeleted: deleteResult.mediaDeleted
     });
 
   } catch (err) {
+    await client.query('ROLLBACK');
+    client.release();
+    
     console.error("deleteQuestion error:", err?.stack ?? err?.message ?? err);
     return res.status(500).json({ error: "Server error while deleting question" });
   }

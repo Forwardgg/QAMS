@@ -76,18 +76,17 @@ export const uploadFile = async (req, res) => {
       mediaId: mediaRecord?.media_id,
       filename,
       userId,
-      isCloudinary: uploadResult.isCloudinary
+      isCloudinary: uploadResult.isCloudinary,
+      url: uploadResult.url
     });
 
     return res.status(201).json({
       success: true,
       media_id: mediaRecord.media_id,
-      url: mediaRecord.media_url,
-      publicUrl: QuestionMedia.getPublicUrl(uploadResult),
+      url: uploadResult.url, // Return the URL that CKEditor should use
+      publicUrl: uploadResult.url,
       isCloudinary: uploadResult.isCloudinary || false,
-      message: uploadResult.isCloudinary 
-        ? 'File uploaded to cloud storage' 
-        : 'File uploaded to local storage'
+      message: 'File uploaded successfully'
     });
 
   } catch (err) {
