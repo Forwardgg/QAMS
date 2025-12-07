@@ -25,7 +25,7 @@ const QuestionCreatePage = () => {
   const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedPaper, setSelectedPaper] = useState('');
   const [selectedCO, setSelectedCO] = useState('');
-  const [marks, setMarks] = useState(''); // NEW: Add marks state
+  const [marks, setMarks] = useState('');
   const [content_html, setContentHtml] = useState('');
 
   // Load courses on mount
@@ -103,7 +103,7 @@ const QuestionCreatePage = () => {
     }
   };
 
-  // CKEditor initialization
+  // CKEditor initialization with better error handling
   useEffect(() => {
     const initEditor = async () => {
       if (editorRef.current && !editor && !isInitializedRef.current) {
@@ -112,40 +112,48 @@ const QuestionCreatePage = () => {
         try {
           const ClassicEditor = (await import('@ckeditor/ckeditor5-build-classic')).default;
           
-          const editorInstance = await ClassicEditor.create(editorRef.current, {
-            toolbar: {
-              items: [
-                'heading', '|',
-                'bold', 'italic', '|',
-                'link', 'blockQuote', '|',
-                'bulletedList', 'numberedList', '|',
-                'insertTable', '|',
-                'imageUpload', '|',
-                'undo', 'redo'
-              ]
-            },
-            image: {
-              toolbar: [
-                'imageTextAlternative',
-                'toggleImageCaption',
-                'imageStyle:inline',
-                'imageStyle:block',
-                'imageStyle:side'
-              ]
-            },
-            table: {
-              contentToolbar: [
-                'tableColumn',
-                'tableRow',
-                'mergeTableCells'
-              ]
-            },
-            link: {
-              addTargetToExternalLinks: true,
-              defaultProtocol: 'https://'
-            },
-            placeholder: 'Type your question here... You can insert images, tables, and format text.',
-          });
+          let editorInstance;
+          try {
+            editorInstance = await ClassicEditor.create(editorRef.current, {
+              toolbar: {
+                items: [
+                  'heading', '|',
+                  'bold', 'italic', '|',
+                  'link', 'blockQuote', '|',
+                  'bulletedList', 'numberedList', '|',
+                  'insertTable', '|',
+                  'imageUpload', '|',
+                  'undo', 'redo'
+                ]
+              },
+              image: {
+                toolbar: [
+                  'imageTextAlternative',
+                  'toggleImageCaption',
+                  'imageStyle:inline',
+                  'imageStyle:block',
+                  'imageStyle:side'
+                ]
+              },
+              table: {
+                contentToolbar: [
+                  'tableColumn',
+                  'tableRow',
+                  'mergeTableCells'
+                ]
+              },
+              link: {
+                addTargetToExternalLinks: true,
+                defaultProtocol: 'https://'
+              },
+              placeholder: 'Type your question here... You can insert images, tables, and format text.',
+            });
+          } catch (createError) {
+            console.error('Failed to create CKEditor instance:', createError);
+            setMessage({ type: 'error', text: 'Editor failed to load. Please refresh the page.' });
+            isInitializedRef.current = false;
+            return;
+          }
 
           setupUploadAdapter(editorInstance, '/api/uploads');
 
@@ -156,8 +164,8 @@ const QuestionCreatePage = () => {
           setEditor(editorInstance);
           
         } catch (error) {
-          console.error('Error initializing CKEditor:', error);
-          setMessage({ type: 'error', text: 'Failed to load editor' });
+          console.error('Error loading CKEditor module:', error);
+          setMessage({ type: 'error', text: 'Failed to load editor. Try refreshing.' });
           isInitializedRef.current = false;
         }
       }
@@ -167,7 +175,11 @@ const QuestionCreatePage = () => {
 
     return () => {
       if (editor) {
-        editor.destroy();
+        try {
+          editor.destroy();
+        } catch (destroyError) {
+          console.warn('Error destroying editor:', destroyError);
+        }
         setEditor(null);
         isInitializedRef.current = false;
       }
@@ -175,94 +187,125 @@ const QuestionCreatePage = () => {
   }, [editor]);
 
   const safeEditorClear = () => {
-  if (editor) {
-    try {
-      // IMPORTANT: Remove focus from editor first
-      editor.editing.view.focus();
-      
-      // Wait a tiny bit before clearing
-      setTimeout(() => {
-        try {
-          // Clear selection first
-          editor.model.change(writer => {
-            const selection = editor.model.document.selection;
-            writer.setSelection(selection.getFirstPosition());
-          });
-          
-          // Then clear data
-          editor.setData('');
-        } catch (err) {
-          console.warn('Error in safe clear:', err);
+    if (editor && editor.model) {
+      try {
+        // Method 1: Clear via model change
+        editor.model.change(writer => {
+          const root = editor.model.document.getRoot();
+          const range = writer.createRangeIn(root);
+          writer.remove(range);
+        });
+        
+        // Method 2: Set empty data after delay as backup
+        setTimeout(() => {
+          if (editor && editor.setData) {
+            try {
+              editor.setData('');
+            } catch (setDataError) {
+              console.warn('setData failed:', setDataError);
+            }
+          }
+        }, 100);
+      } catch (err) {
+        console.warn('Safe editor clear failed:', err);
+        // Final fallback
+        if (editor && editor.setData) {
+          try {
+            editor.setData('');
+          } catch (finalError) {
+            console.error('All editor clear methods failed:', finalError);
+          }
         }
-      }, 50);
-    } catch (error) {
-      console.warn('Safe editor clear failed:', error);
+      }
     }
-  }
-};
+  };
 
-// Update the success part of handleSubmit:
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (!selectedPaper) {
-    setMessage({ type: 'error', text: 'Please select a paper' });
-    return;
-  }
-
-  if (!content_html.trim()) {
-    setMessage({ type: 'error', text: 'Question content is required' });
-    return;
-  }
-
-  // Validate marks
-  let marksValue = null;
-  if (marks.trim() !== '') {
-    const marksNum = parseInt(marks, 10);
-    if (isNaN(marksNum) || marksNum < 0) {
-      setMessage({ type: 'error', text: 'Marks must be a non-negative number' });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedPaper) {
+      setMessage({ type: 'error', text: 'Please select a paper' });
       return;
     }
-    marksValue = marksNum;
-  }
 
-  setIsLoading(true);
-  setMessage({ type: '', text: '' });
+    if (!content_html.trim()) {
+      setMessage({ type: 'error', text: 'Question content is required' });
+      return;
+    }
 
-  try {
-    const submissionData = {
-      content_html,
-      paper_id: parseInt(selectedPaper),
-      co_id: selectedCO ? parseInt(selectedCO) : null,
-      marks: marksValue
-    };
+    // Validate marks
+    let marksValue = null;
+    if (marks.trim() !== '') {
+      const marksNum = parseInt(marks, 10);
+      if (isNaN(marksNum) || marksNum < 0) {
+        setMessage({ type: 'error', text: 'Marks must be a non-negative number' });
+        return;
+      }
+      marksValue = marksNum;
+    }
 
-    await questionAPI.create(submissionData);
-    
-    setMessage({ 
-      type: 'success', 
-      text: 'Question created successfully!' 
-    });
-    
-    // FIX: Use safe clear for images
-    setContentHtml('');
-    setMarks('');
-    
-    // Don't clear CO if you want to keep it
-    // setSelectedCO('');
-    
-    // Use safe clear instead of direct editor.setData('')
-    safeEditorClear();
-    
-  } catch (error) {
-    setMessage({ 
-      type: 'error', 
-      text: error.message || 'Failed to create question' 
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
+    setIsLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const submissionData = {
+        content_html,
+        paper_id: parseInt(selectedPaper),
+        co_id: selectedCO ? parseInt(selectedCO) : null,
+        marks: marksValue
+      };
+
+      await questionAPI.create(submissionData);
+      
+      setMessage({ 
+        type: 'success', 
+        text: 'Question created successfully!' 
+      });
+      
+      // Reset form state
+      setContentHtml('');
+      setMarks('');
+      setSelectedCO('');
+      
+      // Clear editor with multiple fallbacks
+      setTimeout(() => {
+        if (editor) {
+          try {
+            // Try the safest method first
+            if (editor.model && editor.model.change) {
+              editor.model.change(writer => {
+                const root = editor.model.document.getRoot();
+                writer.remove(writer.createRangeIn(root));
+              });
+            }
+            
+            // Then set empty data
+            setTimeout(() => {
+              if (editor && editor.setData) {
+                editor.setData('');
+              }
+            }, 50);
+          } catch (clearError) {
+            console.warn('Editor clear error in handleSubmit:', clearError);
+            // Last resort: reload the component
+            if (clearError.message && clearError.message.includes('view-position-before-root')) {
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            }
+          }
+        }
+      }, 300);
+      
+    } catch (error) {
+      setMessage({ 
+        type: 'error', 
+        text: error.message || 'Failed to create question' 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCancel = () => {
     navigate('/instructor/questions');
@@ -338,7 +381,6 @@ const handleSubmit = async (e) => {
               </select>
             </div>
 
-            {/* NEW: Marks input field */}
             <div className="form-group">
               <label htmlFor="marks">Marks</label>
               <input
