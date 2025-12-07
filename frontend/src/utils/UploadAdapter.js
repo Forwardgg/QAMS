@@ -4,6 +4,7 @@ import authService from "../services/authService";
 export class UploadAdapter {
   constructor(loader, apiUrl) {
     this.loader = loader;
+    // Store the full API URL passed from setupUploadAdapter
     this.apiUrl = apiUrl || '/api/uploads';
   }
 
@@ -24,7 +25,13 @@ export class UploadAdapter {
 
   _initRequest() {
     const xhr = this.xhr = new XMLHttpRequest();
-    xhr.open('POST', this.apiUrl, true);
+    
+    // Use the full API URL from constructor
+    const uploadUrl = this.apiUrl;
+    
+    console.log('UploadAdapter - Upload URL:', uploadUrl); // Debug
+    
+    xhr.open('POST', uploadUrl, true);
     xhr.responseType = 'json';
     
     // Use authService instead of getAuthToken()
@@ -39,18 +46,25 @@ export class UploadAdapter {
     const loader = this.loader;
     const genericErrorText = `Couldn't upload file: ${file.name}.`;
 
-    xhr.addEventListener('error', () => reject(genericErrorText));
+    xhr.addEventListener('error', () => {
+      console.error('Upload XHR error - Status:', xhr.status, 'URL:', this.apiUrl);
+      reject(genericErrorText);
+    });
+    
     xhr.addEventListener('abort', () => reject());
+    
     xhr.addEventListener('load', () => {
+      console.log('Upload response - Status:', xhr.status, 'URL:', this.apiUrl); // Debug
       const response = xhr.response;
 
       if (!response || xhr.status !== 201) {
+        console.error('Upload failed:', response);
         return reject(response && response.error ? response.error : genericErrorText);
       }
 
       // Success - return the URL for CKEditor
       resolve({
-        default: response.url // This becomes the src attribute in <img>
+        default: response.url
       });
     });
 
@@ -76,6 +90,12 @@ export class UploadAdapter {
 // Helper function to setup upload adapter in CKEditor
 export function setupUploadAdapter(editor, apiUrl) {
   editor.plugins.get('FileRepository').createUploadAdapter = (loader) => {
-    return new UploadAdapter(loader, apiUrl);
+    // Build the complete URL here
+    const baseUrl = process.env.REACT_APP_API_URL || '';
+    const fullApiUrl = apiUrl ? apiUrl : `${baseUrl}/api/uploads`;
+    
+    console.log('setupUploadAdapter - Full API URL:', fullApiUrl); // Debug
+    
+    return new UploadAdapter(loader, fullApiUrl);
   };
 }

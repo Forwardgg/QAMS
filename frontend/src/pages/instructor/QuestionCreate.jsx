@@ -155,7 +155,7 @@ const QuestionCreatePage = () => {
             return;
           }
 
-          setupUploadAdapter(editorInstance, '/api/uploads');
+          setupUploadAdapter(editorInstance);
 
           editorInstance.model.document.on('change:data', () => {
             setContentHtml(editorInstance.getData());
