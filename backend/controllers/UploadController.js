@@ -39,8 +39,12 @@ export const uploadFile = async (req, res) => {
     // Generate unique filename
     const filename = QuestionMedia.generateFilename(req.file.originalname, req.file.mimetype);
 
-    // Save file to disk
-    await QuestionMedia.saveFileToDisk(req.file.buffer, filename, 'images/questions');
+    // Save file using hybrid approach
+    const uploadResult = await QuestionMedia.saveFileHybrid(
+      req.file.buffer, 
+      filename, 
+      req.file.mimetype
+    );
 
     // Parse optional relation IDs
     const question_id = req.body.question_id ? Number(req.body.question_id) : null;
@@ -52,15 +56,18 @@ export const uploadFile = async (req, res) => {
       mediaRecord = await QuestionMedia.create({
         filename,
         mimetype: req.file.mimetype,
+        uploadResult,
         question_id,
         paper_id
       });
     } catch (dbErr) {
       // Cleanup file on DB failure
-      try {
-        await QuestionMedia.deleteFileIfExists(filename, 'images/questions');
-      } catch (cleanupErr) {
-        console.warn('Failed to cleanup uploaded file after DB error', cleanupErr);
+      if (!uploadResult.isCloudinary) {
+        try {
+          await QuestionMedia.deleteFileIfExists(filename, 'images/questions');
+        } catch (cleanupErr) {
+          console.warn('Failed to cleanup uploaded file after DB error', cleanupErr);
+        }
       }
       throw dbErr;
     }
@@ -68,15 +75,19 @@ export const uploadFile = async (req, res) => {
     console.log('File uploaded successfully:', {
       mediaId: mediaRecord?.media_id,
       filename,
-      userId
+      userId,
+      isCloudinary: uploadResult.isCloudinary
     });
 
     return res.status(201).json({
       success: true,
       media_id: mediaRecord.media_id,
       url: mediaRecord.media_url,
-      publicUrl: QuestionMedia.getPublicUrl(filename),
-      message: 'File uploaded successfully'
+      publicUrl: QuestionMedia.getPublicUrl(uploadResult),
+      isCloudinary: uploadResult.isCloudinary || false,
+      message: uploadResult.isCloudinary 
+        ? 'File uploaded to cloud storage' 
+        : 'File uploaded to local storage'
     });
 
   } catch (err) {

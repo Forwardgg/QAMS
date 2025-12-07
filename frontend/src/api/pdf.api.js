@@ -3,17 +3,6 @@ import authService from "../services/authService";
 
 const API_BASE = process.env.REACT_APP_API_BASE || '';
 
-/**
- * Generate PDF from paper ID or HTML content
- * @param {Object} params - Generation parameters
- * @param {string} params.paperId - Paper ID for server-side generation
- * @param {string} params.html - HTML content for client-side generation
- * @param {string} params.baseUrl - Base URL for resolving relative images
- * @param {Object} params.pdfOptions - Puppeteer PDF options
- * @param {Object} params.postOptions - PDF post-processing options
- * @param {string} params.filename - Custom filename for download
- * @returns {Promise<Blob>} PDF blob
- */
 export const generatePdf = async (params = {}) => {
   const token = authService.getToken();
   
@@ -25,7 +14,12 @@ export const generatePdf = async (params = {}) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}/api/pdf/generate-pdf`, {
+  // FIX: Remove "/api" from the URL since API_BASE already has it
+  const url = `${API_BASE}/pdf/generate-pdf`;
+  
+  console.log('PDF API Request URL:', url); // Debug log
+
+  const response = await fetch(url, {
     method: 'POST',
     headers,
     body: JSON.stringify(params),

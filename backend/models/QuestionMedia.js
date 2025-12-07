@@ -3,6 +3,7 @@ import { pool } from "../config/db.js";
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import CloudinaryService from "../services/CloudinaryService.js";
 
 export class QuestionMedia {
   static _ensureInteger(val, name) {
@@ -140,31 +141,33 @@ export class QuestionMedia {
   /**
    * Create media record
    */
-  static async create({ filename, mimetype, question_id = null, paper_id = null }) {
-    this._ensureNonEmptyString(filename, 'Filename');
-    this._ensureNonEmptyString(mimetype, 'MIME type');
+  static async create({ filename, mimetype, uploadResult, question_id = null, paper_id = null }) {
+  this._ensureNonEmptyString(filename, 'Filename');
+  this._ensureNonEmptyString(mimetype, 'MIME type');
 
-    const safeFilename = this.sanitizeFilename(filename);
-    const mediaUrl = `/uploads/images/questions/${safeFilename}`;
+  const safeFilename = this.sanitizeFilename(filename);
+  
+  // Use URL from uploadResult if available, otherwise generate local URL
+  const mediaUrl = uploadResult?.url || `/uploads/images/questions/${safeFilename}`;
 
-    const query = `
-      INSERT INTO question_media (
-        question_id,
-        paper_id,
-        media_url,
-        media_type,
-        is_used,
-        created_at
-      )
-      VALUES ($1, $2, $3, $4, false, NOW())
-      RETURNING media_id, question_id, paper_id, media_url, media_type, created_at
-    `;
+  const query = `
+    INSERT INTO question_media (
+      question_id,
+      paper_id,
+      media_url,
+      media_type,
+      is_used,
+      created_at
+    )
+    VALUES ($1, $2, $3, $4, false, NOW())
+    RETURNING media_id, question_id, paper_id, media_url, media_type, created_at
+  `;
 
-    const values = [question_id, paper_id, mediaUrl, mimetype];
+  const values = [question_id, paper_id, mediaUrl, mimetype];
 
-    const result = await pool.query(query, values);
-    return result.rows[0];
-  }
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
 
   /**
    * Find by media_id
@@ -345,4 +348,43 @@ export class QuestionMedia {
     const result = await pool.query(query, urls);
     return result.rows;
   }
+  static async saveFileHybrid(buffer, filename, mimetype) {
+  this._ensureBuffer(buffer, 'File buffer');
+  this._ensureNonEmptyString(filename, 'Filename');
+  
+  const safeFilename = this.sanitizeFilename(filename);
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  // Try Cloudinary in production if configured
+  if (isProduction && CloudinaryService.isConfigured()) {
+    try {
+      const result = await CloudinaryService.uploadImage(buffer, safeFilename);
+      return {
+        url: result.secure_url,
+        isCloudinary: true,
+        cloudinaryId: result.public_id
+      };
+    } catch (cloudinaryError) {
+      console.warn('Cloudinary upload failed, using local storage:', cloudinaryError.message);
+      // Fall through to local storage
+    }
+  }
+  
+  // Local storage (works for both dev and prod fallback)
+  const filePath = await this.saveFileToDisk(buffer, safeFilename, 'images/questions');
+  
+  return {
+    url: CloudinaryService.getFallbackUrl(safeFilename, isProduction),
+    isCloudinary: false,
+    filePath
+  };
+}
+
+/**
+ * Update getPublicUrl to handle hybrid approach
+ */
+static getPublicUrl(uploadResult) {
+  if (!uploadResult || !uploadResult.url) return '';
+  return uploadResult.url;
+}
 }
