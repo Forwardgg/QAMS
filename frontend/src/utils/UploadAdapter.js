@@ -4,8 +4,25 @@ import authService from "../services/authService";
 export class UploadAdapter {
   constructor(loader, apiUrl) {
     this.loader = loader;
-    // Store the full API URL passed from setupUploadAdapter
-    this.apiUrl = apiUrl || '/api/uploads';
+    this.apiUrl = apiUrl || this.getDefaultApiUrl();
+  }
+
+  // Helper to get default API URL
+  getDefaultApiUrl() {
+    const baseUrl = process.env.REACT_APP_API_URL || '';
+    
+    // If baseUrl already ends with /api, we need /api/uploads
+    if (baseUrl.endsWith('/api')) {
+      return `${baseUrl}/uploads`;
+    } 
+    // If no baseUrl (development), use relative path
+    else if (!baseUrl) {
+      return '/api/uploads';
+    }
+    // If baseUrl doesn't end with /api (production without /api)
+    else {
+      return `${baseUrl}/api/uploads`;
+    }
   }
 
   upload() {
@@ -26,15 +43,12 @@ export class UploadAdapter {
   _initRequest() {
     const xhr = this.xhr = new XMLHttpRequest();
     
-    // Use the full API URL from constructor
     const uploadUrl = this.apiUrl;
-    
-    console.log('UploadAdapter - Upload URL:', uploadUrl); // Debug
+    console.log('Upload URL:', uploadUrl); // Debug
     
     xhr.open('POST', uploadUrl, true);
     xhr.responseType = 'json';
     
-    // Use authService instead of getAuthToken()
     const token = authService.getToken();
     if (token) {
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -46,29 +60,20 @@ export class UploadAdapter {
     const loader = this.loader;
     const genericErrorText = `Couldn't upload file: ${file.name}.`;
 
-    xhr.addEventListener('error', () => {
-      console.error('Upload XHR error - Status:', xhr.status, 'URL:', this.apiUrl);
-      reject(genericErrorText);
-    });
-    
+    xhr.addEventListener('error', () => reject(genericErrorText));
     xhr.addEventListener('abort', () => reject());
-    
     xhr.addEventListener('load', () => {
-      console.log('Upload response - Status:', xhr.status, 'URL:', this.apiUrl); // Debug
       const response = xhr.response;
 
       if (!response || xhr.status !== 201) {
-        console.error('Upload failed:', response);
         return reject(response && response.error ? response.error : genericErrorText);
       }
 
-      // Success - return the URL for CKEditor
       resolve({
         default: response.url
       });
     });
 
-    // Upload progress (optional)
     if (xhr.upload) {
       xhr.upload.addEventListener('progress', evt => {
         if (evt.lengthComputable) {
@@ -82,20 +87,17 @@ export class UploadAdapter {
   _sendRequest(file) {
     const data = new FormData();
     data.append('file', file);
-
     this.xhr.send(data);
   }
 }
 
-// Helper function to setup upload adapter in CKEditor
 export function setupUploadAdapter(editor, apiUrl) {
   editor.plugins.get('FileRepository').createUploadAdapter = (loader) => {
-    // Build the complete URL here
-    const baseUrl = process.env.REACT_APP_API_URL || '';
-    const fullApiUrl = apiUrl ? apiUrl : `${baseUrl}/api/uploads`;
-    
-    console.log('setupUploadAdapter - Full API URL:', fullApiUrl); // Debug
-    
-    return new UploadAdapter(loader, fullApiUrl);
+    // If explicit apiUrl provided, use it
+    if (apiUrl) {
+      return new UploadAdapter(loader, apiUrl);
+    }
+    // Otherwise use automatic detection
+    return new UploadAdapter(loader);
   };
 }
