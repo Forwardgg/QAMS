@@ -229,77 +229,77 @@ static async create({ filename, mimetype, uploadResult, question_id = null, pape
   }
 
   /**
-   * Update media record
-   */
-  static async update(mediaId, updates) {
-    this._ensureInteger(mediaId, 'Media ID');
+ * Update media record
+ */
+static async update(mediaId, updates) {
+  this._ensureInteger(mediaId, 'Media ID');
 
-    const allowedFields = ['question_id', 'paper_id', 'is_used'];
-    const setClauses = [];
-    const values = [];
-    let paramCount = 0;
+  const allowedFields = ['question_id', 'paper_id', 'is_used'];
+  const setClauses = [];
+  const values = [];
+  let paramCount = 0;
 
-    for (const [field, value] of Object.entries(updates)) {
-      if (allowedFields.includes(field)) {
-        paramCount++;
-        setClauses.push(`${field} = $${paramCount}`);
-        values.push(value);
-      }
+  for (const [field, value] of Object.entries(updates)) {
+    if (allowedFields.includes(field)) {
+      paramCount++;
+      setClauses.push(`${field} = $${paramCount}`);
+      values.push(value);
     }
-
-    if (setClauses.length === 0) {
-      throw new Error('No valid fields to update');
-    }
-
-    paramCount++;
-    setClauses.push(`updated_at = NOW()`);
-    values.push(mediaId);
-
-    const query = `
-      UPDATE question_media 
-      SET ${setClauses.join(', ')}
-      WHERE media_id = $${paramCount}
-      RETURNING *
-    `;
-
-    const result = await pool.query(query, values);
-    return result.rows[0];
   }
+
+  if (setClauses.length === 0) {
+    throw new Error('No valid fields to update');
+  }
+
+  paramCount++;
+  // REMOVED: setClauses.push(`updated_at = NOW()`);
+  values.push(mediaId);
+
+  const query = `
+    UPDATE question_media 
+    SET ${setClauses.join(', ')}
+    WHERE media_id = $${paramCount}
+    RETURNING media_id, question_id, paper_id, media_url, media_type, is_used, created_at
+  `;
+
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
 
   /**
-   * Link media to question
-   */
-  static async linkToQuestion(mediaId, questionId) {
-    this._ensureInteger(mediaId, 'Media ID');
-    this._ensureInteger(questionId, 'Question ID');
+ * Link media to question
+ */
+static async linkToQuestion(mediaId, questionId) {
+  this._ensureInteger(mediaId, 'Media ID');
+  this._ensureInteger(questionId, 'Question ID');
 
-    const query = `
-      UPDATE question_media 
-      SET question_id = $1, is_used = true, updated_at = NOW()
-      WHERE media_id = $2
-      RETURNING *
-    `;
+  const query = `
+    UPDATE question_media 
+    SET question_id = $1, is_used = true
+    WHERE media_id = $2
+    RETURNING media_id, question_id, paper_id, media_url, media_type, is_used, created_at
+  `;
 
-    const result = await pool.query(query, [questionId, mediaId]);
-    return result.rows[0];
-  }
+  const result = await pool.query(query, [questionId, mediaId]);
+  return result.rows[0];
+}
 
   /**
-   * Unlink media from question
-   */
-  static async unlinkFromQuestion(mediaId) {
-    this._ensureInteger(mediaId, 'Media ID');
+ * Unlink media from question
+ */
+static async unlinkFromQuestion(mediaId) {
+  this._ensureInteger(mediaId, 'Media ID');
 
-    const query = `
-      UPDATE question_media 
-      SET question_id = NULL, is_used = FALSE, updated_at = NOW()
-      WHERE media_id = $1
-      RETURNING *
-    `;
+  const query = `
+    UPDATE question_media 
+    SET question_id = NULL, is_used = FALSE
+    WHERE media_id = $1
+    RETURNING media_id, question_id, paper_id, media_url, media_type, is_used, created_at
+  `;
 
-    const result = await pool.query(query, [mediaId]);
-    return result.rows[0];
-  }
+  const result = await pool.query(query, [mediaId]);
+  return result.rows[0];
+}
 
   /**
    * Delete media record (hard delete)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -44,8 +44,29 @@ import {
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
   FileCopy as FileCopyIcon,
-  Report as ReportIcon
+  Report as ReportIcon,
+  Assessment as AssessmentIcon,
+  DonutLarge as DonutLargeIcon
 } from '@mui/icons-material';
+
+// MUI Components
+import {
+  Box,
+  Paper,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  Alert,
+  LinearProgress
+} from '@mui/material';
 
 import questionAPI from '../../../api/question.api';
 import questionPaperAPI from '../../../api/questionPaper.api';
@@ -98,12 +119,28 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, isDragging, a
         <strong className="question-number">Q{question.sequence_number ?? (index + 1)}.</strong>
 
         <div className="question-actions">
-          {/* NEW: Display marks if available */}
+          {/* Display marks if available */}
           {question.marks !== null && question.marks !== undefined && (
-  <span className="question-marks-indicator" title={`Marks: ${question.marks}`}>
-    [{question.marks} marks]
-  </span>
-)}
+            <span className="question-marks-indicator" title={`Marks: ${question.marks}`}>
+              [{question.marks} marks]
+            </span>
+          )}
+
+          {/* Display Bloom's level if available */}
+          {question.bloom_level && (
+            <Chip 
+              label={`Bloom: ${question.bloom_level}`}
+              size="small"
+              variant="outlined"
+              sx={{ 
+                fontSize: '0.7rem',
+                height: 20,
+                backgroundColor: getBloomColor(question.bloom_level),
+                color: 'white',
+                fontWeight: 'bold'
+              }}
+            />
+          )}
 
           {needsChanges && (
             <span className="change-indicator" title="Changes requested by moderator">
@@ -174,12 +211,28 @@ const NonSortableQuestionItem = ({ question, index, onEdit, onDelete, actionsAll
         <strong className="question-number">Q{question.sequence_number ?? (index + 1)}.</strong>
 
         <div className="question-actions">
-          {/* NEW: Display marks if available */}
+          {/* Display marks if available */}
           {question.marks !== null && question.marks !== undefined && (
-  <span className="question-marks-indicator" title={`Marks: ${question.marks}`}>
-    [{question.marks} marks]
-  </span>
-)}
+            <span className="question-marks-indicator" title={`Marks: ${question.marks}`}>
+              [{question.marks} marks]
+            </span>
+          )}
+
+          {/* Display Bloom's level if available */}
+          {question.bloom_level && (
+            <Chip 
+              label={`Bloom: ${question.bloom_level}`}
+              size="small"
+              variant="outlined"
+              sx={{ 
+                fontSize: '0.7rem',
+                height: 20,
+                backgroundColor: getBloomColor(question.bloom_level),
+                color: 'white',
+                fontWeight: 'bold'
+              }}
+            />
+          )}
 
           {needsChanges && (
             <span className="change-indicator" title="Changes requested by moderator">
@@ -221,6 +274,328 @@ const NonSortableQuestionItem = ({ question, index, onEdit, onDelete, actionsAll
         </div>
       )}
     </div>
+  );
+};
+
+// Helper function for Bloom's colors
+const getBloomColor = (level) => {
+  const colors = {
+    'L1': '#FF6B6B', // Remember
+    'L2': '#4ECDC4', // Understand
+    'L3': '#45B7D1', // Apply
+    'L4': '#96CEB4', // Analyze
+    'L5': '#FFEAA7', // Evaluate
+    'L6': '#DDA0DD'  // Create
+  };
+  return colors[level] || '#CCCCCC';
+};
+
+const getBloomLabel = (level) => {
+  const labels = {
+    'L1': 'Remember',
+    'L2': 'Understand',
+    'L3': 'Apply',
+    'L4': 'Analyze',
+    'L5': 'Evaluate',
+    'L6': 'Create'
+  };
+  return labels[level] || 'Unknown';
+};
+
+/* ---------------------------
+   Bloom's Taxonomy Analysis Component
+   --------------------------- */
+const BloomAnalysis = ({ questions }) => {
+  // Calculate Bloom's Taxonomy distribution
+  const bloomStats = useMemo(() => {
+    const bloomDistribution = {};
+    
+    // Initialize all levels
+    ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'].forEach(level => {
+      bloomDistribution[level] = { count: 0, marks: 0, questions: [] };
+    });
+
+    // Count questions by bloom level
+    questions.forEach(question => {
+      if (question.bloom_level) {
+        const level = question.bloom_level.toUpperCase();
+        if (bloomDistribution[level]) {
+          bloomDistribution[level].count++;
+          bloomDistribution[level].marks += (question.marks || 0);
+          bloomDistribution[level].questions.push(question);
+        }
+      }
+    });
+
+    // Convert to array
+    const chartData = Object.keys(bloomDistribution)
+      .filter(level => bloomDistribution[level].count > 0)
+      .map(level => {
+        const data = bloomDistribution[level];
+        return {
+          id: level,
+          value: data.count,
+          label: getBloomLabel(level),
+          color: getBloomColor(level),
+          marks: data.marks,
+          percentage: (data.count / questions.length * 100).toFixed(1)
+        };
+      });
+
+    // Calculate overall statistics
+    const totalQuestions = questions.length;
+    const questionsWithBloom = questions.filter(q => q.bloom_level).length;
+    const percentageWithBloom = totalQuestions > 0 ? 
+      Math.round((questionsWithBloom / totalQuestions) * 100) : 0;
+    
+    const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+    const marksWithBloom = questions
+      .filter(q => q.bloom_level)
+      .reduce((sum, q) => sum + (q.marks || 0), 0);
+
+    return {
+      chartData,
+      totalQuestions,
+      questionsWithBloom,
+      percentageWithBloom,
+      totalMarks,
+      marksWithBloom,
+      marksPercentageWithBloom: totalMarks > 0 ? 
+        Math.round((marksWithBloom / totalMarks) * 100) : 0
+    };
+  }, [questions]);
+
+  // Function to create conic gradient for pie chart
+  const getPieChartStyle = () => {
+    if (bloomStats.chartData.length === 0) return {};
+    
+    let accumulatedPercentage = 0;
+    const gradients = bloomStats.chartData.map(item => {
+      const start = accumulatedPercentage + '%';
+      accumulatedPercentage += parseFloat(item.percentage);
+      const end = accumulatedPercentage + '%';
+      return `${item.color} ${start} ${end}`;
+    }).join(', ');
+    
+    return {
+      background: `conic-gradient(${gradients})`
+    };
+  };
+
+  if (questions.length === 0) return null;
+
+  return (
+    <Paper className="bloom-analysis-section" elevation={2} sx={{ mb: 3 }}>
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom align="center" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+          <AssessmentIcon />
+          Bloom's Taxonomy Analysis
+        </Typography>
+        
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            {bloomStats.chartData.length > 0 ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Box sx={{ position: 'relative', width: 250, height: 250, mb: 3 }}>
+                  {/* CSS-only Pie Chart */}
+                  <Box 
+                    sx={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      borderRadius: '50%',
+                      ...getPieChartStyle(),
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {/* Center hole */}
+                    <Box 
+                      sx={{ 
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '60%',
+                        height: '60%',
+                        borderRadius: '50%',
+                        backgroundColor: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'column',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      <Typography variant="h4" color="primary" fontWeight="bold">
+                        {bloomStats.totalQuestions}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Total Questions
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+                
+                {/* Legend */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1, mb: 2 }}>
+                  {bloomStats.chartData.map((item) => (
+                    <Box 
+                      key={item.id}
+                      sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 0.5,
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
+                        backgroundColor: 'rgba(255,255,255,0.8)'
+                      }}
+                    >
+                      <Box 
+                        sx={{ 
+                          width: 12, 
+                          height: 12, 
+                          borderRadius: '50%', 
+                          backgroundColor: item.color 
+                        }} 
+                      />
+                      <Typography variant="caption">
+                        {item.label} ({item.value})
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" paragraph>
+                  No Bloom's Taxonomy data available.
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Tag questions with Bloom's levels in the editor.
+                </Typography>
+              </Box>
+            )}
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Paper elevation={1} sx={{ p: 3, height: '100%' }}>
+              <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                Statistics
+              </Typography>
+              
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        Total Questions
+                      </Typography>
+                      <Typography variant="h5" color="primary">
+                        {bloomStats.totalQuestions}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        With Bloom Level
+                      </Typography>
+                      <Typography variant="h5" color="primary">
+                        {bloomStats.questionsWithBloom}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        ({bloomStats.percentageWithBloom}%)
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        Total Marks
+                      </Typography>
+                      <Typography variant="h5" color="primary">
+                        {bloomStats.totalMarks}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        Marks with Bloom
+                      </Typography>
+                      <Typography variant="h5" color="primary">
+                        {bloomStats.marksWithBloom}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        ({bloomStats.marksPercentageWithBloom}%)
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              <Box>
+                <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                  Breakdown by Level
+                </Typography>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Level</TableCell>
+                        <TableCell align="right">Questions</TableCell>
+                        <TableCell align="right">Marks</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {bloomStats.chartData.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  backgroundColor: item.color
+                                }}
+                              />
+                              <Typography variant="body2">
+                                {item.label}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2">
+                              {item.value}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2">
+                              {item.marks}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Box>
+    </Paper>
   );
 };
 
@@ -455,7 +830,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         content_html: updatedQuestion.content_html,
         paper_id: updatedQuestion.paper_id,
         co_id: updatedQuestion.co_id ?? null,
-        marks: updatedQuestion.marks ?? null, // NEW: Add marks to payload
+        marks: updatedQuestion.marks ?? null,
       };
 
       // 1. Update the question
@@ -464,7 +839,7 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       // 2. Get the saved question from response (it might have more data)
       const savedQuestion = apiResponse?.question || apiResponse;
       
-      // 3. FETCH FRESH DATA to get complete CO info
+      // 3. FETCH FRESH DATA to get complete CO info and Bloom's level
       const freshQuestion = await questionAPI.getById(qid);
       
       // 4. Update state with complete question data
@@ -672,6 +1047,9 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
 
       {/* Messages */}
       {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
+
+      {/* Bloom's Taxonomy Analysis */}
+      <BloomAnalysis questions={questions} />
 
       {/* Moderation report button */}
       {moderationData && (

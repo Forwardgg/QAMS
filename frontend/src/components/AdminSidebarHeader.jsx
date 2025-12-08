@@ -2,6 +2,7 @@ import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthContext } from './AuthProvider';
 import './AdminSidebarHeader.css';
+import logo from '../assets/images/logo.png';
 
 // Import MUI Icons
 import {
@@ -116,13 +117,13 @@ const AdminSidebarHeader = () => {
         <div className="sidebar-header">
           {!isCollapsed && (
             <div className="sidebar-logo-container">
-              <AdminPanelSettings className="admin-icon" />
+              <img src={logo} alt="Logo" className="sidebar-logo-image" />
               <span className="sidebar-logo">Admin</span>
             </div>
           )}
           {isCollapsed && (
             <div className="sidebar-collapsed-logo">
-              <AdminPanelSettings />
+              <img src={logo} alt="Logo" className="collapsed-logo-image" />
             </div>
           )}
           

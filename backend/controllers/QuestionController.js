@@ -25,6 +25,14 @@ export const createQuestion = async (req, res) => {
     const { content_html, paper_id: paperIdRaw, co_id: coIdRaw, marks: marksRaw } = req.body;
     const userId = req.user?.user_id;
 
+    console.log('Creating question with data:', {
+      content_html_length: content_html?.length,
+      paperIdRaw,
+      coIdRaw,
+      marksRaw,
+      userId
+    });
+
     if (!content_html || !paperIdRaw) {
       return res.status(400).json({ error: "content_html and paper_id are required" });
     }
@@ -32,6 +40,26 @@ export const createQuestion = async (req, res) => {
     const paperId = Number.isInteger(Number(paperIdRaw)) ? parseInt(paperIdRaw, 10) : NaN;
     if (Number.isNaN(paperId)) {
       return res.status(400).json({ error: "Invalid paper_id" });
+    }
+
+    // Check paper status BEFORE calling Question.create()
+    const pool = (await import('../config/db.js')).pool;
+    const paperCheck = await pool.query(
+      'SELECT paper_id, status FROM question_papers WHERE paper_id = $1 LIMIT 1', 
+      [paperId]
+    );
+    
+    if (!paperCheck.rows.length) {
+      return res.status(404).json({ error: 'Paper not found' });
+    }
+    
+    const paperStatus = paperCheck.rows[0].status;
+    console.log('Paper status check:', { paperId, paperStatus });
+    
+    if (!['draft', 'change_requested'].includes(paperStatus)) {
+      return res.status(400).json({ 
+        error: `Questions cannot be added. Paper status: ${paperStatus}. Only papers in 'draft' or 'change_requested' status can have questions added.` 
+      });
     }
 
     // Validate marks if provided
@@ -77,6 +105,8 @@ export const createQuestion = async (req, res) => {
       sequence_number
     };
 
+    console.log('Calling Question.create() with:', questionData);
+    
     const question = await Question.create(questionData);
 
     console.log('Question created, linking images...', {
@@ -111,7 +141,12 @@ export const createQuestion = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("createQuestion error:", err?.stack ?? err?.message ?? err);
+    console.error("🔴 createQuestion error:", {
+      message: err.message,
+      stack: err.stack,
+      name: err.name,
+      code: err.code
+    });
     
     // Handle specific validation errors
     if (err.message.includes('Questions cannot be added') || 
@@ -119,7 +154,21 @@ export const createQuestion = async (req, res) => {
       return res.status(400).json({ error: err.message });
     }
     
-    return res.status(500).json({ error: "Server error while creating question" });
+    // Check for database errors
+    if (err.code === '23503') { // foreign key violation
+      return res.status(400).json({ error: "Invalid foreign key reference" });
+    }
+    if (err.code === '23505') { // unique constraint violation
+      return res.status(400).json({ error: "Duplicate entry" });
+    }
+    if (err.code === '23514') { // check constraint violation
+      return res.status(400).json({ error: "Check constraint violation" });
+    }
+    
+    return res.status(500).json({ 
+      error: "Server error while creating question",
+      details: err.message 
+    });
   }
 };
 

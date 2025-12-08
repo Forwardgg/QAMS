@@ -513,17 +513,18 @@ export const viewQuestionReport = async (req, res) => {
 
     // Transform for response - RETURN FULL CONTENT
     const transformed = questions.map(q => ({
-      question_id: q.question_id,
-      sequence_number: q.sequence_number,
-      status: q.status,
-      content_html: q.content_html, // ← ADD THIS LINE - FULL HTML WITH IMAGES
-      content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
-      co_id: q.co_id,
-      co_number: q.co_number,
-      co_description: q.co_description,
-      marks: q.marks, // ADD THIS LINE
-      updated_at: q.updated_at
-    }));
+  question_id: q.question_id,
+  sequence_number: q.sequence_number,
+  status: q.status,
+  content_html: q.content_html,
+  content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
+  co_id: q.co_id,
+  co_number: q.co_number,
+  co_description: q.co_description,
+  bloom_level: q.bloom_level, // ← ADD THIS LINE
+  marks: q.marks,
+  updated_at: q.updated_at
+}));
 
     return res.json({
       success: true,
@@ -588,17 +589,18 @@ export const viewPaperReport = async (req, res) => {
 
     // Prepare a compact questions array (include content_preview)
     const questionsCompact = questions.map(q => ({
-      question_id: q.question_id,
-      sequence_number: q.sequence_number,
-      status: q.status,
-      content_html: q.content_html, // Add full content
-      content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
-      co_id: q.co_id,
-      co_number: q.co_number,
-      co_description: q.co_description,
-      marks: q.marks, // ADD THIS LINE
-      updated_at: q.updated_at
-    }));
+  question_id: q.question_id,
+  sequence_number: q.sequence_number,
+  status: q.status,
+  content_html: q.content_html,
+  content_preview: q.content_html ? String(q.content_html).substring(0, 300) : '',
+  co_id: q.co_id,
+  co_number: q.co_number,
+  co_description: q.co_description,
+  bloom_level: q.bloom_level, // ← ADD THIS LINE
+  marks: q.marks,
+  updated_at: q.updated_at
+}));
 
     return res.json({
       success: true,

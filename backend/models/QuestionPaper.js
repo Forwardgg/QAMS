@@ -326,7 +326,8 @@ export class QuestionPaper {
           DISTINCT jsonb_build_object(
             'co_id', co.co_id,
             'co_number', co.co_number,
-            'description', co.description
+            'description', co.description,
+            'bloom_level', co.bloom_level  -- ADDED bloom_level
           )
         ) FILTER (WHERE co.co_id IS NOT NULL) as course_outcomes
       FROM question_papers p
@@ -479,6 +480,7 @@ export class QuestionPaper {
       SELECT 
         co.co_number,
         co.description,
+        co.bloom_level,  -- ADDED bloom_level
         COALESCE(SUM(q.marks), 0) as total_marks,
         COUNT(q.question_id) as question_count,
         COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_count,
@@ -486,7 +488,7 @@ export class QuestionPaper {
       FROM course_outcomes co
       LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
       WHERE co.course_id = (SELECT course_id FROM question_papers WHERE paper_id = $1)
-      GROUP BY co.co_id, co.co_number, co.description
+      GROUP BY co.co_id, co.co_number, co.description, co.bloom_level  -- ADDED bloom_level to GROUP BY
       ORDER BY co.co_number
     `;
     
@@ -638,5 +640,23 @@ export class QuestionPaper {
       console.error('Error in searchPapers:', error);
       throw error;
     }
+  }
+
+  // NEW: Get bloom level distribution for a paper
+  static async getBloomLevelDistribution(paperId) {
+    const query = `
+      SELECT 
+        co.bloom_level,
+        COUNT(q.question_id) as question_count,
+        COALESCE(SUM(q.marks), 0) as total_marks
+      FROM course_outcomes co
+      LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
+      WHERE co.course_id = (SELECT course_id FROM question_papers WHERE paper_id = $1)
+      GROUP BY co.bloom_level
+      ORDER BY co.bloom_level
+    `;
+    
+    const { rows } = await pool.query(query, [paperId]);
+    return rows;
   }
 }

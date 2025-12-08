@@ -679,3 +679,72 @@
 .question-number {
   margin-right: auto;
 }
+/* Add to PaperQuestionsManager.css */
+
+/* Bloom's Taxonomy Analysis Section */
+.bloom-analysis-section {
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.bloom-analysis-section .MuiTypography-h6 {
+  color: #2c3e50;
+  font-weight: 600;
+  padding-top: 20px;
+}
+
+.bloom-analysis-section .MuiCard-root {
+  border-radius: 8px;
+  height: 100%;
+  transition: transform 0.2s ease;
+}
+
+.bloom-analysis-section .MuiCard-root:hover {
+  transform: translateY(-2px);
+}
+
+.bloom-analysis-section .MuiCardContent-root {
+  padding: 16px !important;
+}
+
+.bloom-analysis-section .MuiTypography-h5 {
+  color: #2c3e50;
+  font-weight: 700;
+}
+
+.bloom-analysis-section .MuiTableContainer-root {
+  margin-top: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+}
+
+.bloom-analysis-section .MuiTable-root {
+  background: white;
+}
+
+.bloom-analysis-section .MuiTableCell-root {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 8px 16px;
+}
+
+/* Question Bloom's level chip styling */
+.question-actions .MuiChip-root {
+  font-weight: 600;
+  border: none;
+}
+
+/* Responsive adjustments for Bloom's section */
+@media (max-width: 768px) {
+  .bloom-analysis-section {
+    margin: 0 -20px 20px -20px;
+    border-radius: 0;
+  }
+  
+  .bloom-analysis-section .MuiGrid-container {
+    flex-direction: column;
+  }
+}

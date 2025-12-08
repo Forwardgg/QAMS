@@ -8,7 +8,8 @@ import {
   createCourseOutcome,
   updateCourseOutcome,
   deleteCourseOutcome,
-  searchCourseOutcomes
+  searchCourseOutcomes,
+  getBloomLevels // Import the new function
 } from "../controllers/coController.js";
 
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
@@ -20,6 +21,9 @@ router.get("/", getAllCourseOutcomes);
 
 // Search COs
 router.get("/search", searchCourseOutcomes);
+
+// Get available bloom levels
+router.get("/bloom-levels", getBloomLevels); // NEW ROUTE
 
 // Get COs by course code
 router.get("/course/:code", getCourseOutcomesByCourseCode);

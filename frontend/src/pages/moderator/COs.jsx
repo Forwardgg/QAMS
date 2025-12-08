@@ -12,6 +12,7 @@ const ModeratorCO = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('');
+  const [selectedBloomLevel, setSelectedBloomLevel] = useState(''); // NEW: Bloom level filter
   const [sortField, setSortField] = useState('co_number');
   const [sortDirection, setSortDirection] = useState('asc');
   const [viewingCO, setViewingCO] = useState(null);
@@ -52,6 +53,16 @@ const ModeratorCO = () => {
     .filter(Boolean)
   )].sort();
 
+  // Get bloom levels for filter
+  const bloomLevels = coAPI.getAllBloomLevels ? coAPI.getAllBloomLevels() : [
+    { value: 'L1', label: 'Level 1 (Remember)' },
+    { value: 'L2', label: 'Level 2 (Understand)' },
+    { value: 'L3', label: 'Level 3 (Apply)' },
+    { value: 'L4', label: 'Level 4 (Analyze)' },
+    { value: 'L5', label: 'Level 5 (Evaluate)' },
+    { value: 'L6', label: 'Level 6 (Create)' }
+  ];
+
   // Filter and sort course outcomes
   const filteredCOs = courseOutcomes
     .filter(co => {
@@ -63,7 +74,10 @@ const ModeratorCO = () => {
       
       const matchesCourse = !selectedCourse || co.course_code === selectedCourse;
       
-      return matchesSearch && matchesCourse;
+      // NEW: Filter by bloom level
+      const matchesBloomLevel = !selectedBloomLevel || co.bloom_level === selectedBloomLevel;
+      
+      return matchesSearch && matchesCourse && matchesBloomLevel;
     });
 
   // Use the same sorting method as instructor
@@ -86,6 +100,7 @@ const ModeratorCO = () => {
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCourse('');
+    setSelectedBloomLevel(''); // NEW: Clear bloom level filter
   };
 
   // View CO details
@@ -160,8 +175,25 @@ const ModeratorCO = () => {
             ))}
           </select>
         </div>
+
+        {/* NEW: Bloom Level Filter */}
+        <div className="filter-group">
+          <label>Filter by Bloom Level:</label>
+          <select
+            value={selectedBloomLevel}
+            onChange={(e) => setSelectedBloomLevel(e.target.value)}
+            className="bloom-select"
+          >
+            <option value="">All Levels</option>
+            {bloomLevels.map(level => (
+              <option key={level.value} value={level.value}>
+                {level.label}
+              </option>
+            ))}
+          </select>
+        </div>
         
-        {(searchTerm || selectedCourse) && (
+        {(searchTerm || selectedCourse || selectedBloomLevel) && (
           <button onClick={clearFilters} className="clear-filters-btn">
             Clear Filters
           </button>
@@ -191,6 +223,12 @@ const ModeratorCO = () => {
               >
                 CO Number {getSortIcon('co_number')}
               </th>
+              <th 
+                onClick={() => handleSort('bloom_level')}
+                className="sortable-header"
+              >
+                Bloom Level {getSortIcon('bloom_level')}
+              </th>
               <th>Description</th>
               <th>Actions</th>
             </tr>
@@ -208,6 +246,11 @@ const ModeratorCO = () => {
                 </td>
                 <td className="co-number">
                   <span className="co-badge">CO{co.co_number}</span>
+                </td>
+                <td className="bloom-level">
+                  <span className={`bloom-badge bloom-${co.bloom_level || 'L1'}`}>
+                    {coAPI.getBloomLevelDisplay ? coAPI.getBloomLevelDisplay(co.bloom_level) : (co.bloom_level || 'L1')}
+                  </span>
                 </td>
                 <td className="co-description">
                   <div className="description-text" title={co.description}>
@@ -246,6 +289,7 @@ const ModeratorCO = () => {
         <div className="summary">
           Displaying {sortedCOs.length} of {courseOutcomes.length} course outcomes
           {selectedCourse && ` for course ${selectedCourse}`}
+          {selectedBloomLevel && ` with Bloom Level ${selectedBloomLevel}`}
         </div>
       </div>
 
@@ -277,6 +321,14 @@ const ModeratorCO = () => {
               <div className="detail-row">
                 <label>CO Number:</label>
                 <span className="co-badge-large">CO{viewingCO.co_number}</span>
+              </div>
+              
+              {/* NEW: Bloom Level in details */}
+              <div className="detail-row">
+                <label>Bloom Level:</label>
+                <span className={`bloom-badge-large bloom-${viewingCO.bloom_level || 'L1'}`}>
+                  {coAPI.getBloomLevelDisplay ? coAPI.getBloomLevelDisplay(viewingCO.bloom_level) : (viewingCO.bloom_level || 'L1')}
+                </span>
               </div>
               
               <div className="detail-row full-width">

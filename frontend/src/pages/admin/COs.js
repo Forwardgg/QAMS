@@ -13,6 +13,7 @@ const CO = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('');
+  const [selectedBloomLevel, setSelectedBloomLevel] = useState(''); // NEW: Filter by bloom level
   const [sortField, setSortField] = useState('co_number');
   const [sortDirection, setSortDirection] = useState('asc');
   const [showForm, setShowForm] = useState(false);
@@ -20,7 +21,8 @@ const CO = () => {
   const [formData, setFormData] = useState({
     course_code: '',
     co_number: '',
-    description: ''
+    description: '',
+    bloom_level: 'L1' // NEW: Default bloom level
   });
 
   useEffect(() => {
@@ -40,9 +42,16 @@ const CO = () => {
   };
 
   const loadAllCOs = async () => {
+  try {
     const response = await coAPI.getAll();
+    console.log('CO API Response:', response); // Debug log
+    console.log('First CO object:', response.data?.rows?.[0]); // Debug log
     setCourseOutcomes(response.data?.rows || []);
-  };
+  } catch (error) {
+    console.error('Error loading COs:', error);
+    setCourseOutcomes([]);
+  }
+};
 
   const loadAllCourses = async () => {
     try {
@@ -62,6 +71,16 @@ const CO = () => {
     .filter(Boolean)
   )].sort();
 
+  // NEW: Get bloom levels for filter
+  const bloomLevels = coAPI.getAllBloomLevels ? coAPI.getAllBloomLevels() : [
+    { value: 'L1', label: 'Level 1 (Remember)' },
+    { value: 'L2', label: 'Level 2 (Understand)' },
+    { value: 'L3', label: 'Level 3 (Apply)' },
+    { value: 'L4', label: 'Level 4 (Analyze)' },
+    { value: 'L5', label: 'Level 5 (Evaluate)' },
+    { value: 'L6', label: 'Level 6 (Create)' }
+  ];
+
   // Filter and sort course outcomes
   const filteredCOs = courseOutcomes
     .filter(co => {
@@ -73,7 +92,10 @@ const CO = () => {
       
       const matchesCourse = !selectedCourse || co.course_code === selectedCourse;
       
-      return matchesSearch && matchesCourse;
+      // NEW: Filter by bloom level
+      const matchesBloomLevel = !selectedBloomLevel || co.bloom_level === selectedBloomLevel;
+      
+      return matchesSearch && matchesCourse && matchesBloomLevel;
     });
 
   const sortedCOs = coAPI.sortCOs ? 
@@ -101,6 +123,7 @@ const CO = () => {
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCourse('');
+    setSelectedBloomLevel(''); // NEW: Clear bloom level filter
   };
 
   // CRUD Functions
@@ -108,7 +131,8 @@ const CO = () => {
     setFormData({
       course_code: '',
       co_number: '',
-      description: ''
+      description: '',
+      bloom_level: 'L1' // NEW: Reset to default
     });
     setEditingCO(null);
     setShowForm(false);
@@ -123,7 +147,8 @@ const CO = () => {
     setFormData({
       course_code: co.course_code,
       co_number: co.co_number,
-      description: co.description
+      description: co.description,
+      bloom_level: co.bloom_level || 'L1' // NEW: Include bloom level
     });
     setEditingCO(co);
     setShowForm(true);
@@ -151,7 +176,7 @@ const CO = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    console.log('Form data:', formData);
     // Enhanced validation
     const errors = [];
     
@@ -171,6 +196,11 @@ const CO = () => {
       errors.push("Description must be at least 10 characters long");
     }
 
+    // NEW: Validate bloom level
+    if (coAPI.validateBloomLevel && !coAPI.validateBloomLevel(formData.bloom_level)) {
+      errors.push("Bloom level must be one of: L1, L2, L3, L4, L5, L6");
+    }
+
     if (errors.length > 0) {
       alert(errors.join('\n'));
       return;
@@ -181,7 +211,8 @@ const CO = () => {
         // For edit
         await coAPI.update(editingCO.co_id, {
           co_number: formData.co_number,
-          description: formData.description
+          description: formData.description,
+          bloom_level: formData.bloom_level // NEW: Include bloom level in update
         });
       } else {
         // For create - convert course_code to course_id
@@ -195,7 +226,8 @@ const CO = () => {
         await coAPI.create({
           course_id: courseId,
           co_number: formData.co_number,
-          description: formData.description
+          description: formData.description,
+          bloom_level: formData.bloom_level // NEW: Include bloom level in create
         });
       }
       
@@ -317,6 +349,24 @@ const CO = () => {
               </div>
 
               <div className="form-group">
+                <label>Bloom Level *</label>
+                <select
+                  name="bloom_level"
+                  value={formData.bloom_level}
+                  onChange={handleChange}
+                  required
+                  className="bloom-select"
+                >
+                  {bloomLevels.map(level => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
+                <small>Cognitive level of this outcome</small>
+              </div>
+
+              <div className="form-group">
                 <label>Description *</label>
                 <textarea
                   name="description"
@@ -369,8 +419,25 @@ const CO = () => {
             ))}
           </select>
         </div>
+
+        {/* NEW: Bloom Level Filter */}
+        <div className="filter-group">
+          <label>Filter by Bloom Level:</label>
+          <select
+            value={selectedBloomLevel}
+            onChange={(e) => setSelectedBloomLevel(e.target.value)}
+            className="bloom-select"
+          >
+            <option value="">All Levels</option>
+            {bloomLevels.map(level => (
+              <option key={level.value} value={level.value}>
+                {level.label}
+              </option>
+            ))}
+          </select>
+        </div>
         
-        {(searchTerm || selectedCourse) && (
+        {(searchTerm || selectedCourse || selectedBloomLevel) && (
           <button onClick={clearFilters} className="clear-filters-btn">
             Clear Filters
           </button>
@@ -400,6 +467,12 @@ const CO = () => {
               >
                 CO Number {getSortIcon('co_number')}
               </th>
+              <th 
+                onClick={() => handleSort('bloom_level')}
+                className="sortable-header"
+              >
+                Bloom Level {getSortIcon('bloom_level')}
+              </th>
               <th>Description</th>
               <th>Actions</th>
             </tr>
@@ -417,6 +490,11 @@ const CO = () => {
                 </td>
                 <td className="co-number">
                   <span className="co-badge">CO{co.co_number}</span>
+                </td>
+                <td className="bloom-level">
+                  <span className={`bloom-badge bloom-${co.bloom_level || 'L1'}`}>
+                    {coAPI.getBloomLevelDisplay ? coAPI.getBloomLevelDisplay(co.bloom_level) : (co.bloom_level || 'L1')}
+                  </span>
                 </td>
                 <td className="co-description">
                   <div className="description-text" title={co.description}>
@@ -457,6 +535,7 @@ const CO = () => {
         <div className="summary">
           Displaying {sortedCOs.length} of {courseOutcomes.length} course outcomes
           {selectedCourse && ` for course ${selectedCourse}`}
+          {selectedBloomLevel && ` with Bloom Level ${selectedBloomLevel}`}
         </div>
         <div className="export-options">
           {/* Add export buttons if needed */}

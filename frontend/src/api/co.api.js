@@ -4,9 +4,9 @@ import api from "./axios";
  * --- COURSE OUTCOME API ---
  * Backend response structures:
  * - getAll/search: { rows: [], total: number, page: number, limit: number }
- * - getById: { co_id, course_id, co_number, description, course_code, course_title, created_at }
- * - getByCourseCode: [{ co_id, course_id, co_number, description, course_code, course_title, created_at }]
- * - create: { co_id, course_id, co_number, description, course_code, created_at }
+ * - getById: { co_id, course_id, co_number, description, bloom_level, course_code, course_title, created_at }
+ * - getByCourseCode: [{ co_id, course_id, co_number, description, bloom_level, course_code, course_title, created_at }]
+ * - create: { co_id, course_id, co_number, description, bloom_level, course_code, created_at }
  * - update: { outcome: {...}, actor: { actorId } }
  * - delete: { message: "Course outcome deleted", outcome: {...}, actor: { actorId } }
  */
@@ -27,9 +27,15 @@ const coAPI = {
   /**
    * Search course outcomes
    * GET /cos/search
-   * Optional query params: courseCode, coNumber, page, limit
+   * Optional query params: courseCode, coNumber, bloomLevel, page, limit
    */
   search: (params = {}) => api.get("/cos/search", { params }),
+
+  /**
+   * Get available bloom levels
+   * GET /cos/bloom-levels
+   */
+  getBloomLevels: () => api.get("/cos/bloom-levels"),
 
   /**
    * Get course outcomes by course code
@@ -82,6 +88,47 @@ const coAPI = {
   },
 
   /**
+   * Format CO with bloom level
+   */
+  formatCOWithBloomLevel: (co) => {
+    if (!co) return "";
+    const base = coAPI.formatCO(co);
+    if (co.bloom_level) {
+      return `${base} (${co.bloom_level})`;
+    }
+    return base;
+  },
+
+  /**
+   * Get bloom level display name
+   */
+  getBloomLevelDisplay: (level) => {
+    const levelMap = {
+      'L1': 'Level 1 (Remember)',
+      'L2': 'Level 2 (Understand)',
+      'L3': 'Level 3 (Apply)',
+      'L4': 'Level 4 (Analyze)',
+      'L5': 'Level 5 (Evaluate)',
+      'L6': 'Level 6 (Create)'
+    };
+    return levelMap[level] || level;
+  },
+
+  /**
+   * Get all bloom levels with display names
+   */
+  getAllBloomLevels: () => {
+    return [
+      { value: 'L1', label: 'Level 1 (Remember)' },
+      { value: 'L2', label: 'Level 2 (Understand)' },
+      { value: 'L3', label: 'Level 3 (Apply)' },
+      { value: 'L4', label: 'Level 4 (Analyze)' },
+      { value: 'L5', label: 'Level 5 (Evaluate)' },
+      { value: 'L6', label: 'Level 6 (Create)' }
+    ];
+  },
+
+  /**
    * Validate CO number format
    */
   validateCONumber: (coNumber) => {
@@ -89,6 +136,15 @@ const coAPI = {
     // Allow formats like: "1", "2.1", "3.2.1", "CO1", "CO2.1"
     const cleaned = coNumber.replace(/^CO/i, "").trim();
     return /^[0-9]+(\.[0-9]+)*$/.test(cleaned);
+  },
+
+  /**
+   * Validate bloom level
+   */
+  validateBloomLevel: (bloomLevel) => {
+    if (bloomLevel === undefined || bloomLevel === null || bloomLevel === '') return true;
+    const validLevels = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
+    return validLevels.includes(bloomLevel);
   },
 
   /**
@@ -116,6 +172,8 @@ const coAPI = {
       co_number: co.co_number,
       co_display: coAPI.formatCO(co),
       description: co.description,
+      bloom_level: co.bloom_level,
+      bloom_level_display: coAPI.getBloomLevelDisplay(co.bloom_level),
       course_code: co.course_code,
       course_title: co.course_title,
     };
@@ -146,6 +204,14 @@ const coAPI = {
         return 0;
       }
 
+      // Special handling for bloom levels (L1, L2, etc.)
+      if (field === "bloom_level") {
+        const bloomOrder = { 'L1': 1, 'L2': 2, 'L3': 3, 'L4': 4, 'L5': 5, 'L6': 6 };
+        const aOrder = bloomOrder[aVal] || 0;
+        const bOrder = bloomOrder[bVal] || 0;
+        return direction === "asc" ? aOrder - bOrder : bOrder - aOrder;
+      }
+
       if (field === "created_at") {
         aVal = new Date(aVal);
         bVal = new Date(bVal);
@@ -170,6 +236,14 @@ const coAPI = {
   },
 
   /**
+   * Filter course outcomes by bloom level
+   */
+  filterByBloomLevel: (cos, bloomLevel) => {
+    if (!bloomLevel) return cos;
+    return cos.filter(co => co.bloom_level === bloomLevel);
+  },
+
+  /**
    * Group course outcomes by course
    */
   groupByCourse: (cos) => {
@@ -189,22 +263,53 @@ const coAPI = {
   },
 
   /**
+   * Group course outcomes by bloom level
+   */
+  groupByBloomLevel: (cos) => {
+    const grouped = {};
+    cos.forEach(co => {
+      const level = co.bloom_level || 'L1';
+      if (!grouped[level]) {
+        grouped[level] = {
+          level: level,
+          level_display: coAPI.getBloomLevelDisplay(level),
+          outcomes: []
+        };
+      }
+      grouped[level].outcomes.push(co);
+    });
+    return grouped;
+  },
+
+  /**
    * Get CO statistics for a course
    */
   getCOStats: (cos) => {
     const stats = {
       total: cos.length,
       byCourse: {},
-      coursesCount: 0
+      byBloomLevel: {},
+      coursesCount: 0,
+      bloomLevelsCount: 0
     };
 
-    const grouped = coAPI.groupByCourse(cos);
-    stats.coursesCount = Object.keys(grouped).length;
+    const groupedByCourse = coAPI.groupByCourse(cos);
+    stats.coursesCount = Object.keys(groupedByCourse).length;
     
-    Object.keys(grouped).forEach(courseCode => {
+    Object.keys(groupedByCourse).forEach(courseCode => {
       stats.byCourse[courseCode] = {
-        count: grouped[courseCode].outcomes.length,
-        course_title: grouped[courseCode].course_title
+        count: groupedByCourse[courseCode].outcomes.length,
+        course_title: groupedByCourse[courseCode].course_title
+      };
+    });
+
+    const groupedByBloom = coAPI.groupByBloomLevel(cos);
+    stats.bloomLevelsCount = Object.keys(groupedByBloom).length;
+    
+    Object.keys(groupedByBloom).forEach(level => {
+      stats.byBloomLevel[level] = {
+        count: groupedByBloom[level].outcomes.length,
+        level_display: groupedByBloom[level].level_display
       };
     });
 
@@ -233,6 +338,10 @@ const coAPI = {
       errors.push("Description must be at least 10 characters long");
     }
 
+    if (data.bloom_level && !coAPI.validateBloomLevel(data.bloom_level)) {
+      errors.push("Bloom level must be one of: L1, L2, L3, L4, L5, L6");
+    }
+
     return errors;
   },
 
@@ -249,7 +358,17 @@ const coAPI = {
     
     const maxNumber = Math.max(...numbers);
     return String(maxNumber + 1);
-  }
+  },
+
+  /**
+   * Default CO data structure
+   */
+  getDefaultCOData: () => ({
+    course_id: "",
+    co_number: "",
+    description: "",
+    bloom_level: "L1"
+  })
 };
 
 export default coAPI;

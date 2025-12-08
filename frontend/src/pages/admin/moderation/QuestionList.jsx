@@ -1,5 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { 
+  Box, 
+  Paper, 
+  Typography, 
+  Grid, 
+  Card, 
+  CardContent,
+  CircularProgress,
+  Button,
+  Switch,
+  FormControlLabel,
+  Alert,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ListIcon from '@mui/icons-material/List';
 import moderatorAPI from '../../../api/moderator.api';
 import './QuestionList.css';
 
@@ -14,10 +38,33 @@ const QuestionList = () => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfMessage, setPdfMessage] = useState({ type: '', text: '' });
   const [showCO, setShowCO] = useState(true);
+  const [bloomData, setBloomData] = useState([]);
 
   const searchParams = new URLSearchParams(location.search);
   const moderationId = searchParams.get('moderationId');
   const paperId = searchParams.get('paperId');
+
+  // Bloom's Taxonomy color scheme
+  const BLOOM_COLORS = {
+    'L1': '#FF6B6B', // Remember
+    'L2': '#4ECDC4', // Understand
+    'L3': '#45B7D1', // Apply
+    'L4': '#96CEB4', // Analyze
+    'L5': '#FFEAA7', // Evaluate
+    'L6': '#DDA0DD', // Create
+    'UNKNOWN': '#CCCCCC' // Unknown/Not assigned
+  };
+
+  // Bloom's Taxonomy labels
+  const BLOOM_LABELS = {
+    'L1': 'Remember',
+    'L2': 'Understand',
+    'L3': 'Apply',
+    'L4': 'Analyze',
+    'L5': 'Evaluate',
+    'L6': 'Create',
+    'UNKNOWN': 'Not Assigned'
+  };
 
   useEffect(() => {
     loadData();
@@ -61,11 +108,82 @@ const QuestionList = () => {
     }
   };
 
+  // Calculate Bloom's Taxonomy distribution
+  useEffect(() => {
+    if (questionReport && questionReport.length > 0) {
+      const bloomDistribution = {};
+      
+      // Initialize all levels
+      Object.keys(BLOOM_LABELS).forEach(level => {
+        bloomDistribution[level] = { count: 0, marks: 0, questions: [] };
+      });
+
+      // Count questions by bloom level
+      questionReport.forEach(question => {
+        if (question.bloom_level) {
+          const level = question.bloom_level.toUpperCase();
+          if (bloomDistribution[level]) {
+            bloomDistribution[level].count++;
+            bloomDistribution[level].marks += (question.marks || 0);
+            bloomDistribution[level].questions.push(question);
+          }
+        } else {
+          // Handle questions without bloom level
+          bloomDistribution['UNKNOWN'].count++;
+          bloomDistribution['UNKNOWN'].marks += (question.marks || 0);
+          bloomDistribution['UNKNOWN'].questions.push(question);
+        }
+      });
+
+      // Convert to array for pie chart
+      const chartData = Object.keys(bloomDistribution)
+        .filter(level => bloomDistribution[level].count > 0)
+        .map(level => {
+          const data = bloomDistribution[level];
+          const label = BLOOM_LABELS[level] || 'Unknown';
+          return {
+            id: level,
+            value: data.count,
+            label: `${level}: ${label}`,
+            color: BLOOM_COLORS[level] || '#CCCCCC',
+            marks: data.marks,
+            questions: data.questions,
+            percentage: (data.count / questionReport.length * 100).toFixed(1)
+          };
+        });
+
+      setBloomData(chartData);
+    }
+  }, [questionReport]);
+
   const hasQuestions = Array.isArray(questionReport) && questionReport.length > 0;
   
   const sortedQuestions = [...questionReport].sort((a, b) => 
     (a.sequence_number || 0) - (b.sequence_number || 0)
   );
+
+  // Calculate statistics
+  const bloomStats = useMemo(() => {
+    const totalQuestions = sortedQuestions.length;
+    const questionsWithBloom = sortedQuestions.filter(q => q.bloom_level).length;
+    const percentageWithBloom = totalQuestions > 0 ? 
+      Math.round((questionsWithBloom / totalQuestions) * 100) : 0;
+    
+    const totalMarks = sortedQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
+    const marksWithBloom = sortedQuestions
+      .filter(q => q.bloom_level)
+      .reduce((sum, q) => sum + (q.marks || 0), 0);
+    
+    return {
+      totalQuestions,
+      questionsWithBloom,
+      percentageWithBloom,
+      totalMarks,
+      marksWithBloom,
+      marksPercentageWithBloom: totalMarks > 0 ? 
+        Math.round((marksWithBloom / totalMarks) * 100) : 0
+    };
+  }, [sortedQuestions]);
 
   const handleGeneratePdf = async () => {
     if (!paperData?.paper?.paper_id) {
@@ -73,7 +191,6 @@ const QuestionList = () => {
       return;
     }
 
-    // FIXED: Check paper status from nested structure
     if (paperData.paper.status !== 'approved') {
       setPdfMessage({ 
         type: 'error', 
@@ -140,232 +257,564 @@ const QuestionList = () => {
   const hasCOData = sortedQuestions.some(question => question.co_number);
   const isPaperApproved = paperData?.paper?.status === 'approved';
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'approved': return 'success';
+      case 'change_requested': return 'warning';
+      case 'under_review': return 'info';
+      case 'draft': return 'default';
+      case 'submitted': return 'secondary';
+      default: return 'default';
+    }
+  };
+
+  // Function to create conic gradient for pie chart
+  const getPieChartStyle = () => {
+    if (bloomData.length === 0) return {};
+    
+    let accumulatedPercentage = 0;
+    const gradients = bloomData.map(item => {
+      const start = accumulatedPercentage + '%';
+      accumulatedPercentage += parseFloat(item.percentage);
+      const end = accumulatedPercentage + '%';
+      return `${item.color} ${start} ${end}`;
+    }).join(', ');
+    
+    return {
+      background: `conic-gradient(${gradients})`
+    };
+  };
+
   if (loading) {
     return (
-      <div className="question-list">
-        <div className="page-header">
-          <button onClick={() => navigate('/admin/moderation/list')} className="btn btn-outline">
-            ← Back to List
-          </button>
-          <h1>Question Analysis</h1>
-        </div>
-        <div className="loading">Loading question data...</div>
-      </div>
+      <Box className="question-list">
+        <Box className="page-header">
+          <Button 
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/admin/moderation/list')} 
+            variant="outlined"
+          >
+            Back to List
+          </Button>
+          <Typography variant="h4" component="h1">
+            Question Analysis
+          </Typography>
+        </Box>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+        </Box>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <div className="question-list">
-        <div className="page-header">
-          <button onClick={() => navigate('/admin/moderation/list')} className="btn btn-outline">
-            ← Back to List
-          </button>
-          <h1>Question Analysis</h1>
-        </div>
-        <div className="error-message">
-          <p>{error}</p>
-          <div className="action-buttons">
-            <button onClick={loadData} className="btn btn-primary">Try Again</button>
-            <button onClick={() => navigate('/admin/moderation/list')} className="btn btn-outline">
+      <Box className="question-list">
+        <Box className="page-header">
+          <Button 
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/admin/moderation/list')} 
+            variant="outlined"
+          >
+            Back to List
+          </Button>
+          <Typography variant="h4" component="h1">
+            Question Analysis
+          </Typography>
+        </Box>
+        <Box className="error-message">
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+          <Box className="action-buttons">
+            <Button onClick={loadData} variant="contained" color="primary">
+              Try Again
+            </Button>
+            <Button 
+              onClick={() => navigate('/admin/moderation/list')} 
+              variant="outlined"
+            >
               Browse Moderation List
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </Box>
+        </Box>
+      </Box>
     );
   }
 
   if (!hasQuestions) {
     return (
-      <div className="question-list">
-        <div className="page-header">
-          <button onClick={() => navigate('/admin/moderation/list')} className="btn btn-outline">
-            ← Back to List
-          </button>
-          <div className="header-right">
-            <button 
-              onClick={() => navigate(`/admin/moderation/report?moderationId=${moderationId}`)}
-              className="btn btn-primary"
+      <Box className="question-list">
+        <Box className="page-header">
+          <Button 
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/admin/moderation/list')} 
+            variant="outlined"
+          >
+            Back to List
+          </Button>
+          <Box className="header-right">
+            {moderationId && (
+              <Button 
+                startIcon={<VisibilityIcon />}
+                onClick={() => navigate(`/admin/moderation/report?moderationId=${moderationId}`)}
+                variant="contained"
+                color="primary"
+              >
+                View Report
+              </Button>
+            )}
+          </Box>
+        </Box>
+        <Box className="no-data">
+          <Typography variant="h5" gutterBottom>
+            No Questions Found
+          </Typography>
+          <Typography variant="body1" paragraph>
+            No questions found for this paper.
+          </Typography>
+          <Box className="action-buttons">
+            <Button onClick={loadData} variant="contained" color="primary">
+              Reload
+            </Button>
+            <Button 
+              onClick={() => navigate('/admin/moderation/list')} 
+              variant="outlined"
             >
-              View Report
-            </button>
-          </div>
-        </div>
-        <div className="no-data">
-          <h2>No Questions Found</h2>
-          <p>No questions found for this paper.</p>
-          <div className="action-buttons">
-            <button onClick={loadData} className="btn btn-primary">Reload</button>
-            <button onClick={() => navigate('/admin/moderation/list')} className="btn btn-outline">
               Back to List
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </Box>
+        </Box>
+      </Box>
     );
   }
 
   return (
-    <div className="question-list">
-      <div className="page-header">
-        <button onClick={() => navigate('/admin/moderation/list')} className="btn btn-outline">
-          ← Back to List
-        </button>
-        <div className="header-right">
+    <Box className="question-list">
+      <Box className="page-header">
+        <Button 
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/admin/moderation/list')} 
+          variant="outlined"
+        >
+          Back to List
+        </Button>
+        <Box className="header-right">
           {moderationId && (
-            <button 
+            <Button 
+              startIcon={<VisibilityIcon />}
               onClick={() => navigate(`/admin/moderation/report?moderationId=${moderationId}`)}
-              className="btn btn-primary"
+              variant="contained"
+              color="primary"
             >
               View Report
-            </button>
+            </Button>
           )}
-          <button 
+          <Button 
+            startIcon={<ListIcon />}
             onClick={() => navigate('/admin/moderation/list')}
-            className="btn btn-secondary"
+            variant="outlined"
           >
             View All
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Box>
+      </Box>
 
       {paperData?.paper && (
-        <div className="paper-info-card">
-          <h2>Question Paper Analysis</h2>
-          <div className="info-grid">
+        <Paper className="paper-info-card" elevation={2}>
+          <Typography variant="h5" gutterBottom>
+            Question Paper Analysis
+          </Typography>
+          <Grid container spacing={2} className="info-grid">
             {paperData.paper.paper_title && (
-              <div className="info-item">
-                <label>Paper Title:</label>
-                <span>{paperData.paper.paper_title}</span>
-              </div>
+              <Grid item xs={12} sm={6} md={4}>
+                <Typography variant="body2" color="textSecondary">
+                  Paper Title:
+                </Typography>
+                <Typography variant="body1">
+                  {paperData.paper.paper_title}
+                </Typography>
+              </Grid>
             )}
             {paperData.paper.course_code && (
-              <div className="info-item">
-                <label>Course:</label>
-                <span>{paperData.paper.course_code} - {paperData.paper.course_title || 'N/A'}</span>
-              </div>
+              <Grid item xs={12} sm={6} md={4}>
+                <Typography variant="body2" color="textSecondary">
+                  Course:
+                </Typography>
+                <Typography variant="body1">
+                  {paperData.paper.course_code} - {paperData.paper.course_title || 'N/A'}
+                </Typography>
+              </Grid>
             )}
             {paperData.paper.semester && (
-              <div className="info-item">
-                <label>Semester:</label>
-                <span>{paperData.paper.semester}</span>
-              </div>
+              <Grid item xs={12} sm={6} md={4}>
+                <Typography variant="body2" color="textSecondary">
+                  Semester:
+                </Typography>
+                <Typography variant="body1">
+                  {paperData.paper.semester}
+                </Typography>
+              </Grid>
             )}
             {paperData.paper.exam_type && (
-              <div className="info-item">
-                <label>Exam Type:</label>
-                <span>{paperData.paper.exam_type}</span>
-              </div>
+              <Grid item xs={12} sm={6} md={4}>
+                <Typography variant="body2" color="textSecondary">
+                  Exam Type:
+                </Typography>
+                <Typography variant="body1">
+                  {paperData.paper.exam_type}
+                </Typography>
+              </Grid>
             )}
             {paperData.paper.status && (
-              <div className="info-item">
-                <label>Status:</label>
-                <span className={`status-badge status-${paperData.paper.status}`}>
-                  {paperData.paper.status}
-                </span>
-              </div>
+              <Grid item xs={12} sm={6} md={4}>
+                <Typography variant="body2" color="textSecondary">
+                  Status:
+                </Typography>
+                <Chip 
+                  label={paperData.paper.status}
+                  color={getStatusColor(paperData.paper.status)}
+                  size="small"
+                />
+              </Grid>
             )}
-          </div>
-        </div>
+          </Grid>
+        </Paper>
       )}
 
-      <div className="print-controls">
-        <div className="controls-left">
-          <button 
-            className="btn btn-primary print-btn" 
+      {/* Bloom's Taxonomy Analysis Section */}
+      <Paper className="bloom-analysis-section" elevation={2}>
+        <Typography variant="h5" gutterBottom align="center">
+          Bloom's Taxonomy Analysis
+        </Typography>
+        
+        <Grid container spacing={3} className="bloom-container">
+          <Grid item xs={12} md={6} className="bloom-chart-container">
+            {bloomData.length > 0 ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Box sx={{ position: 'relative', width: 250, height: 250, mb: 3 }}>
+                  {/* CSS-only Pie Chart */}
+                  <Box 
+                    sx={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      borderRadius: '50%',
+                      ...getPieChartStyle(),
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {/* Center hole */}
+                    <Box 
+                      sx={{ 
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '60%',
+                        height: '60%',
+                        borderRadius: '50%',
+                        backgroundColor: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'column',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      <Typography variant="h4" color="primary" fontWeight="bold">
+                        {bloomStats.totalQuestions}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Total Questions
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+                
+                {/* Legend */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1, mb: 2 }}>
+                  {bloomData.map((item) => (
+                    <Box 
+                      key={item.id}
+                      sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 0.5,
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
+                        backgroundColor: 'rgba(255,255,255,0.8)'
+                      }}
+                    >
+                      <Box 
+                        sx={{ 
+                          width: 12, 
+                          height: 12, 
+                          borderRadius: '50%', 
+                          backgroundColor: item.color 
+                        }} 
+                      />
+                      <Typography variant="caption">
+                        {item.label} ({item.value})
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            ) : (
+              <Box className="no-bloom-data">
+                <Typography variant="body1" paragraph align="center">
+                  No Bloom's Taxonomy data available for this paper.
+                </Typography>
+                <Typography variant="body2" color="textSecondary" align="center">
+                  Please ensure questions are tagged with Bloom's levels.
+                </Typography>
+              </Box>
+            )}
+          </Grid>
+
+          <Grid item xs={12} md={6} className="bloom-stats-container">
+            <Paper elevation={1} sx={{ p: 3, height: '100%' }}>
+              <Typography variant="h6" gutterBottom>
+                Statistics
+              </Typography>
+              
+              <Grid container spacing={2} className="bloom-stats-grid">
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        Total Questions
+                      </Typography>
+                      <Typography variant="h4" color="primary">
+                        {bloomStats.totalQuestions}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        With Bloom Level
+                      </Typography>
+                      <Typography variant="h4" color="primary">
+                        {bloomStats.questionsWithBloom}
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary">
+                        ({bloomStats.percentageWithBloom}%)
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        Total Marks
+                      </Typography>
+                      <Typography variant="h4" color="primary">
+                        {bloomStats.totalMarks}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        Marks with Bloom
+                      </Typography>
+                      <Typography variant="h4" color="primary">
+                        {bloomStats.marksWithBloom}
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary">
+                        ({bloomStats.marksPercentageWithBloom}%)
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Bloom's Taxonomy Levels:
+                </Typography>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Level</TableCell>
+                        <TableCell align="right">Questions</TableCell>
+                        <TableCell align="right">Marks</TableCell>
+                        <TableCell align="right">Percentage</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {bloomData.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  backgroundColor: item.color
+                                }}
+                              />
+                              <Typography variant="body2">
+                                {item.label.split(': ')[1]}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2">
+                              {item.value}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2">
+                              {item.marks}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2" color="textSecondary">
+                              {item.percentage}%
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Box className="print-controls">
+        <Box className="controls-left">
+          <Button 
+            startIcon={<PictureAsPdfIcon />}
             onClick={handleGeneratePdf}
             disabled={isGeneratingPdf || !isPaperApproved}
-            title={!isPaperApproved ? `Paper status: ${paperData?.paper?.status}. Only approved papers can be downloaded.` : 'Generate PDF'}
+            variant="contained"
+            color="primary"
+            size="large"
           >
             {isGeneratingPdf ? 'Generating PDF...' : 'Generate Question Paper PDF'}
             {!isPaperApproved && ' (Approved Only)'}
-          </button>
+          </Button>
           
           {paperData?.paper?.status && (
-            <div className={`paper-status status-${paperData.paper.status}`}>
-              Status: {paperData.paper.status}
-            </div>
+            <Chip 
+              label={`Status: ${paperData.paper.status}`}
+              color={getStatusColor(paperData.paper.status)}
+              size="medium"
+              className="paper-status"
+            />
           )}
-        </div>
+        </Box>
         
-        <div className="controls-right">
+        <Box className="controls-right">
           {hasCOData && (
-            <div className="co-toggle">
-              <label className="toggle-label">
-                Show Course Outcomes
-                <div className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={showCO}
-                    onChange={(e) => setShowCO(e.target.checked)}
-                    className="toggle-checkbox"
-                    id="co-toggle"
-                  />
-                  <span className="toggle-slider"></span>
-                </div>
-              </label>
-            </div>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showCO}
+                  onChange={(e) => setShowCO(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Show Course Outcomes"
+              className="co-toggle"
+            />
           )}
           
-          <div className="question-count">
+          <Typography variant="body1" className="question-count">
             {sortedQuestions.length} question{sortedQuestions.length !== 1 ? 's' : ''}
-          </div>
-        </div>
-      </div>
+          </Typography>
+        </Box>
+      </Box>
 
       {pdfMessage.text && (
-        <div className={`pdf-message ${pdfMessage.type}`}>
+        <Alert 
+          severity={pdfMessage.type === 'success' ? 'success' : 'error'}
+          className={`pdf-message ${pdfMessage.type}`}
+          sx={{ mb: 2 }}
+        >
           {pdfMessage.text}
-        </div>
+        </Alert>
       )}
 
-      <div className="print-preview-wrapper">
-        <div className="print-preview-page">
-          <header className="print-preview-header">
-            <div className="header-line1">{headerData.institution}</div>
-            <div className="header-line2">
+      <Box className="print-preview-wrapper">
+        <Paper className="print-preview-page" elevation={3}>
+          <Box className="print-preview-header">
+            <Typography variant="h6" className="header-line1">
+              {headerData.institution}
+            </Typography>
+            <Typography variant="subtitle1" className="header-line2">
               {headerData.semester} {headerData.examType}, {headerData.academicYear}
-            </div>
-            <div className="header-line3">{headerData.course}</div>
+            </Typography>
+            <Typography variant="subtitle1" fontWeight="bold" className="header-line3">
+              {headerData.course}
+            </Typography>
             
-            <div className="marks-time-line">
-              <div className="full-marks">Full mark : {headerData.fullMarks}</div>
-              <div className="time">Time: {headerData.duration}</div>
-            </div>
-          </header>
+            <Box className="marks-time-line">
+              <Typography variant="body2" className="full-marks">
+                Full mark : {headerData.fullMarks}
+              </Typography>
+              <Typography variant="body2" className="time">
+                Time: {headerData.duration}
+              </Typography>
+            </Box>
+          </Box>
 
-          <main className="print-preview-body">
-  {sortedQuestions.map((question, index) => (
-    <div key={question.question_id} className="print-preview-question">
-      <div className="question-number-content">
-        <strong className="question-number">
-          {question.sequence_number || index + 1}.
-        </strong>
-        <div 
-          className="question-content" 
-          dangerouslySetInnerHTML={{ 
-            __html: question.content_html || question.content_preview || 'No content available' 
-          }} 
-        />
-        {/* Add marks display on the right side */}
-        {question.marks !== null && question.marks !== undefined && (
-          <div className="question-marks-right">
-            [{question.marks}]
-          </div>
-        )}
-      </div>
-      {showCO && question.co_number && (
-        <div className="question-co">
-          Course Outcome: CO{question.co_number}
-        </div>
-      )}
-    </div>
-  ))}
-</main>
-        </div>
-      </div>
-    </div>
+          <Box className="print-preview-body">
+            {sortedQuestions.map((question, index) => (
+              <Box key={question.question_id} className="print-preview-question" sx={{ mb: 2 }}>
+                <Box className="question-number-content">
+                  <Typography fontWeight="bold" className="question-number">
+                    {question.sequence_number || index + 1}.
+                  </Typography>
+                  <Box 
+                    className="question-content" 
+                    dangerouslySetInnerHTML={{ 
+                      __html: question.content_html || question.content_preview || 'No content available' 
+                    }} 
+                  />
+                  {question.marks !== null && question.marks !== undefined && (
+                    <Typography fontWeight="bold" className="question-marks-right">
+                      [{question.marks}]
+                    </Typography>
+                  )}
+                </Box>
+                {showCO && question.co_number && (
+                  <Chip 
+                    label={
+                      <>
+                        Course Outcome: CO{question.co_number}
+                        {question.bloom_level && ` (Bloom's: ${question.bloom_level})`}
+                      </>
+                    }
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    className="question-co"
+                  />
+                )}
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      </Box>
+    </Box>
   );
 };
 

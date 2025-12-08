@@ -11,7 +11,7 @@ export class Question {
       paper_id, 
       content_html, 
       co_id, 
-      marks = null, // NEW FIELD
+      marks = null,
       status = 'draft', 
       sequence_number = null 
     } = questionData;
@@ -142,6 +142,7 @@ export class Question {
       SELECT q.*, 
              co.co_number, 
              co.description as co_description,
+             co.bloom_level,  -- ADDED bloom_level
              c.course_id,
              c.code as course_code,
              c.title as course_title
@@ -160,7 +161,8 @@ export class Question {
     const query = `
       SELECT q.*, 
              co.co_number, 
-             co.description as co_description
+             co.description as co_description,
+             co.bloom_level  -- ADDED bloom_level
       FROM questions q
       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
       WHERE q.paper_id = $1
@@ -324,6 +326,7 @@ export class Question {
       co_id,
       status,
       course_id,
+      bloom_level,  // ADDED bloom_level filter
       page = 1,
       limit = 25
     } = filters;
@@ -356,6 +359,13 @@ export class Question {
       queryParams.push(course_id);
     }
 
+    // ADDED: bloom_level filter
+    if (bloom_level) {
+      paramCount++;
+      whereConditions.push(`co.bloom_level = $${paramCount}`);
+      queryParams.push(bloom_level);
+    }
+
     const whereClause = whereConditions.length > 0 
       ? `WHERE ${whereConditions.join(' AND ')}` 
       : '';
@@ -365,14 +375,16 @@ export class Question {
       SELECT COUNT(*) as total
       FROM questions q
       LEFT JOIN question_papers qp ON q.paper_id = qp.paper_id
+      LEFT JOIN course_outcomes co ON q.co_id = co.co_id  -- ADDED join for bloom_level
       ${whereClause}
     `;
 
-    // Main query
+    // Main query - UPDATED to include bloom_level
     const mainQuery = `
       SELECT q.*, 
              co.co_number, 
              co.description as co_description,
+             co.bloom_level,  -- ADDED bloom_level
              qp.course_id,
              c.code as course_code,
              c.title as course_title,
@@ -463,6 +475,7 @@ export class Question {
         q.question_id, q.paper_id, q.content_html, q.marks, q.status, q.sequence_number,
         q.created_at, q.updated_at,
         co.co_id, co.co_number, co.description as co_description,
+        co.bloom_level,  -- ADDED bloom_level
         c.course_id, c.code as course_code, c.title as course_title
       FROM questions q
       LEFT JOIN course_outcomes co ON q.co_id = co.co_id
@@ -541,15 +554,16 @@ export class Question {
         co.co_id,
         co.co_number,
         co.description as co_description,
+        co.bloom_level,  -- ADDED bloom_level
         COUNT(q.question_id) as total_questions,
         COUNT(CASE WHEN q.status = 'approved' THEN 1 END) as approved_questions,
         COUNT(CASE WHEN q.status = 'change_requested' THEN 1 END) as change_requested_questions,
-        SUM(q.marks) as total_marks, -- NEW: Calculate total marks per CO
+        SUM(q.marks) as total_marks,
         json_agg(
           jsonb_build_object(
             'question_id', q.question_id,
             'sequence_number', q.sequence_number,
-            'marks', q.marks, -- NEW: Include marks in JSON
+            'marks', q.marks,
             'content_preview', SUBSTRING(q.content_html FROM 1 FOR 100),
             'status', q.status,
             'created_at', q.created_at
@@ -559,7 +573,7 @@ export class Question {
       JOIN (SELECT course_id FROM question_papers WHERE paper_id = $1 LIMIT 1) qp_course
         ON co.course_id = qp_course.course_id
       LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
-      GROUP BY co.co_id, co.co_number, co.description
+      GROUP BY co.co_id, co.co_number, co.description, co.bloom_level  -- ADDED bloom_level to GROUP BY
       ORDER BY co.co_number
     `;
 
@@ -571,7 +585,7 @@ export class Question {
     if (!paperId) throw new Error('paper_id is required');
     
     const query = `
-      SELECT co.co_id, co.co_number, co.description
+      SELECT co.co_id, co.co_number, co.description, co.bloom_level  -- ADDED bloom_level
       FROM course_outcomes co
       JOIN question_papers qp ON co.course_id = qp.course_id
       WHERE qp.paper_id = $1
@@ -594,80 +608,99 @@ export class Question {
     return parseInt(result.rows[0].total_marks) || 0;
   }
 
-  // NEW METHOD: Get marks distribution by CO
+  // NEW METHOD: Get marks distribution by CO - UPDATED to include bloom_level
   static async getMarksDistribution(paperId) {
     const query = `
       SELECT 
         co.co_number,
+        co.bloom_level,  -- ADDED bloom_level
         COALESCE(SUM(q.marks), 0) as total_marks,
         COUNT(q.question_id) as question_count
       FROM course_outcomes co
       LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
       WHERE co.course_id = (SELECT course_id FROM question_papers WHERE paper_id = $1)
-      GROUP BY co.co_id, co.co_number
+      GROUP BY co.co_id, co.co_number, co.bloom_level  -- ADDED bloom_level to GROUP BY
       ORDER BY co.co_number
     `;
     
     const result = await pool.query(query, [paperId]);
     return result.rows;
   }
-  // Add this method to your Question class in Question.js
-static async deleteQuestionWithMedia(questionId, client = null) {
-  const executor = client || pool;
 
-  // First get all media associated with this question
-  const mediaQuery = `
-    SELECT media_id, media_url, media_type 
-    FROM question_media 
-    WHERE question_id = $1 AND deleted_at IS NULL
-  `;
-  
-  const mediaResult = await executor.query(mediaQuery, [questionId]);
-  const mediaRecords = mediaResult.rows;
-
-  // Delete from Cloudinary if it's a Cloudinary URL
-  for (const media of mediaRecords) {
-    if (media.media_url.includes('cloudinary.com')) {
-      try {
-        // Extract public_id from Cloudinary URL
-        const urlParts = media.media_url.split('/');
-        const uploadIndex = urlParts.indexOf('upload');
-        if (uploadIndex !== -1 && uploadIndex + 1 < urlParts.length) {
-          const publicId = urlParts[uploadIndex + 1];
-          // Import CloudinaryService dynamically to avoid circular dependency
-          const { CloudinaryService } = await import('./CloudinaryService.js');
-          await CloudinaryService.deleteImage(publicId);
-          console.log(`Deleted from Cloudinary: ${publicId}`);
-        }
-      } catch (cloudinaryError) {
-        console.warn(`Failed to delete from Cloudinary for media ${media.media_id}:`, cloudinaryError.message);
-      }
-    } else if (media.media_url.startsWith('/uploads/')) {
-      // Delete local file
-      try {
-        const QuestionMedia = (await import('./QuestionMedia.js')).QuestionMedia;
-        const filename = media.media_url.split('/').pop();
-        await QuestionMedia.deleteFileIfExists(filename, 'images/questions');
-        console.log(`Deleted local file: ${filename}`);
-      } catch (fileError) {
-        console.warn(`Failed to delete local file for media ${media.media_id}:`, fileError.message);
-      }
-    }
+  // NEW METHOD: Get bloom level distribution for a paper
+  static async getBloomLevelDistribution(paperId) {
+    const query = `
+      SELECT 
+        co.bloom_level,
+        COUNT(q.question_id) as question_count,
+        COALESCE(SUM(q.marks), 0) as total_marks
+      FROM course_outcomes co
+      LEFT JOIN questions q ON co.co_id = q.co_id AND q.paper_id = $1
+      WHERE co.course_id = (SELECT course_id FROM question_papers WHERE paper_id = $1)
+      GROUP BY co.bloom_level
+      ORDER BY co.bloom_level
+    `;
+    
+    const result = await pool.query(query, [paperId]);
+    return result.rows;
   }
 
-  // Delete media records from database
-  await executor.query(
-    'DELETE FROM question_media WHERE question_id = $1',
-    [questionId]
-  );
+  static async deleteQuestionWithMedia(questionId, client = null) {
+    const executor = client || pool;
 
-  // Finally delete the question
-  const questionQuery = 'DELETE FROM questions WHERE question_id = $1 RETURNING question_id';
-  const result = await executor.query(questionQuery, [questionId]);
-  
-  return {
-    question: result.rows[0],
-    mediaDeleted: mediaRecords.length
-  };
-}
+    // First get all media associated with this question
+    const mediaQuery = `
+      SELECT media_id, media_url, media_type 
+      FROM question_media 
+      WHERE question_id = $1 AND deleted_at IS NULL
+    `;
+    
+    const mediaResult = await executor.query(mediaQuery, [questionId]);
+    const mediaRecords = mediaResult.rows;
+
+    // Delete from Cloudinary if it's a Cloudinary URL
+    for (const media of mediaRecords) {
+      if (media.media_url.includes('cloudinary.com')) {
+        try {
+          // Extract public_id from Cloudinary URL
+          const urlParts = media.media_url.split('/');
+          const uploadIndex = urlParts.indexOf('upload');
+          if (uploadIndex !== -1 && uploadIndex + 1 < urlParts.length) {
+            const publicId = urlParts[uploadIndex + 1];
+            // Import CloudinaryService dynamically to avoid circular dependency
+            const { CloudinaryService } = await import('./CloudinaryService.js');
+            await CloudinaryService.deleteImage(publicId);
+            console.log(`Deleted from Cloudinary: ${publicId}`);
+          }
+        } catch (cloudinaryError) {
+          console.warn(`Failed to delete from Cloudinary for media ${media.media_id}:`, cloudinaryError.message);
+        }
+      } else if (media.media_url.startsWith('/uploads/')) {
+        // Delete local file
+        try {
+          const QuestionMedia = (await import('./QuestionMedia.js')).QuestionMedia;
+          const filename = media.media_url.split('/').pop();
+          await QuestionMedia.deleteFileIfExists(filename, 'images/questions');
+          console.log(`Deleted local file: ${filename}`);
+        } catch (fileError) {
+          console.warn(`Failed to delete local file for media ${media.media_id}:`, fileError.message);
+        }
+      }
+    }
+
+    // Delete media records from database
+    await executor.query(
+      'DELETE FROM question_media WHERE question_id = $1',
+      [questionId]
+    );
+
+    // Finally delete the question
+    const questionQuery = 'DELETE FROM questions WHERE question_id = $1 RETURNING question_id';
+    const result = await executor.query(questionQuery, [questionId]);
+    
+    return {
+      question: result.rows[0],
+      mediaDeleted: mediaRecords.length
+    };
+  }
 }

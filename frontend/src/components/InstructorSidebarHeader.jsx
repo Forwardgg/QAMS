@@ -2,6 +2,7 @@ import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthContext } from './AuthProvider';
 import './AdminSidebarHeader.css';
+import logo from '../assets/images/logo.png';
 
 // Import MUI Icons
 import {
@@ -115,12 +116,19 @@ const InstructorSidebarHeader = () => {
         {/* Sidebar Header */}
         <div className="sidebar-header">
           {!isCollapsed && (
-            <>
-              <div className="sidebar-logo">INSTRUCTOR</div>
-              <div className="sidebar-title">Dashboard</div>
-            </>
+            <div className="sidebar-logo-container">
+              <img src={logo} alt="Logo" className="sidebar-logo-image" />
+              <div className="sidebar-logo-content">
+                <div className="sidebar-logo">INSTRUCTOR</div>
+                <div className="sidebar-title">Dashboard</div>
+              </div>
+            </div>
           )}
-          {isCollapsed && <div className="sidebar-collapsed-logo">I</div>}
+          {isCollapsed && (
+            <div className="sidebar-collapsed-logo">
+              <img src={logo} alt="Logo" className="collapsed-logo-image" />
+            </div>
+          )}
           
           <button 
             className="sidebar-toggle" 
@@ -218,13 +226,7 @@ const InstructorSidebarHeader = () => {
         {/* Footer */}
         <footer className="admin-footer">
           <div className="footer-content">
-            <p>© {new Date().getFullYear()} Learning Management System • v1.0</p>
-            <div className="footer-links">
-              <a href="/instructor/help" className="footer-link">Help</a>
-              <a href="/instructor/support" className="footer-link">Support</a>
-              <a href="/instructor/privacy" className="footer-link">Privacy</a>
-              <a href="/instructor/terms" className="footer-link">Terms</a>
-            </div>
+            <p>© {new Date().getFullYear()} Question Authoring and Moderation System • v1.0</p>
           </div>
         </footer>
       </div>

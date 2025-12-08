@@ -649,3 +649,131 @@
     justify-content: center;
   }
 }
+/* Add these to your CO.css file if not already present */
+
+/* Bloom select styling */
+.bloom-select {
+  padding: 0.75rem 1rem;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 1rem;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.bloom-select:focus {
+  outline: none;
+  border-color: #9b59b6;
+  background-color: white;
+}
+
+/* Bloom Level Badges */
+.bloom-level {
+  text-align: center;
+}
+
+.bloom-badge {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.bloom-L1 {
+  background-color: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+}
+
+.bloom-L2 {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.bloom-L3 {
+  background-color: #fff3e0;
+  color: #ef6c00;
+  border: 1px solid #ffe0b2;
+}
+
+.bloom-L4 {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #e1bee7;
+}
+
+.bloom-L5 {
+  background-color: #e8eaf6;
+  color: #303f9f;
+  border: 1px solid #c5cae9;
+}
+
+.bloom-L6 {
+  background-color: #fce4ec;
+  color: #c2185b;
+  border: 1px solid #f8bbd9;
+}
+
+/* Large bloom badge for modal */
+.bloom-badge-large {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  min-width: 80px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+/* Table column width adjustments for 6 columns */
+.co-table th:nth-child(1),
+.co-table td:nth-child(1) {
+  width: 120px;
+  min-width: 120px;
+  max-width: 150px;
+}
+
+.co-table th:nth-child(2),
+.co-table td:nth-child(2) {
+  width: 200px;
+  min-width: 150px;
+  max-width: 250px;
+}
+
+.co-table th:nth-child(3),
+.co-table td:nth-child(3) {
+  width: 100px;
+  min-width: 90px;
+  max-width: 120px;
+}
+
+.co-table th:nth-child(4),
+.co-table td:nth-child(4) {
+  width: 130px;
+  min-width: 130px;
+  max-width: 150px;
+  text-align: center;
+}
+
+.co-table th:nth-child(5),
+.co-table td:nth-child(5) {
+  width: 280px;
+  min-width: 200px;
+  max-width: 400px;
+}
+
+.co-table th:nth-child(6),
+.co-table td:nth-child(6) {
+  width: 120px;
+  min-width: 120px;
+  max-width: 140px;
+}

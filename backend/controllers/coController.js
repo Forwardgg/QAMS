@@ -88,7 +88,7 @@ export const getCourseOutcomeById = async (req, res) => {
 export const createCourseOutcome = async (req, res) => {
   // log writes as well (includes user info from auth middleware)
   logRequest(req);
-  const { course_id, co_number, description } = req.body ?? {};
+  const { course_id, co_number, description, bloom_level = 'L1' } = req.body ?? {};
 
   if (!course_id || !co_number || !description) {
     return res.status(400).json({ error: "course_id, co_number and description are required" });
@@ -98,7 +98,8 @@ export const createCourseOutcome = async (req, res) => {
     const outcome = await CourseOutcome.createCourseOutcome({ 
       course_id: Number(course_id), 
       co_number, 
-      description 
+      description,
+      bloom_level
     });
     return res.status(201).json(outcome);
   } catch (err) {
@@ -107,6 +108,9 @@ export const createCourseOutcome = async (req, res) => {
     }
     if (err && (err.message || "").toLowerCase().includes("not found")) {
       return res.status(404).json({ error: err.message });
+    }
+    if (err && err.message && err.message.includes("bloom_level must be one of")) {
+      return res.status(400).json({ error: err.message });
     }
     console.error("createCourseOutcome error:", err?.stack ?? err?.message ?? err);
     return res.status(500).json({ error: "Server error while creating course outcome" });
@@ -130,6 +134,9 @@ export const updateCourseOutcome = async (req, res) => {
   } catch (err) {
     if (err && (err.message || "").toLowerCase().includes("already exists")) {
       return res.status(409).json({ error: err.message });
+    }
+    if (err && err.message && err.message.includes("bloom_level must be one of")) {
+      return res.status(400).json({ error: err.message });
     }
     console.error("updateCourseOutcome error:", err?.stack ?? err?.message ?? err);
     return res.status(500).json({ error: "Server error while updating course outcome" });
@@ -159,13 +166,32 @@ export const searchCourseOutcomes = async (req, res) => {
   try {
     const courseCode = req.query?.courseCode ?? "";
     const coNumber = req.query?.coNumber ?? "";
+    const bloomLevel = req.query?.bloomLevel ?? ""; // Added bloom level search
     const page = parsePositiveInt(req.query.page, 1);
     const limit = parsePositiveInt(req.query.limit, 25);
 
-    const data = await CourseOutcome.searchCourseOutcomes({ courseCode, coNumber, page, limit });
+    const data = await CourseOutcome.searchCourseOutcomes({ 
+      courseCode, 
+      coNumber, 
+      bloomLevel, // Added to search
+      page, 
+      limit 
+    });
     return res.json(data);
   } catch (err) {
     console.error("searchCourseOutcomes error:", err?.stack ?? err?.message ?? err);
     return res.status(500).json({ error: "Server error while searching course outcomes" });
+  }
+};
+
+// NEW: Add endpoint to get valid bloom levels
+export const getBloomLevels = async (req, res) => {
+  logRequest(req);
+  try {
+    const bloomLevels = CourseOutcome.getBloomLevels();
+    return res.json({ bloomLevels });
+  } catch (err) {
+    console.error("getBloomLevels error:", err?.stack ?? err?.message ?? err);
+    return res.status(500).json({ error: "Server error while fetching bloom levels" });
   }
 };

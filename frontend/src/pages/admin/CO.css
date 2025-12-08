@@ -60,7 +60,7 @@
 /* Filters Section */
 .filters-section {
   display: flex;
-  gap: 20px;
+  gap: 16px;
   align-items: flex-end;
   margin-bottom: 24px;
   padding: 16px;
@@ -73,6 +73,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+  min-width: 180px;
 }
 
 .filter-group label {
@@ -85,17 +87,25 @@
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
-  width: 300px;
+  width: 100%;
   font-size: 14px;
+  min-width: 250px;
 }
 
-.course-select {
+.course-select, .bloom-select {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
   background: white;
   font-size: 14px;
-  min-width: 200px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.course-select:focus, .bloom-select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.25);
 }
 
 /* Blue theme for clear filters button */
@@ -160,6 +170,50 @@
   background: #f8f9fa;
 }
 
+/* Table column width adjustments for 6 columns */
+.co-table th:nth-child(1), /* Course Code */
+.co-table td:nth-child(1) {
+  width: 120px;
+  min-width: 120px;
+  max-width: 150px;
+}
+
+.co-table th:nth-child(2), /* Course Title */
+.co-table td:nth-child(2) {
+  width: 200px;
+  min-width: 150px;
+  max-width: 250px;
+}
+
+.co-table th:nth-child(3), /* CO Number */
+.co-table td:nth-child(3) {
+  width: 100px;
+  min-width: 80px;
+  max-width: 120px;
+}
+
+.co-table th:nth-child(4), /* Bloom Level column */
+.co-table td:nth-child(4) {
+  width: 130px;
+  min-width: 130px;
+  max-width: 160px;
+  text-align: center;
+}
+
+.co-table th:nth-child(5), /* Description column */
+.co-table td:nth-child(5) {
+  width: 250px;
+  min-width: 150px;
+  max-width: 400px;
+}
+
+.co-table th:nth-child(6), /* Actions column */
+.co-table td:nth-child(6) {
+  width: 140px;
+  min-width: 140px;
+  max-width: 160px;
+}
+
 /* Cell Styles */
 .course-code .code-badge {
   background: #e3f2fd;
@@ -189,9 +243,62 @@
   display: inline-block;
 }
 
-/* Shorter description width to make room for buttons */
+/* Bloom Level Badges */
+.bloom-level {
+  text-align: center;
+}
+
+.bloom-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  min-width: 50px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.bloom-L1 {
+  background-color: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+}
+
+.bloom-L2 {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.bloom-L3 {
+  background-color: #fff3e0;
+  color: #ef6c00;
+  border: 1px solid #ffe0b2;
+}
+
+.bloom-L4 {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #e1bee7;
+}
+
+.bloom-L5 {
+  background-color: #e8eaf6;
+  color: #303f9f;
+  border: 1px solid #c5cae9;
+}
+
+.bloom-L6 {
+  background-color: #fce4ec;
+  color: #c2185b;
+  border: 1px solid #f8bbd9;
+}
+
+/* Shorter description width to make room for buttons and bloom level */
 .co-description .description-text {
-  max-width: 300px;
+  max-width: 250px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -258,6 +365,22 @@
   background: #1565c0;
 }
 
+/* Back Button */
+.back-btn {
+  padding: 8px 16px;
+  background: #64b5f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.back-btn:hover {
+  background: #42a5f5;
+}
+
 /* Form Modal */
 .form-modal {
   position: fixed;
@@ -283,10 +406,31 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
-.form-content h2 {
-  margin: 0 0 20px 0;
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.form-header h2 {
+  margin: 0;
   color: #2c3e50;
   font-size: 24px;
+}
+
+.close-form-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.close-form-btn:hover {
+  color: #495057;
 }
 
 .form-group {
@@ -301,7 +445,8 @@
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
   width: 100%;
   padding: 10px;
   border: 1px solid #ddd;
@@ -312,7 +457,8 @@
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
   outline: none;
   border-color: #1976d2;
   box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.25);
@@ -328,6 +474,12 @@
   font-size: 12px;
   margin-top: 4px;
   display: block;
+}
+
+.readonly-input {
+  background: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
 }
 
 .form-actions {
@@ -396,21 +548,8 @@
 
 /* Actions Column - Fixed width to prevent wrapping */
 .actions {
-  width: 140px;
   text-align: center;
   white-space: nowrap;
-}
-
-/* Read-only input style for edit form */
-.readonly-input {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #f8f9fa;
-  color: #6c757d;
-  font-size: 14px;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 /* No Data State */
@@ -445,25 +584,62 @@
     align-items: stretch;
   }
   
-  .search-input {
+  .filter-group {
+    min-width: unset;
     width: 100%;
   }
   
-  .course-select {
+  .search-input {
     min-width: unset;
-    width: 100%;
   }
   
   .co-table-container {
     overflow-x: auto;
   }
   
-  .co-description .description-text {
-    max-width: 200px;
+  .co-table th,
+  .co-table td {
+    padding: 8px;
   }
   
-  .actions {
+  .co-table th:nth-child(1),
+  .co-table td:nth-child(1) {
+    width: 100px;
+    min-width: 100px;
+  }
+  
+  .co-table th:nth-child(2),
+  .co-table td:nth-child(2) {
+    width: 150px;
+    min-width: 120px;
+  }
+  
+  .co-table th:nth-child(3),
+  .co-table td:nth-child(3) {
+    width: 80px;
+    min-width: 70px;
+  }
+  
+  .co-table th:nth-child(4),
+  .co-table td:nth-child(4) {
+    width: 100px;
+    min-width: 100px;
+  }
+  
+  .co-table th:nth-child(5),
+  .co-table td:nth-child(5) {
+    width: 150px;
+    min-width: 120px;
+  }
+  
+  .co-table th:nth-child(6),
+  .co-table td:nth-child(6) {
     width: 120px;
+    min-width: 120px;
+  }
+  
+  .co-description .description-text {
+    max-width: 150px;
   }
   
   .btn-edit,
@@ -476,5 +652,60 @@
   .form-content {
     margin: 20px;
     width: calc(100% - 40px);
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .co-stats {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .stat-total,
+  .stat-filtered,
+  .stat-courses {
+    margin-bottom: 4px;
+  }
+  
+  .co-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .create-btn,
+  .refresh-btn,
+  .back-btn {
+    width: 100%;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  
+  .co-table th:nth-child(1),
+  .co-table td:nth-child(1) {
+    width: 80px;
+    min-width: 80px;
+  }
+  
+  .co-table th:nth-child(2),
+  .co-table td:nth-child(2) {
+    display: none; /* Hide course title on very small screens */
+  }
+  
+  .co-table th:nth-child(5),
+  .co-table td:nth-child(5) {
+    width: 120px;
+    min-width: 100px;
+  }
+  
+  .co-description .description-text {
+    max-width: 120px;
+    font-size: 13px;
+  }
+  
+  .bloom-badge {
+    font-size: 10px;
+    min-width: 40px;
+    padding: 3px 6px;
   }
 }

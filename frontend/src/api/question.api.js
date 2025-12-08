@@ -5,12 +5,21 @@ async function handle(promise) {
     const res = await promise;
     return res.data;
   } catch (err) {
+    // Better error handling with detailed logging
+    console.error('API Error Details:', {
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      data: err.response?.data,
+      config: err.response?.config,
+      message: err.message
+    });
+    
     if (err.response && err.response.data) {
       const data = err.response.data;
       const msg = data.message ?? data.error ?? JSON.stringify(data);
-      throw new Error(msg);
+      throw new Error(msg); // This is throwing generic error
     }
-    throw err;
+    throw new Error(err.message || 'Server error while creating question');
   }
 }
 
@@ -30,7 +39,6 @@ const questionAPI = {
   getByPaper: (paperId, config = {}) =>
     handle(api.get(`/questions/paper/${encodeURIComponent(paperId)}`, config)),
 
-  // NEW METHOD: Get COs for a paper
   getPaperCOs: (paperId, config = {}) =>
     handle(api.get(`/questions/paper/${encodeURIComponent(paperId)}/cos`, config)),
 

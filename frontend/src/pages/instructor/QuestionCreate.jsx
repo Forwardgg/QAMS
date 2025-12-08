@@ -273,6 +273,20 @@ const QuestionCreatePage = () => {
     setContentHtml('');
   };
 
+  // Refresh button handler
+  const handleRefresh = () => {
+    // Reset everything
+    setSelectedCourse('');
+    setSelectedPaper('');
+    setSelectedCO('');
+    setMarks('');
+    clearEditorContent();
+    setMessage({ type: '', text: '' });
+    
+    // Reload courses
+    loadCourses();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -343,21 +357,23 @@ const QuestionCreatePage = () => {
     navigate('/instructor/questions');
   };
 
-  const handleResetForm = () => {
-    // Reset everything
-    setSelectedCourse('');
-    setSelectedPaper('');
-    setSelectedCO('');
-    setMarks('');
-    clearEditorContent();
-    setMessage({ type: '', text: '' });
-  };
-
   return (
     <div className="question-create-page">
       <div className="question-create-header">
-        <h1>Create New Question</h1>
-        <p>Select course and paper to create a question</p>
+        <div className="header-content">
+          <div>
+            <h1>Create New Question</h1>
+            <p>Select course and paper to create a question</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={handleRefresh}
+            className="btn-refresh"
+            title="Refresh form"
+          >
+            ↻ Refresh
+          </button>
+        </div>
       </div>
 
       {message.text && (
@@ -446,22 +462,12 @@ const QuestionCreatePage = () => {
               <small className="form-hint">Leave blank if not applicable</small>
             </div>
           </div>
-          
-          <div className="form-actions-top">
-            <button 
-              type="button" 
-              onClick={handleResetForm}
-              className="btn-secondary"
-            >
-              Reset All
-            </button>
-          </div>
         </div>
 
         <div className="form-section">
           <h3>Question Content *</h3>
-          <div className="editor-container">
-            <div ref={editorRef}></div>
+          <div className="editor-container" style={{ height: '400px' }}>
+            <div ref={editorRef} style={{ height: '100%' }}></div>
           </div>
           {isUploading && (
             <div className="upload-hint">

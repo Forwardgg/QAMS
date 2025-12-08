@@ -18,18 +18,29 @@ export class CourseOutcome {
     if (!Number.isInteger(val)) throw new Error(`${name} must be an integer`);
   }
 
-  static async createCourseOutcome({ course_id, co_number, description }) {
+  // Add validation for bloom_level
+  static _ensureBloomLevel(val, name = "bloom_level") {
+    if (val === undefined || val === null) return;
+    const bloomLevels = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
+    if (!bloomLevels.includes(val)) {
+      throw new Error(`${name} must be one of: ${bloomLevels.join(', ')}`);
+    }
+  }
+
+  // Update create method to include bloom_level
+  static async createCourseOutcome({ course_id, co_number, description, bloom_level = 'L1' }) {
     this._ensureInt(course_id, "course_id");
     this._ensureRequiredString(co_number, "co_number");
     this._ensureRequiredString(description, "description");
+    this._ensureBloomLevel(bloom_level);
 
     const query = `
-      INSERT INTO course_outcomes (course_id, co_number, description) 
-      VALUES ($1, $2, $3) 
-      RETURNING co_id, course_id, co_number, description, 
+      INSERT INTO course_outcomes (course_id, co_number, description, bloom_level) 
+      VALUES ($1, $2, $3, $4) 
+      RETURNING co_id, course_id, co_number, description, bloom_level,
         (SELECT code FROM courses WHERE course_id = $1) as course_code
     `;
-    const values = [course_id, String(co_number).trim(), String(description).trim()];
+    const values = [course_id, String(co_number).trim(), String(description).trim(), bloom_level];
 
     try {
       const { rows } = await pool.query(query, values);
@@ -45,8 +56,8 @@ export class CourseOutcome {
     page = Number(page) || 1;
     limit = Number(limit) || CourseOutcome.DEFAULT_LIMIT;
     const offset = (page - 1) * limit;
-    // removed created_at from allowedOrderBy because the table does not contain that column
-    const allowedOrderBy = new Set(["co_number", "co_id"]);
+    // Add bloom_level to allowed order columns
+    const allowedOrderBy = new Set(["co_number", "co_id", "bloom_level"]);
     if (!allowedOrderBy.has(orderBy)) orderBy = "co_number";
     order = String(order).toLowerCase() === "desc" ? "DESC" : "ASC";
 
@@ -57,6 +68,7 @@ export class CourseOutcome {
         co.course_id, 
         co.co_number, 
         co.description,
+        co.bloom_level,
         c.code as course_code,
         c.title as course_title
       FROM course_outcomes co
@@ -88,6 +100,7 @@ export class CourseOutcome {
         co.course_id, 
         co.co_number, 
         co.description,
+        co.bloom_level,
         c.code as course_code,
         c.title as course_title
       FROM course_outcomes co
@@ -109,6 +122,7 @@ export class CourseOutcome {
         co.course_id, 
         co.co_number, 
         co.description,
+        co.bloom_level,
         c.code as course_code,
         c.title as course_title
       FROM course_outcomes co
@@ -131,6 +145,7 @@ export class CourseOutcome {
         co.course_id, 
         co.co_number, 
         co.description,
+        co.bloom_level,
         c.code as course_code,
         c.title as course_title
       FROM course_outcomes co
@@ -151,6 +166,7 @@ export class CourseOutcome {
         co.course_id, 
         co.co_number, 
         co.description,
+        co.bloom_level,
         c.code as course_code,
         c.title as course_title
       FROM course_outcomes co
@@ -162,10 +178,12 @@ export class CourseOutcome {
     return rows[0] || null;
   }
 
-  static async updateCourseOutcome(coId, { co_number, description } = {}) {
+  // Update update method to include bloom_level
+  static async updateCourseOutcome(coId, { co_number, description, bloom_level } = {}) {
     this._ensureInt(coId, "co_id");
     this._ensureString(co_number, "co_number");
     this._ensureString(description, "description");
+    this._ensureBloomLevel(bloom_level);
 
     const sets = [];
     const values = [];
@@ -179,6 +197,10 @@ export class CourseOutcome {
       sets.push(`description = $${idx++}`); 
       values.push(String(description).trim()); 
     }
+    if (bloom_level !== undefined) { 
+      sets.push(`bloom_level = $${idx++}`); 
+      values.push(bloom_level); 
+    }
 
     if (sets.length === 0) return this.getCourseOutcomeById(coId);
 
@@ -187,7 +209,7 @@ export class CourseOutcome {
       SET ${sets.join(", ")} 
       WHERE co_id = $${idx} 
       RETURNING 
-        co_id, course_id, co_number, description,
+        co_id, course_id, co_number, description, bloom_level,
         (SELECT code FROM courses WHERE course_id = course_outcomes.course_id) as course_code
     `;
     values.push(coId);
@@ -208,7 +230,7 @@ export class CourseOutcome {
       DELETE FROM course_outcomes 
       WHERE co_id = $1 
       RETURNING 
-        co_id, course_id, co_number, description,
+        co_id, course_id, co_number, description, bloom_level,
         (SELECT code FROM courses WHERE course_id = course_outcomes.course_id) as course_code
     `;
     
@@ -216,7 +238,7 @@ export class CourseOutcome {
     return rows[0] || null;
   }
 
-  static async searchCourseOutcomes({ courseCode, coNumber, page = 1, limit = CourseOutcome.DEFAULT_LIMIT } = {}) {
+  static async searchCourseOutcomes({ courseCode, coNumber, bloomLevel, page = 1, limit = CourseOutcome.DEFAULT_LIMIT } = {}) {
     page = Number(page) || 1;
     limit = Number(limit) || CourseOutcome.DEFAULT_LIMIT;
     const offset = (page - 1) * limit;
@@ -234,6 +256,12 @@ export class CourseOutcome {
       filters.push(`co.co_number ILIKE $${values.length}`);
     }
 
+    // Add bloom level filter
+    if (bloomLevel && String(bloomLevel).trim() !== "") {
+      values.push(String(bloomLevel).trim());
+      filters.push(`co.bloom_level = $${values.length}`);
+    }
+
     const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
 
     const countQuery = `
@@ -249,6 +277,7 @@ export class CourseOutcome {
         co.course_id, 
         co.co_number, 
         co.description,
+        co.bloom_level,
         c.code as course_code,
         c.title as course_title
       FROM course_outcomes co
@@ -258,7 +287,6 @@ export class CourseOutcome {
       LIMIT $${values.length + 1} OFFSET $${values.length + 2}
     `;
 
-    // preserve a copy of values for the count query before pushing limit/offset
     const countValues = [...values];
     values.push(limit, offset);
 
@@ -274,6 +302,11 @@ export class CourseOutcome {
         try { client.release(); } catch (e) { console.error("Error releasing client in searchCourseOutcomes:", e); }
       }
     }
+  }
+
+  // Optional: Add a method to get all valid bloom levels
+  static getBloomLevels() {
+    return ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
   }
 }
 
