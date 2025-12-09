@@ -27,7 +27,7 @@ const DEFAULTS = {
   inlineRemoteImages: true,
   allowLocalFileImages: false,
   userAgent: 'QuestionPaperPDFGenerator/1.0',
-  waitUntil: 'networkidle0',
+  waitUntil: 'domcontentloaded',
   launchOptions: {
     args: [
       '--no-sandbox',
@@ -188,7 +188,10 @@ class PDFGenerationService {
       const vpHeight = Math.round(pageHeightIn * dpi);
       await page.setViewport({ width: vpWidth, height: vpHeight });
 
-      await page.setContent(html, { waitUntil: opts.waitUntil || DEFAULTS.waitUntil });
+      await page.setContent(html, { 
+  waitUntil: opts.waitUntil || DEFAULTS.waitUntil,
+  timeout: 60000
+});
       await page.emulateMediaType('print');
 
       const pdfBuffer = await page.pdf({
