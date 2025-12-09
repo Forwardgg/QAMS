@@ -98,14 +98,17 @@ const moderatorAPI = {
   }
 },
   generatePdf: async (params = {}) => {
-    try {
-      // Use the existing pdfAPI that we know works
-      return await pdfAPI.generatePdf(params);
-    } catch (error) {
-      console.error('API Error in generatePdf:', error);
-      throw error;
-    }
-  },
+  try {
+    // Call backend directly using axios
+    const response = await api.post('/pdf/generate-pdf', params, {
+      responseType: 'blob',
+    });
+    return response.data;
+  } catch (error) {
+    console.error('API Error in generatePdf:', error);
+    throw error;
+  }
+},
   downloadPdf: (pdfBlob, filename = 'paper.pdf') => {
     pdfAPI.downloadPdf(pdfBlob, filename);
   },
