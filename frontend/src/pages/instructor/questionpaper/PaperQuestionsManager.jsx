@@ -917,16 +917,18 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
 
-      const body = {
-        paperId,
-        baseUrl: process.env.REACT_APP_BASE_URL || window.location.origin,
-        postOptions: {
-          addPageNumbers: true,
-          pageNumberOptions: { fontSize: 10, marginBottom: 18 },
-        },
-      };
+      const API_URL = process.env.REACT_APP_API_URL || 'https://qams.onrender.com/api';
 
-      const resp = await fetch('/api/pdf/generate-pdf', {
+const body = {
+  paperId,
+  baseUrl: process.env.REACT_APP_BASE_URL || window.location.origin,
+  postOptions: {
+    addPageNumbers: true,
+    pageNumberOptions: { fontSize: 10, marginBottom: 18 },
+  },
+};
+
+const resp = await fetch(`${API_URL}/pdf/generate-pdf`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
