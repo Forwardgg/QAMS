@@ -1,36 +1,20 @@
 // src/api/pdf.api.js
 import authService from "../services/authService";
+import axios from "axios";
 
 const API_BASE = process.env.REACT_APP_API_BASE || '';
 
 export const generatePdf = async (params = {}) => {
-  const token = authService.getToken();
-  
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  try {
+    const response = await api.post('/pdf/generate-pdf', params, {
+      responseType: 'blob',  // Important for PDF files
+    });
+    
+    return response.data;  // Returns blob
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    throw new Error(error.response?.data?.error || 'PDF generation failed');
   }
-
-  // FIX: Remove "/api" from the URL since API_BASE already has it
-  const url = `${API_BASE}/pdf/generate-pdf`;
-  
-  console.log('PDF API Request URL:', url); // Debug log
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `PDF generation failed: ${response.status}`);
-  }
-
-  return await response.blob();
 };
 
 /**
