@@ -29,8 +29,17 @@ const DEFAULTS = {
   userAgent: 'QuestionPaperPDFGenerator/1.0',
   waitUntil: 'networkidle0',
   launchOptions: {
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    // executablePath can be provided in constructor config
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process',
+      '--no-zygote'
+    ],
+    headless: 'new',
+    // Point to the Chrome we installed
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable'
   },
 };
 
