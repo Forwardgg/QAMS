@@ -196,7 +196,7 @@ const InstructorSidebarHeader = () => {
                 </div>
                 <div className="header-user-details">
                   <div className="header-user-name">{user?.name || 'Instructor'}</div>
-                  <div className="header-user-email">{user?.email || 'instructor@example.com'}</div>
+                  <div className="header-user-email">{user?.email || 'instructor'}</div>
                 </div>
                 <div className="dropdown-arrow">
                   {isUserDropdownOpen ? <KeyboardArrowUp /> : <KeyboardArrowDown />}

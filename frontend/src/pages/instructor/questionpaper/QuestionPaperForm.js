@@ -149,7 +149,7 @@ const QuestionPaperForm = ({
                   type="text"
                   value={formData.title}
                   onChange={(e) => handleInputChange('title', e.target.value)}
-                  placeholder="Enter paper title..."
+                  placeholder="e.g., End Term, Mid-Term, Sessional"
                   required
                 />
               </div>
@@ -204,7 +204,7 @@ const QuestionPaperForm = ({
                     type="text"
                     value={formData.semester}
                     onChange={(e) => handleInputChange('semester', e.target.value)}
-                    placeholder="e.g., Fall 2024"
+                    placeholder="e.g., Spring 2024"
                   />
                 </div>
               </div>

@@ -44,6 +44,8 @@
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
 }
 
 .btn-back:hover {
@@ -58,11 +60,15 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
 }
 
 .btn-secondary {
@@ -73,16 +79,57 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
 }
 
 .btn-secondary:hover:not(:disabled) {
   background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
 }
 
 .btn-secondary:disabled {
   background: #6c757d;
   cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Bloom's Taxonomy Toggle Button */
+.btn-bloom-toggle {
+  background-color: #4A90E2;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.btn-bloom-toggle:hover {
+  background-color: #357ABD;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(74, 144, 226, 0.2);
+}
+
+.btn-bloom-toggle.active {
+  background-color: #6c757d;
+}
+
+.btn-bloom-toggle.active:hover {
+  background-color: #5a6268;
+}
+
+.btn-bloom-toggle:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* Message Styles */
@@ -292,6 +339,7 @@
   gap: 8px;
   margin-left: auto;
   flex-shrink: 0;
+  align-items: center;
 }
 
 .btn-edit, .btn-delete {
@@ -303,6 +351,8 @@
   font-size: 12px;
   transition: all 0.2s;
   font-weight: 500;
+  display: flex;
+  align-items: center;
 }
 
 .btn-edit:hover {
@@ -463,6 +513,8 @@
   transition: all 0.2s ease;
   white-space: nowrap;
   box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+  display: flex;
+  align-items: center;
 }
 
 .btn-resubmit:hover:not(:disabled) {
@@ -481,6 +533,68 @@
   opacity: 0.7;
   transform: none !important;
   box-shadow: none !important;
+}
+
+/* Question Marks Indicator */
+.question-marks-indicator {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+  margin-right: 8px;
+  border: 1px solid #bbdefb;
+}
+
+/* Table Styling for Question Content */
+.print-preview-question table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  border: 2px solid #333;
+  font-size: 11pt;
+  font-family: "Times New Roman", serif;
+}
+
+.print-preview-question th,
+.print-preview-question td {
+  border: 1px solid #666;
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.print-preview-question th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+  color: #333;
+  border-bottom: 2px solid #333;
+}
+
+.print-preview-question tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.print-preview-question tr:hover {
+  background-color: #f0f8ff;
+}
+
+/* Ensure table borders print correctly */
+@media print {
+  .print-preview-question table,
+  .print-preview-question th,
+  .print-preview-question td {
+    border-color: #000 !important;
+  }
+}
+
+/* Make sure table images are contained */
+.print-preview-question table img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 4px auto;
 }
 
 /* Responsive design for moderation features */
@@ -521,6 +635,7 @@
   .header-actions {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
   
   /* Adjust preview for mobile */
@@ -554,6 +669,14 @@
     font-size: 12px;
     padding: 10px;
   }
+  
+  /* Adjust button sizes on mobile */
+  .btn-primary,
+  .btn-secondary,
+  .btn-bloom-toggle {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
 }
 
 /* Print-specific styles */
@@ -572,7 +695,8 @@
   .drag-instructions,
   .question-drag-handle,
   .moderation-report-section,
-  .moderation-alert {
+  .moderation-alert,
+  .btn-bloom-toggle {
     display: none !important;
   }
   
@@ -649,102 +773,4 @@
   color: #6c757d;
   font-size: 13px;
   margin-top: 8px !important;
-}
-/* Add to PaperQuestionsManager.css */
-
-.question-marks-indicator {
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: 600;
-  margin-right: 8px;
-  border: 1px solid #bbdefb;
-}
-
-.question-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.question-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.question-number {
-  margin-right: auto;
-}
-/* Add to PaperQuestionsManager.css */
-
-/* Bloom's Taxonomy Analysis Section */
-.bloom-analysis-section {
-  background: white;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  overflow: hidden;
-}
-
-.bloom-analysis-section .MuiTypography-h6 {
-  color: #2c3e50;
-  font-weight: 600;
-  padding-top: 20px;
-}
-
-.bloom-analysis-section .MuiCard-root {
-  border-radius: 8px;
-  height: 100%;
-  transition: transform 0.2s ease;
-}
-
-.bloom-analysis-section .MuiCard-root:hover {
-  transform: translateY(-2px);
-}
-
-.bloom-analysis-section .MuiCardContent-root {
-  padding: 16px !important;
-}
-
-.bloom-analysis-section .MuiTypography-h5 {
-  color: #2c3e50;
-  font-weight: 700;
-}
-
-.bloom-analysis-section .MuiTableContainer-root {
-  margin-top: 16px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #e0e0e0;
-}
-
-.bloom-analysis-section .MuiTable-root {
-  background: white;
-}
-
-.bloom-analysis-section .MuiTableCell-root {
-  border-bottom: 1px solid #e0e0e0;
-  padding: 8px 16px;
-}
-
-/* Question Bloom's level chip styling */
-.question-actions .MuiChip-root {
-  font-weight: 600;
-  border: none;
-}
-
-/* Responsive adjustments for Bloom's section */
-@media (max-width: 768px) {
-  .bloom-analysis-section {
-    margin: 0 -20px 20px -20px;
-    border-radius: 0;
-  }
-  
-  .bloom-analysis-section .MuiGrid-container {
-    flex-direction: column;
-  }
 }

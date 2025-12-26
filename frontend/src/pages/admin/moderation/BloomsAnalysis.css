@@ -1,0 +1,461 @@
+/* BloomAnalysis.css */
+
+/* Main container */
+.bloom-analysis-section {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  margin: 20px 0;
+  padding: 24px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.bloom-analysis-section:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+}
+
+/* Header */
+.bloom-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.bloom-header h2 {
+  color: #2d3748;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bloom-header svg {
+  color: #667eea;
+  font-size: 2rem;
+}
+
+/* Content layout */
+.bloom-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.bloom-chart-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bloom-stats-section {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Pie chart container */
+.bloom-pie-chart-container {
+  position: relative;
+  width: 250px;
+  height: 250px;
+  margin: 0 auto 20px;
+}
+
+.bloom-pie-chart {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  animation: sliceFadeIn 0.6s ease-out;
+}
+
+/* Center hole for pie chart */
+.pie-chart-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+
+.pie-chart-center h4 {
+  color: #4a5568;
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1;
+}
+
+.pie-chart-center .total-questions-label {
+  color: #718096;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* Legend */
+.bloom-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0;
+  padding: 0 10px;
+  max-width: 100%;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  cursor: default;
+  border: 1px solid #e2e8f0;
+}
+
+.legend-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background: white;
+}
+
+.legend-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.legend-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2d3748;
+  white-space: nowrap;
+}
+
+.legend-count {
+  font-size: 0.7rem;
+  color: #718096;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* Statistics container */
+.stats-container {
+  padding: 20px;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  height: 100%;
+}
+
+.stats-header {
+  color: #2d3748;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+/* Statistics grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
+}
+
+.stat-label {
+  color: #718096;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.stat-value {
+  color: #2d3748;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0 0 4px 0;
+}
+
+.stat-percentage {
+  color: #38a169;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: block;
+}
+
+/* Breakdown section */
+.breakdown-section {
+  margin-top: 24px;
+}
+
+.breakdown-header {
+  color: #2d3748;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+}
+
+.breakdown-table-container {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.breakdown-table th {
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  color: #4a5568;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.breakdown-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #2d3748;
+  font-size: 0.9rem;
+}
+
+.breakdown-table tr:last-child td {
+  border-bottom: none;
+}
+
+.breakdown-table tr:hover {
+  background-color: #f7fafc;
+}
+
+/* Level cell */
+.level-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.level-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.level-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 2px dashed #cbd5e0;
+  margin: 20px 0;
+  width: 100%;
+}
+
+.empty-state p {
+  color: #4a5568;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.empty-state .hint {
+  color: #718096;
+  font-size: 0.85rem;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* Animation for pie chart */
+@keyframes sliceFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 900px) {
+  .bloom-content {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  
+  .bloom-pie-chart-container {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .pie-chart-center h4 {
+    font-size: 2rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .bloom-analysis-section {
+    border-radius: 12px;
+    padding: 16px;
+    margin: 15px 0;
+  }
+  
+  .bloom-header h2 {
+    font-size: 1.25rem;
+  }
+  
+  .bloom-header svg {
+    font-size: 1.5rem;
+  }
+  
+  .bloom-pie-chart-container {
+    width: 180px;
+    height: 180px;
+  }
+  
+  .pie-chart-center h4 {
+    font-size: 1.8rem;
+  }
+  
+  .pie-chart-center .total-questions-label {
+    font-size: 0.7rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .stat-card {
+    padding: 12px;
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+  }
+  
+  .breakdown-table th,
+  .breakdown-table td {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+  }
+  
+  .legend-item {
+    padding: 4px 6px;
+  }
+  
+  .legend-label {
+    font-size: 0.7rem;
+  }
+  
+  .legend-color {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .bloom-analysis-section {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid;
+    padding: 12px;
+  }
+  
+  .bloom-header h2 {
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: black !important;
+    color: black !important;
+  }
+  
+  .stat-card {
+    border: 1px solid #ddd !important;
+    background: none !important;
+  }
+  
+  .breakdown-table-container {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .bloom-analysis-section,
+  .stat-card,
+  .legend-item {
+    transition: none !important;
+  }
+  
+  .bloom-pie-chart {
+    animation: none !important;
+  }
+}

@@ -73,6 +73,7 @@ import questionPaperAPI from '../../../api/questionPaper.api';
 import moderatorAPI from '../../../api/moderator.api';
 import QuestionEditModal from './QuestionEditModal';
 import ModerationReportModal from './ModerationReportModal';
+import BloomAnalysis from './BloomAnalysis'; // Import the new component
 import authService from '../../../services/authService';
 import './PaperQuestionsManager.css';
 
@@ -277,7 +278,7 @@ const NonSortableQuestionItem = ({ question, index, onEdit, onDelete, actionsAll
   );
 };
 
-// Helper function for Bloom's colors
+// Helper function for Bloom's colors (keep this for question items)
 const getBloomColor = (level) => {
   const colors = {
     'L1': '#FF6B6B', // Remember
@@ -288,315 +289,6 @@ const getBloomColor = (level) => {
     'L6': '#DDA0DD'  // Create
   };
   return colors[level] || '#CCCCCC';
-};
-
-const getBloomLabel = (level) => {
-  const labels = {
-    'L1': 'Remember',
-    'L2': 'Understand',
-    'L3': 'Apply',
-    'L4': 'Analyze',
-    'L5': 'Evaluate',
-    'L6': 'Create'
-  };
-  return labels[level] || 'Unknown';
-};
-
-/* ---------------------------
-   Bloom's Taxonomy Analysis Component
-   --------------------------- */
-const BloomAnalysis = ({ questions }) => {
-  // Calculate Bloom's Taxonomy distribution
-  const bloomStats = useMemo(() => {
-    const bloomDistribution = {};
-    
-    // Initialize all levels
-    ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'].forEach(level => {
-      bloomDistribution[level] = { count: 0, marks: 0, questions: [] };
-    });
-
-    // Count questions by bloom level
-    questions.forEach(question => {
-      if (question.bloom_level) {
-        const level = question.bloom_level.toUpperCase();
-        if (bloomDistribution[level]) {
-          bloomDistribution[level].count++;
-          bloomDistribution[level].marks += (question.marks || 0);
-          bloomDistribution[level].questions.push(question);
-        }
-      }
-    });
-
-    // Convert to array
-    const chartData = Object.keys(bloomDistribution)
-      .filter(level => bloomDistribution[level].count > 0)
-      .map(level => {
-        const data = bloomDistribution[level];
-        return {
-          id: level,
-          value: data.count,
-          label: getBloomLabel(level),
-          color: getBloomColor(level),
-          marks: data.marks,
-          percentage: (data.count / questions.length * 100).toFixed(1)
-        };
-      });
-
-    // Calculate overall statistics
-    const totalQuestions = questions.length;
-    const questionsWithBloom = questions.filter(q => q.bloom_level).length;
-    const percentageWithBloom = totalQuestions > 0 ? 
-      Math.round((questionsWithBloom / totalQuestions) * 100) : 0;
-    
-    const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
-    const marksWithBloom = questions
-      .filter(q => q.bloom_level)
-      .reduce((sum, q) => sum + (q.marks || 0), 0);
-
-    return {
-      chartData,
-      totalQuestions,
-      questionsWithBloom,
-      percentageWithBloom,
-      totalMarks,
-      marksWithBloom,
-      marksPercentageWithBloom: totalMarks > 0 ? 
-        Math.round((marksWithBloom / totalMarks) * 100) : 0
-    };
-  }, [questions]);
-
-  // Function to create conic gradient for pie chart
-  const getPieChartStyle = () => {
-    if (bloomStats.chartData.length === 0) return {};
-    
-    let accumulatedPercentage = 0;
-    const gradients = bloomStats.chartData.map(item => {
-      const start = accumulatedPercentage + '%';
-      accumulatedPercentage += parseFloat(item.percentage);
-      const end = accumulatedPercentage + '%';
-      return `${item.color} ${start} ${end}`;
-    }).join(', ');
-    
-    return {
-      background: `conic-gradient(${gradients})`
-    };
-  };
-
-  if (questions.length === 0) return null;
-
-  return (
-    <Paper className="bloom-analysis-section" elevation={2} sx={{ mb: 3 }}>
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom align="center" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-          <AssessmentIcon />
-          Bloom's Taxonomy Analysis
-        </Typography>
-        
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            {bloomStats.chartData.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Box sx={{ position: 'relative', width: 250, height: 250, mb: 3 }}>
-                  {/* CSS-only Pie Chart */}
-                  <Box 
-                    sx={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      borderRadius: '50%',
-                      ...getPieChartStyle(),
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {/* Center hole */}
-                    <Box 
-                      sx={{ 
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '60%',
-                        height: '60%',
-                        borderRadius: '50%',
-                        backgroundColor: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexDirection: 'column',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      <Typography variant="h4" color="primary" fontWeight="bold">
-                        {bloomStats.totalQuestions}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        Total Questions
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-                
-                {/* Legend */}
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1, mb: 2 }}>
-                  {bloomStats.chartData.map((item) => (
-                    <Box 
-                      key={item.id}
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 0.5,
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1,
-                        backgroundColor: 'rgba(255,255,255,0.8)'
-                      }}
-                    >
-                      <Box 
-                        sx={{ 
-                          width: 12, 
-                          height: 12, 
-                          borderRadius: '50%', 
-                          backgroundColor: item.color 
-                        }} 
-                      />
-                      <Typography variant="caption">
-                        {item.label} ({item.value})
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant="body1" paragraph>
-                  No Bloom's Taxonomy data available.
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Tag questions with Bloom's levels in the editor.
-                </Typography>
-              </Box>
-            )}
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Paper elevation={1} sx={{ p: 3, height: '100%' }}>
-              <Typography variant="subtitle1" gutterBottom fontWeight="bold">
-                Statistics
-              </Typography>
-              
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={6}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        Total Questions
-                      </Typography>
-                      <Typography variant="h5" color="primary">
-                        {bloomStats.totalQuestions}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        With Bloom Level
-                      </Typography>
-                      <Typography variant="h5" color="primary">
-                        {bloomStats.questionsWithBloom}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        ({bloomStats.percentageWithBloom}%)
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        Total Marks
-                      </Typography>
-                      <Typography variant="h5" color="primary">
-                        {bloomStats.totalMarks}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        Marks with Bloom
-                      </Typography>
-                      <Typography variant="h5" color="primary">
-                        {bloomStats.marksWithBloom}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        ({bloomStats.marksPercentageWithBloom}%)
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-
-              <Box>
-                <Typography variant="subtitle1" gutterBottom fontWeight="bold">
-                  Breakdown by Level
-                </Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Level</TableCell>
-                        <TableCell align="right">Questions</TableCell>
-                        <TableCell align="right">Marks</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {bloomStats.chartData.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <Box display="flex" alignItems="center" gap={1}>
-                              <Box
-                                sx={{
-                                  width: 12,
-                                  height: 12,
-                                  borderRadius: '50%',
-                                  backgroundColor: item.color
-                                }}
-                              />
-                              <Typography variant="body2">
-                                {item.label}
-                              </Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2">
-                              {item.value}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2">
-                              {item.marks}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Box>
-    </Paper>
-  );
 };
 
 /* ---------------------------
@@ -611,15 +303,16 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   const [showModerationReport, setShowModerationReport] = useState(false);
   const [moderationData, setModerationData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [activeId, setActiveId] = useState(null);
+  const [showBloomAnalysis, setShowBloomAnalysis] = useState(false); // New state for toggle
 
   const mountedRef = useRef(true);
   const loadAbortRef = useRef(null);
   const pdfAbortRef = useRef(null);
+  const isGeneratingPdfRef = useRef(false); // 🔥 CRITICAL: Use ref instead of state
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -629,10 +322,14 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   useEffect(() => {
     mountedRef.current = true;
     loadPaperAndQuestions();
-    loadModerationData();
+    // Load moderation data after a short delay (non-critical for initial render)
+    const timer = setTimeout(() => {
+      loadModerationData();
+    }, 500);
 
     return () => {
       mountedRef.current = false;
+      clearTimeout(timer);
       if (loadAbortRef.current) {
         try { loadAbortRef.current.abort(); } catch (_) {}
         loadAbortRef.current = null;
@@ -897,104 +594,60 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     navigate('/instructor/papers');
   };
 
+  /* ---------------------------
+     OPTIMIZED PDF Export Function
+     --------------------------- */
   const exportPdf = async () => {
-    if (!paperId) return;
+  if (!paperId || isGeneratingPdfRef.current) return;
 
-    setMessage({ type: '', text: '' });
-    setIsGeneratingPdf(true);
+  isGeneratingPdfRef.current = true;
+  
+  // Update button state
+  const pdfButton = document.querySelector('.btn-pdf-export');
+  if (pdfButton) {
+    pdfButton.disabled = true;
+    const originalText = pdfButton.innerHTML;
+    pdfButton.innerHTML = '<span style="display: inline-flex; align-items: center;"><DownloadIcon style="font-size: 18px; margin-right: 8px;" />Generating PDF…</span>';
+    pdfButton.dataset.originalText = originalText;
+  }
 
-    if (pdfAbortRef.current) {
-      try { pdfAbortRef.current.abort(); } catch (_) {}
-      pdfAbortRef.current = null;
+  setMessage({ type: '', text: '' });
+
+  try {
+    // 🔥 CRITICAL FIX: Use SAME API as admin component
+    const pdfBlob = await moderatorAPI.generatePdf({
+      paperId: paperId, // Pass paperId directly
+      baseUrl: process.env.REACT_APP_BASE_URL || window.location.origin,
+      postOptions: {
+        addPageNumbers: true,
+        pageNumberOptions: { fontSize: 10, marginBottom: 18 },
+      },
+      // Optional: add filename if needed
+      filename: `${paper?.course_code || 'paper'}-${paper?.title || 'questions'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
+    });
+
+    // Use same download method
+    moderatorAPI.downloadPdf(
+      pdfBlob, 
+      `${paper?.course_code || 'paper'}-${paper?.title || 'questions'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
+    );
+
+    setMessage({ type: 'success', text: 'PDF generated and downloaded!' });
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    setMessage({ type: 'error', text: error.message || 'Failed to generate PDF' });
+  } finally {
+    // Restore button state
+    isGeneratingPdfRef.current = false;
+    if (pdfButton) {
+      pdfButton.disabled = false;
+      const originalText = pdfButton.dataset.originalText;
+      if (originalText) {
+        pdfButton.innerHTML = originalText;
+      }
     }
-    const ac = new AbortController();
-    pdfAbortRef.current = ac;
-
-    try {
-      const token = typeof authService.getToken === 'function' ? authService.getToken() : null;
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      };
-
-      const API_URL = process.env.REACT_APP_API_URL || 'https://qams.onrender.com/api';
-
-const body = {
-  paperId,
-  baseUrl: process.env.REACT_APP_BASE_URL || window.location.origin,
-  postOptions: {
-    addPageNumbers: true,
-    pageNumberOptions: { fontSize: 10, marginBottom: 18 },
-  },
+  }
 };
-
-const resp = await fetch(`${API_URL}/pdf/generate-pdf`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: ac.signal,
-      });
-
-      if (!resp.ok) {
-        let errJson = null;
-        try { errJson = await resp.json(); } catch (_) {}
-        const status = resp.status;
-        if (status === 401) {
-          setMessage({ type: 'error', text: 'Unauthorized — please log in again.' });
-          return;
-        }
-        if (status === 403) {
-          setMessage({ type: 'error', text: errJson?.error || 'Access denied for PDF export.' });
-          return;
-        }
-        if (status === 404) {
-          setMessage({ type: 'error', text: errJson?.error || 'Paper not found.' });
-          return;
-        }
-        setMessage({ type: 'error', text: errJson?.error || `PDF generation failed (${status})` });
-        return;
-      }
-
-      const blob = await resp.blob();
-      if (!blob || blob.size === 0) {
-        setMessage({ type: 'error', text: 'PDF generation returned an empty file.' });
-        return;
-      }
-
-      const contentDisp = resp.headers.get('Content-Disposition') || '';
-      const headerFilename = (() => {
-        const match = /filename\*?=(?:UTF-8'')?["']?([^;"']+)["']?/i.exec(contentDisp);
-        if (match && match[1]) {
-          try { return decodeURIComponent(match[1]); } catch (_) { return match[1]; }
-        }
-        return null;
-      })();
-
-      const safeFilename = headerFilename || `paper-${paperId || 'export'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
-
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = safeFilename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-      setMessage({ type: 'success', text: 'PDF generated and downloaded.' });
-    } catch (err) {
-      if (err?.name === 'AbortError') {
-        console.debug('PDF request aborted');
-        setMessage({ type: '', text: '' });
-      } else {
-        console.error('exportPdf error:', err);
-        setMessage({ type: 'error', text: err?.message || 'Failed to generate PDF' });
-      }
-    } finally {
-      setIsGeneratingPdf(false);
-      pdfAbortRef.current = null;
-    }
-  };
 
   if (isLoading) {
     return (
@@ -1040,9 +693,23 @@ const resp = await fetch(`${API_URL}/pdf/generate-pdf`, {
             <AddIcon sx={{ fontSize: 18, marginRight: 1 }} />
             Add New Question
           </button>
-          <button type="button" onClick={exportPdf} className="btn-secondary" disabled={isGeneratingPdf}>
+          <button 
+            type="button" 
+            onClick={exportPdf} 
+            className="btn-secondary btn-pdf-export"
+            disabled={isGeneratingPdfRef.current}
+          >
             <DownloadIcon sx={{ fontSize: 18, marginRight: 1 }} />
-            {isGeneratingPdf ? 'Generating PDF…' : 'Export PDF'}
+            Export PDF
+          </button>
+          {/* Bloom's Taxonomy Toggle Button */}
+          <button 
+            type="button" 
+            onClick={() => setShowBloomAnalysis(!showBloomAnalysis)}
+            className={`btn-bloom-toggle ${showBloomAnalysis ? 'active' : ''}`}
+          >
+            <AssessmentIcon sx={{ fontSize: 18, marginRight: 1 }} />
+            {showBloomAnalysis ? 'Hide Bloom\'s' : 'Show Bloom\'s'}
           </button>
         </div>
       </div>
@@ -1050,8 +717,10 @@ const resp = await fetch(`${API_URL}/pdf/generate-pdf`, {
       {/* Messages */}
       {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
-      {/* Bloom's Taxonomy Analysis */}
-      <BloomAnalysis questions={questions} />
+      {/* Bloom's Taxonomy Analysis - Conditionally Rendered */}
+      {showBloomAnalysis && (
+        <BloomAnalysis questions={questions} />
+      )}
 
       {/* Moderation report button */}
       {moderationData && (
@@ -1095,11 +764,6 @@ const resp = await fetch(`${API_URL}/pdf/generate-pdf`, {
 
       {/* Preview / Questions */}
       <div className="preview-section">
-        <div className="section-header">
-          <h2>Paper Preview (Print Layout)</h2>
-          <p>Preview approximates how the paper will appear when exported.</p>
-        </div>
-
         {questions.length === 0 ? (
           <div className="no-questions">
             <p>No questions added to this paper yet.</p>

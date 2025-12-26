@@ -4,17 +4,14 @@ import questionPaperAPI from '../../api/questionPaper.api';
 import moderatorAPI from '../../api/moderator.api';
 import courseAPI from '../../api/course.api';
 
-// Import MUI Icons
+// Import only used icons
 import {
   Book as BookIcon,
   HourglassEmpty as HourglassIcon,
   CheckCircle as CheckCircleIcon,
   Description as DescriptionIcon,
-  Edit as EditIcon,
   Warning as WarningIcon,
-  Dashboard as DashboardIcon,
-  Notifications as NotificationsIcon,
-  TrendingUp as TrendingUpIcon
+  Dashboard as DashboardIcon
 } from '@mui/icons-material';
 
 const Dashboard = () => {
@@ -34,22 +31,12 @@ const Dashboard = () => {
     const now = new Date();
     const seconds = Math.floor((now - date) / 1000);
     
-    let interval = Math.floor(seconds / 31536000);
-    if (interval >= 1) return interval + " year" + (interval > 1 ? "s" : "") + " ago";
-    
-    interval = Math.floor(seconds / 2592000);
-    if (interval >= 1) return interval + " month" + (interval > 1 ? "s" : "") + " ago";
-    
-    interval = Math.floor(seconds / 86400);
-    if (interval >= 1) return interval + " day" + (interval > 1 ? "s" : "") + " ago";
-    
-    interval = Math.floor(seconds / 3600);
-    if (interval >= 1) return interval + " hour" + (interval > 1 ? "s" : "") + " ago";
-    
-    interval = Math.floor(seconds / 60);
-    if (interval >= 1) return interval + " minute" + (interval > 1 ? "s" : "") + " ago";
-    
-    return "just now";
+    if (seconds < 60) return "just now";
+    if (seconds < 3600) return Math.floor(seconds / 60) + " minutes ago";
+    if (seconds < 86400) return Math.floor(seconds / 3600) + " hours ago";
+    if (seconds < 2592000) return Math.floor(seconds / 86400) + " days ago";
+    if (seconds < 31536000) return Math.floor(seconds / 2592000) + " months ago";
+    return Math.floor(seconds / 31536000) + " years ago";
   };
 
   // Fetch dashboard data
@@ -59,16 +46,16 @@ const Dashboard = () => {
       setError(null);
       
       try {
-        // 1. Get total courses count
+        // Get total courses count
         const coursesResponse = await courseAPI.getAll({ limit: 1, page: 1 });
         const totalCourses = coursesResponse.data?.total || 0;
         
-        // 2. Get all papers for stats and activities
-        const papersResponse = await questionPaperAPI.getAll({ limit: 200 });
+        // Get all papers for stats and activities
+        const papersResponse = await questionPaperAPI.getAll({ limit: 100 });
         const papers = papersResponse.data || [];
         
-        // 3. Get all moderations for stats and activities
-        const moderationsResponse = await moderatorAPI.getAllModerations({ limit: 200 });
+        // Get all moderations for stats and activities
+        const moderationsResponse = await moderatorAPI.getAllModerations({ limit: 100 });
         const moderations = moderationsResponse.data || [];
         
         // Calculate stats
@@ -82,21 +69,17 @@ const Dashboard = () => {
           approvedPapers
         });
         
-        // Build recent activities from 3 sources
+        // Build recent activities
         const activities = [];
         
-        // A. Recent Paper Submissions (last 7 days)
+        // Recent Paper Submissions
         const recentSubmissions = papers
-          .filter(paper => 
-            ['submitted', 'under_review'].includes(paper.status) &&
-            new Date(paper.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          )
+          .filter(paper => ['submitted', 'under_review'].includes(paper.status))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-          .slice(0, 5)
+          .slice(0, 3)
           .map(paper => ({
             id: `paper-${paper.paper_id}`,
-            type: 'paper_submitted',
-            description: `New paper "${paper.title}" submitted for ${paper.course_code || 'course'}`,
+            description: `New paper submitted: ${paper.title}`,
             time: paper.created_at,
             icon: <DescriptionIcon />,
             color: '#4f46e5'
@@ -104,15 +87,14 @@ const Dashboard = () => {
         
         activities.push(...recentSubmissions);
         
-        // B. Recent Moderation Completions
+        // Recent Moderation Completions
         const recentCompletions = moderations
           .filter(mod => ['approved', 'rejected'].includes(mod.status))
           .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-          .slice(0, 5)
+          .slice(0, 3)
           .map(mod => ({
             id: `mod-${mod.moderation_id}`,
-            type: mod.status === 'approved' ? 'moderation_approved' : 'moderation_rejected',
-            description: `Paper "${mod.paper_title}" ${mod.status === 'approved' ? 'approved' : 'rejected'}`,
+            description: `Paper ${mod.status}: ${mod.paper_title}`,
             time: mod.updated_at || mod.created_at,
             icon: mod.status === 'approved' ? <CheckCircleIcon /> : <WarningIcon />,
             color: mod.status === 'approved' ? '#10b981' : '#ef4444'
@@ -120,75 +102,20 @@ const Dashboard = () => {
         
         activities.push(...recentCompletions);
         
-        // C. Recent Paper Updates (status changes)
-        const recentUpdates = papers
-          .filter(paper => 
-            new Date(paper.updated_at) > new Date(paper.created_at) &&
-            new Date(paper.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          )
-          .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-          .slice(0, 5)
-          .map(paper => ({
-            id: `update-${paper.paper_id}`,
-            type: 'paper_updated',
-            description: `Paper "${paper.title}" status changed to ${paper.status}`,
-            time: paper.updated_at,
-            icon: <EditIcon />,
-            color: '#f59e0b'
-          }));
-        
-        activities.push(...recentUpdates);
-        
-        // Sort all activities by time and take top 8
+        // Sort activities by time
         const sortedActivities = activities
           .sort((a, b) => new Date(b.time) - new Date(a.time))
+          .slice(0, 6)
           .map(activity => ({
             ...activity,
             time: timeAgo(activity.time)
-          }))
-          .slice(0, 8);
+          }));
         
         setRecentActivity(sortedActivities);
         
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setError('Failed to load dashboard data. Please try again.');
-        
-        // Fallback to mock data on error with MUI icons
-        setRecentActivity([
-          { 
-            id: 1, 
-            type: 'course_added', 
-            description: 'New course "Advanced React" added', 
-            time: '2 hours ago', 
-            icon: <BookIcon />,
-            color: '#4f46e5'
-          },
-          { 
-            id: 2, 
-            type: 'moderation_approved', 
-            description: 'Paper "Web Development" approved', 
-            time: '5 hours ago', 
-            icon: <CheckCircleIcon />,
-            color: '#10b981'
-          },
-          { 
-            id: 3, 
-            type: 'co_added', 
-            description: 'New Course Outcomes added', 
-            time: '1 day ago', 
-            icon: <TrendingUpIcon />,
-            color: '#8b5cf6'
-          },
-          { 
-            id: 4, 
-            type: 'moderation_pending', 
-            description: 'Paper "Data Structures" awaiting review', 
-            time: '2 days ago', 
-            icon: <HourglassIcon />,
-            color: '#f59e0b'
-          }
-        ]);
       } finally {
         setLoading(false);
       }
@@ -225,7 +152,7 @@ const Dashboard = () => {
           <DashboardIcon sx={{ fontSize: 32, color: '#4f46e5', marginRight: 2 }} />
           <h1>Admin Dashboard</h1>
         </div>
-        <p className="dashboard-subtitle">Welcome to the admin panel. Here's what's happening.</p>
+        <p className="dashboard-subtitle">Welcome to the admin panel.</p>
       </div>
 
       {error && (
@@ -257,9 +184,7 @@ const Dashboard = () => {
       {/* Recent Activity */}
       <div className="section-card">
         <div className="section-header">
-          <div className="section-header-icon">
-            <h2>Recent Activity</h2>
-          </div>
+          <h2>Recent Activity</h2>
         </div>
         
         {loading ? (
@@ -267,33 +192,26 @@ const Dashboard = () => {
             <div className="loading-spinner"></div>
             <p>Loading activities...</p>
           </div>
+        ) : recentActivity.length === 0 ? (
+          <div className="no-activities">
+            <p>No recent activities found.</p>
+          </div>
         ) : (
           <div className="activity-list">
-            {recentActivity.length === 0 ? (
-              <div className="no-activities">
-                <p>No recent activities found.</p>
-              </div>
-            ) : (
-              recentActivity.map((activity) => (
-                <div key={activity.id} className="activity-item">
-                  <div 
-                    className="activity-icon" 
-                    style={{ 
-                      backgroundColor: `${activity.color}20`,
-                      border: `1px solid ${activity.color}40`
-                    }}
-                  >
-                    <div className="activity-icon-wrapper">
-                      {activity.icon}
-                    </div>
-                  </div>
-                  <div className="activity-content">
-                    <p className="activity-description">{activity.description}</p>
-                    <span className="activity-time">{activity.time}</span>
-                  </div>
+            {recentActivity.map((activity) => (
+              <div key={activity.id} className="activity-item">
+                <div 
+                  className="activity-icon" 
+                  style={{ backgroundColor: `${activity.color}20` }}
+                >
+                  {activity.icon}
                 </div>
-              ))
-            )}
+                <div className="activity-content">
+                  <p className="activity-description">{activity.description}</p>
+                  <span className="activity-time">{activity.time}</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

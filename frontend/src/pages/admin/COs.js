@@ -187,13 +187,13 @@ const CO = () => {
     if (!formData.co_number || formData.co_number.trim() === '') {
       errors.push("CO number is required");
     } else if (coAPI.validateCONumber && !coAPI.validateCONumber(formData.co_number)) {
-      errors.push("CO number must be in valid format (e.g., '1', '2.1', '3.2.1')");
+      errors.push("CO number must be in valid format (e.g., '1', '2', '3')");
     }
 
     if (!formData.description || formData.description.trim() === '') {
       errors.push("Description is required");
-    } else if (formData.description.trim().length < 10) {
-      errors.push("Description must be at least 10 characters long");
+    } else if (formData.description.trim().length < 8) {
+      errors.push("Description must be at least 8 characters long");
     }
 
     // NEW: Validate bloom level
@@ -283,13 +283,6 @@ const CO = () => {
           <button onClick={loadAllData} className="refresh-btn">
             Refresh
           </button>
-          {/* Optional: Back to dashboard button */}
-          <button 
-            onClick={() => navigate('/admin/dashboard')} 
-            className="back-btn"
-          >
-            ← Dashboard
-          </button>
         </div>
       </div>
 
@@ -343,9 +336,9 @@ const CO = () => {
                   value={formData.co_number}
                   onChange={handleChange}
                   required
-                  placeholder="e.g., 1, 2.1, 3.2.1"
+                  placeholder="e.g., 1, 2, 3"
                 />
-                <small>Format: 1, 2.1, 3.2.1, etc.</small>
+                <small>Format: 1, 2, 3, etc.</small>
               </div>
 
               <div className="form-group">

@@ -1,5 +1,6 @@
 // backend/controllers/QuestionController.js
 import { Question } from "../models/Question.js";
+import { pool } from '../config/db.js';
 
 /**
  * Lightweight request logger for questions endpoints

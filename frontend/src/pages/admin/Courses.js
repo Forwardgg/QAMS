@@ -337,12 +337,6 @@ const Courses = () => {
                 Delete Selected ({selectedCourses.length})
               </button>
             )}
-            <button 
-              onClick={() => navigate('/admin/dashboard')} 
-              className="btn btn-secondary"
-            >
-              ← Dashboard
-            </button>
           </div>
         </div>
       </div>

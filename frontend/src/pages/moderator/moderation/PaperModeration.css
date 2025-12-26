@@ -1,214 +1,133 @@
 .paper-moderation-container {
-  padding: 2rem;
-  max-width: 1200px;
+  padding: 1.5rem;
+  max-width: 900px;
   margin: 0 auto;
-  background-color: #f8f9fa;
+  background: #f8f9fa;
   min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Header */
 .moderation-header {
   background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 2rem;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
 }
 
 .header-main h1 {
-  color: #2c3e50;
-  margin: 0 0 1rem 0;
-  font-size: 2rem;
+  color: #2d3748;
+  margin: 0 0 0.75rem 0;
+  font-size: 1.5rem;
   font-weight: 700;
 }
 
 .paper-info h2 {
-  color: #2c3e50;
+  color: #4a5568;
   margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .paper-meta {
   display: flex;
-  gap: 1rem;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.course-code {
-  background: #e67e22;
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.course-title {
-  color: #7f8c8d;
+.course-name {
+  color: #2d3748;
+  font-size: 1rem;
   font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  background: #edf2f7;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: fit-content;
 }
 
-.paper-status {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
+/* Action Buttons in Header */
+.header-actions {
+  flex-shrink: 0;
 }
 
-/* Approval Summary */
-.approval-summary {
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
-}
-
-.approval-summary h3 {
-  color: #2c3e50;
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-}
-
-.approval-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-}
-
-.stat-item {
-  background: #f8f9fa;
-  padding: 1.5rem;
-  border-radius: 8px;
-  text-align: center;
-  border-left: 4px solid #95a5a6;
-}
-
-.stat-item.approved {
-  border-left-color: #27ae60;
-}
-
-.stat-item.change-requested {
-  border-left-color: #e74c3c;
-}
-
-.stat-item.pending {
-  border-left-color: #f39c12;
-}
-
-.stat-number {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-}
-
-.stat-label {
-  color: #7f8c8d;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* CO Breakdown */
-.co-breakdown-section {
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
-}
-
-.co-breakdown-section h3 {
-  color: #2c3e50;
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-}
-
-.co-breakdown-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1rem;
-}
-
-.co-item {
-  border: 1px solid #ecf0f1;
-  border-radius: 8px;
-  padding: 1.5rem;
-  background: #f8f9fa;
-}
-
-.co-header {
+.action-buttons {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 180px;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
   align-items: center;
-  margin-bottom: 0.5rem;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
 }
 
-.co-number {
-  background: #3498db;
+.btn-back {
+  background: #718096;
   color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 0.9rem;
 }
 
-.co-stats {
-  color: #7f8c8d;
-  font-size: 0.9rem;
-  font-weight: 600;
+.btn-back:hover {
+  background: #4a5568;
 }
 
-.co-description {
-  color: #2c3e50;
-  line-height: 1.4;
-  margin-bottom: 0.5rem;
+.btn-bloom {
+  background: #805ad5;
+  color: white;
 }
 
-.co-warning {
-  color: #e74c3c;
-  font-size: 0.85rem;
-  font-weight: 600;
+.btn-bloom.active {
+  background: #6b46c1;
+}
+
+.btn-bloom:hover:not(:disabled) {
+  background: #6b46c1;
 }
 
 /* Moderation Criteria */
 .moderation-criteria {
   background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
 }
 
 .moderation-criteria h3 {
-  color: #2c3e50;
-  margin: 0 0 1rem 0;
-  font-size: 1.5rem;
+  color: #2d3748;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .instructions {
-  color: #7f8c8d;
-  margin: 0 0 2rem 0;
-  line-height: 1.5;
+  color: #718096;
+  margin: 0 0 1.5rem 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .criteria-list {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .criterion-item {
-  border-bottom: 1px solid #ecf0f1;
-  padding-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .criterion-item:last-child {
@@ -218,16 +137,17 @@
 
 .criterion-question {
   display: block;
-  color: #2c3e50;
+  color: #2d3748;
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 1rem;
   margin-bottom: 1rem;
   line-height: 1.4;
 }
 
+/* Radio Button Options - YES selected by default */
 .criterion-options {
   display: flex;
-  gap: 2rem;
+  gap: 1.5rem;
   margin-bottom: 1rem;
 }
 
@@ -236,106 +156,146 @@
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-}
-
-.option:hover {
-  background: #f8f9fa;
+  padding: 0.5rem 0;
 }
 
 .option input[type="radio"] {
   margin: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: #4299e1; /* Modern browser accent color */
+}
+
+/* Make YES option visually distinct - it's selected by default */
+.option:first-child input[type="radio"] {
+  accent-color: #48bb78; /* Green for YES */
+}
+
+.option:last-child input[type="radio"] {
+  accent-color: #f56565; /* Red for NO */
 }
 
 .option span {
-  color: #2c3e50;
+  color: #4a5568;
   font-weight: 500;
+  font-size: 0.95rem;
 }
 
+/* For criterion 7 (verbatim copy), reverse the colors */
+.criterion-item:last-child .option:first-child input[type="radio"] {
+  accent-color: #48bb78; /* NO is good - Green */
+}
+
+.criterion-item:last-child .option:last-child input[type="radio"] {
+  accent-color: #f56565; /* YES is bad - Red */
+}
+
+/* Comment Box */
 .comment-box {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #dcdfe6;
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
   font-size: 0.9rem;
-  resize: vertical;
   min-height: 80px;
+  resize: vertical;
   font-family: inherit;
+  background: #f7fafc;
 }
 
 .comment-box:focus {
   outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+  border-color: #4299e1;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.comment-box::placeholder {
+  color: #a0aec0;
+}
+
+/* Fix N/A behavior */
+.comment-box[value="N/A"] {
+  color: #718096;
+  font-style: italic;
 }
 
 /* Final Decision */
 .final-decision {
   background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
 }
 
 .final-decision h3 {
-  color: #2c3e50;
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
+  color: #2d3748;
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.approval-warning {
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  background: #fef5e7;
+  border: 1px solid #fed7aa;
+  color: #dd6b20;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .decision-options {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .decision-option {
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
-  padding: 1.5rem;
-  border: 2px solid #ecf0f1;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
   cursor: pointer;
+  background: white;
   transition: all 0.2s;
 }
 
 .decision-option:hover {
-  border-color: #bdc3c7;
+  border-color: #cbd5e0;
+  background: #f7fafc;
 }
 
-.decision-option input[type="radio"]:checked + .decision-label {
-  font-weight: 700;
+.decision-option input[type="radio"] {
+  margin-top: 0.25rem;
+  width: 18px;
+  height: 18px;
+  accent-color: #4299e1;
 }
 
-.decision-option.approve input[type="radio"]:checked {
-  background: #27ae60;
-  border-color: #27ae60;
+.decision-option.approve input[type="radio"] {
+  accent-color: #48bb78;
 }
 
-.decision-option.reject input[type="radio"]:checked {
-  background: #e74c3c;
-  border-color: #e74c3c;
-}
-
-.decision-option input[type="radio"]:checked ~ .decision-description {
-  color: #2c3e50;
+.decision-option.reject input[type="radio"] {
+  accent-color: #f56565;
 }
 
 .decision-label {
-  color: #2c3e50;
-  font-size: 1.1rem;
+  color: #2d3748;
+  font-size: 1rem;
   font-weight: 600;
   margin-bottom: 0.25rem;
   display: block;
 }
 
 .decision-description {
-  color: #7f8c8d;
-  font-size: 0.9rem;
+  color: #718096;
+  font-size: 0.85rem;
   line-height: 1.4;
   display: block;
 }
@@ -343,107 +303,57 @@
 /* Submit Section */
 .submit-section {
   background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
   text-align: center;
 }
 
 .btn-submit {
-  background: #27ae60;
+  background: #4299e1;
   color: white;
-  padding: 1rem 2rem;
+  padding: 0.75rem 1.5rem;
   border: none;
-  border-radius: 8px;
-  font-size: 1.1rem;
+  border-radius: 6px;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-submit:hover:not(:disabled) {
-  background: #219653;
-  transform: translateY(-2px);
+  background: #3182ce;
 }
 
 .btn-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  transform: none;
 }
 
 .submit-note {
-  color: #7f8c8d;
+  color: #718096;
   margin: 1rem 0 0 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
-/* Buttons */
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-back {
-  background: #95a5a6;
-  color: white;
-}
-
-.btn-back:hover {
-  background: #7f8c8d;
-}
-
-/* Status Badges */
-.status-draft {
-  background-color: #f8f9fa;
-  color: #6c757d;
-  border: 1px solid #dee2e6;
-}
-
-.status-submitted {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
-}
-
-.status-under-review {
-  background-color: #d1ecf1;
-  color: #0c5460;
-  border: 1px solid #bee5eb;
-}
-
-.status-change-requested {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
-
-.status-approved {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-/* Loading and Error States */
-.loading,
-.error {
+/* Loading & Error States */
+.loading, .error {
   text-align: center;
-  padding: 3rem;
-  color: #7f8c8d;
-  font-size: 1.1rem;
+  padding: 2rem;
+  color: #718096;
+  font-size: 1rem;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
 }
 
 .error {
-  color: #e74c3c;
+  color: #e53e3e;
+}
+
+/* Icons */
+.icon {
+  font-size: 1rem;
 }
 
 /* Responsive Design */
@@ -455,37 +365,53 @@
   .moderation-header {
     flex-direction: column;
     gap: 1rem;
+    padding: 1.25rem;
   }
   
-  .approval-stats,
-  .co-breakdown-grid {
-    grid-template-columns: 1fr;
+  .header-actions {
+    width: 100%;
+  }
+  
+  .action-buttons {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    width: auto;
+    flex: 1;
   }
   
   .criterion-options {
     flex-direction: column;
-    gap: 1rem;
+    align-items: flex-start;
+    gap: 0.75rem;
   }
   
   .decision-option {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.5rem;
   }
 }
 
 @media (max-width: 480px) {
   .moderation-header,
-  .approval-summary,
-  .co-breakdown-section,
   .moderation-criteria,
   .final-decision,
   .submit-section {
-    padding: 1.5rem;
+    padding: 1.25rem;
   }
   
-  .paper-meta {
+  .action-buttons {
     flex-direction: column;
-    align-items: flex-start;
     gap: 0.5rem;
+  }
+  
+  .btn {
+    width: 100%;
   }
 }

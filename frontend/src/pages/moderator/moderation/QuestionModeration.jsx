@@ -1,26 +1,16 @@
-import React, { useState, useContext, useEffect, useMemo } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../../../components/AuthProvider';
 import moderatorAPI from '../../../api/moderator.api';
+import BloomAnalysis from './BloomAnalysis';
 import './QuestionModeration.css';
-
-// Import MUI components for Bloom's analysis
-import {
-  Box,
-  Paper,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  LinearProgress
-} from '@mui/material';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 
 const QuestionModeration = ({ paperId, onBack, onContinue }) => {
   const auth = useContext(AuthContext);
@@ -30,38 +20,15 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [bloomData, setBloomData] = useState([]);
+  const [showBloomAnalysis, setShowBloomAnalysis] = useState(false);
+  const [showAcceptAllConfirm, setShowAcceptAllConfirm] = useState(false);
+  const [showRejectAllConfirm, setShowRejectAllConfirm] = useState(false);
 
   useEffect(() => {
     if (paperId) {
       loadPaperDetails();
     }
   }, [paperId]);
-
-  // Helper functions for Bloom's analysis
-  const getBloomColor = (level) => {
-    const colors = {
-      'L1': '#FF6B6B', // Remember
-      'L2': '#4ECDC4', // Understand
-      'L3': '#45B7D1', // Apply
-      'L4': '#96CEB4', // Analyze
-      'L5': '#FFEAA7', // Evaluate
-      'L6': '#DDA0DD'  // Create
-    };
-    return colors[level] || '#CCCCCC';
-  };
-
-  const getBloomLabel = (level) => {
-    const labels = {
-      'L1': 'Remember',
-      'L2': 'Understand',
-      'L3': 'Apply',
-      'L4': 'Analyze',
-      'L5': 'Evaluate',
-      'L6': 'Create'
-    };
-    return labels[level] || 'Unknown';
-  };
 
   const loadPaperDetails = async () => {
     setLoading(true);
@@ -73,7 +40,6 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
       
       // Check if main response has CO data
       const hasCO = data.questions?.some(q => q.co_number || q.co_id);
-      console.log('Has CO data in main response?', hasCO);
       
       if (hasCO) {
         // Use CO data from main response
@@ -82,7 +48,6 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
         // Try to get CO data from breakdown
         try {
           const coResponse = await moderatorAPI.getCOBreakdown(paperId);
-          console.log('CO Breakdown response:', coResponse);
           
           if (coResponse.success && coResponse.data) {
             // Create a mapping of question_id to CO data
@@ -93,7 +58,7 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
                   questionToCOMap[q.question_id] = {
                     co_number: co.co_number,
                     co_description: co.co_description,
-                    bloom_level: co.bloom_level // Add Bloom's level from CO
+                    bloom_level: co.bloom_level
                   };
                 });
               }
@@ -105,7 +70,6 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
               return coData ? { ...question, ...coData } : question;
             });
             
-            console.log('Questions with CO mapped:', questionsWithCO);
             setQuestions(questionsWithCO);
           } else {
             setQuestions(data.questions || []);
@@ -122,47 +86,6 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
     }
   };
 
-  // Calculate Bloom's Taxonomy distribution
-  useEffect(() => {
-    if (questions && questions.length > 0) {
-      const bloomDistribution = {};
-      
-      // Initialize all levels
-      ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'].forEach(level => {
-        bloomDistribution[level] = { count: 0, marks: 0, questions: [] };
-      });
-
-      // Count questions by bloom level
-      questions.forEach(question => {
-        if (question.bloom_level) {
-          const level = question.bloom_level.toUpperCase();
-          if (bloomDistribution[level]) {
-            bloomDistribution[level].count++;
-            bloomDistribution[level].marks += (question.marks || 0);
-            bloomDistribution[level].questions.push(question);
-          }
-        }
-      });
-
-      // Convert to array
-      const chartData = Object.keys(bloomDistribution)
-        .filter(level => bloomDistribution[level].count > 0)
-        .map(level => {
-          const data = bloomDistribution[level];
-          return {
-            id: level,
-            value: data.count,
-            label: getBloomLabel(level),
-            color: getBloomColor(level),
-            marks: data.marks,
-            percentage: (data.count / questions.length * 100).toFixed(1)
-          };
-        });
-
-      setBloomData(chartData);
-    }
-  }, [questions]);
-
   const handleQuestionStatusChange = async (questionId, newStatus) => {
     try {
       setSaving(true);
@@ -173,6 +96,52 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
       setHasChanges(true);
     } catch (error) {
       console.error('Failed to update question status:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAcceptAll = async () => {
+    try {
+      setSaving(true);
+      
+      // Update all questions to approved
+      const updatePromises = questions.map(question => 
+        moderatorAPI.updateQuestionStatus(question.question_id, 'approved')
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Update local state
+      setQuestions(prev => prev.map(q => ({ ...q, status: 'approved' })));
+      setHasChanges(true);
+      setShowAcceptAllConfirm(false);
+      
+    } catch (error) {
+      console.error('Failed to accept all questions:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRejectAll = async () => {
+    try {
+      setSaving(true);
+      
+      // Update all questions to change_requested
+      const updatePromises = questions.map(question => 
+        moderatorAPI.updateQuestionStatus(question.question_id, 'change_requested')
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Update local state
+      setQuestions(prev => prev.map(q => ({ ...q, status: 'change_requested' })));
+      setHasChanges(true);
+      setShowRejectAllConfirm(false);
+      
+    } catch (error) {
+      console.error('Failed to reject all questions:', error);
     } finally {
       setSaving(false);
     }
@@ -209,44 +178,8 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
     return { total, approved, changeRequested, pending };
   };
 
-  // Calculate Bloom's statistics
-  const bloomStats = useMemo(() => {
-    const totalQuestions = questions.length;
-    const questionsWithBloom = questions.filter(q => q.bloom_level).length;
-    const percentageWithBloom = totalQuestions > 0 ? 
-      Math.round((questionsWithBloom / totalQuestions) * 100) : 0;
-    
-    const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
-    const marksWithBloom = questions
-      .filter(q => q.bloom_level)
-      .reduce((sum, q) => sum + (q.marks || 0), 0);
-
-    return {
-      totalQuestions,
-      questionsWithBloom,
-      percentageWithBloom,
-      totalMarks,
-      marksWithBloom,
-      marksPercentageWithBloom: totalMarks > 0 ? 
-        Math.round((marksWithBloom / totalMarks) * 100) : 0
-    };
-  }, [questions]);
-
-  // Function to create conic gradient for pie chart
-  const getPieChartStyle = () => {
-    if (bloomData.length === 0) return {};
-    
-    let accumulatedPercentage = 0;
-    const gradients = bloomData.map(item => {
-      const start = accumulatedPercentage + '%';
-      accumulatedPercentage += parseFloat(item.percentage);
-      const end = accumulatedPercentage + '%';
-      return `${item.color} ${start} ${end}`;
-    }).join(', ');
-    
-    return {
-      background: `conic-gradient(${gradients})`
-    };
+  const toggleBloomAnalysis = () => {
+    setShowBloomAnalysis(!showBloomAnalysis);
   };
 
   if (loading) return <div className="loading">Loading paper details...</div>;
@@ -254,6 +187,10 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
 
   const stats = getApprovalStats();
   const hasCOData = questions.some(q => q.co_number || q.co_id);
+  const hasBloomData = questions.some(q => q.bloom_level);
+  const moderationStarted = paper.status !== 'submitted';
+  const allApproved = questions.length > 0 && questions.every(q => q.status === 'approved');
+  const allRejected = questions.length > 0 && questions.every(q => q.status === 'change_requested');
 
   return (
     <div className="question-moderation-container">
@@ -264,11 +201,25 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
           <div className="paper-info">
             <h2>{paper.title}</h2>
             <div className="paper-meta">
-              <span className="course-code">{paper.course_code}</span>
-              <span className="course-title">{paper.course_title}</span>
-              <span className={`paper-status ${getStatusBadgeClass(paper.status)}`}>
-                {paper.status.replace('_', ' ')}
-              </span>
+              <span className="course-code">{paper.course_code}: {paper.course_title}</span>
+              <div className="quick-stats">
+                <div className="quick-stat total">
+                  <span className="stat-count">{stats.total}</span>
+                  <span className="stat-label">Total</span>
+                </div>
+                <div className="quick-stat approved">
+                  <span className="stat-count">{stats.approved}</span>
+                  <span className="stat-label">Approved</span>
+                </div>
+                <div className="quick-stat pending">
+                  <span className="stat-count">{stats.pending}</span>
+                  <span className="stat-label">Pending</span>
+                </div>
+                <div className="quick-stat change-requested">
+                  <span className="stat-count">{stats.changeRequested}</span>
+                  <span className="stat-label">Changes</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -276,6 +227,7 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
         <div className="header-actions">
           {paper.status === 'submitted' && (
             <button className="btn btn-start" onClick={handleStartModeration} disabled={saving}>
+              <PlayArrowIcon style={{ fontSize: '1rem', marginRight: '4px' }} />
               {saving ? 'Starting...' : 'Start Moderation'}
             </button>
           )}
@@ -285,219 +237,100 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
             onClick={onContinue}
             disabled={saving || (paper.status === 'submitted' && !hasChanges)}
           >
-            Continue to Paper Moderation →
+            Create Moderation Report
+            <ArrowForwardIcon style={{ fontSize: '1rem', marginLeft: '4px' }} />
           </button>
+
+          {hasBloomData && (
+            <button 
+              className={`btn btn-toggle ${showBloomAnalysis ? 'active' : ''}`}
+              onClick={toggleBloomAnalysis}
+            >
+              <AssessmentIcon style={{ fontSize: '1rem', marginRight: '4px' }} />
+              {showBloomAnalysis ? 'Hide Bloom Analysis' : 'Show Bloom Analysis'}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Approval Stats */}
-      <div className="approval-stats">
-        <div className="stat-item"><div className="stat-number">{stats.total}</div><div className="stat-label">Total</div></div>
-        <div className="stat-item approved"><div className="stat-number">{stats.approved}</div><div className="stat-label">Approved</div></div>
-        <div className="stat-item change-requested"><div className="stat-number">{stats.changeRequested}</div><div className="stat-label">Changes</div></div>
-        <div className="stat-item pending"><div className="stat-number">{stats.pending}</div><div className="stat-label">Pending</div></div>
-      </div>
+      {/* Removed old approval stats box */}
 
-      {/* Bloom's Taxonomy Analysis Section */}
-      {questions.length > 0 && (
-        <Paper className="bloom-analysis-section" elevation={2} sx={{ mb: 3 }}>
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom align="center" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-              <AssessmentIcon />
-              Bloom's Taxonomy Analysis
-            </Typography>
-            
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                {bloomData.length > 0 ? (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <Box sx={{ position: 'relative', width: 250, height: 250, mb: 3 }}>
-                      {/* CSS-only Pie Chart */}
-                      <Box 
-                        sx={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          borderRadius: '50%',
-                          ...getPieChartStyle(),
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {/* Center hole */}
-                        <Box 
-                          sx={{ 
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: '60%',
-                            height: '60%',
-                            borderRadius: '50%',
-                            backgroundColor: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexDirection: 'column',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }}
-                        >
-                          <Typography variant="h4" color="primary" fontWeight="bold">
-                            {bloomStats.totalQuestions}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            Total Questions
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Box>
-                    
-                    {/* Legend */}
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1, mb: 2 }}>
-                      {bloomData.map((item) => (
-                        <Box 
-                          key={item.id}
-                          sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: 0.5,
-                            px: 1,
-                            py: 0.5,
-                            borderRadius: 1,
-                            backgroundColor: 'rgba(255,255,255,0.8)'
-                          }}
-                        >
-                          <Box 
-                            sx={{ 
-                              width: 12, 
-                              height: 12, 
-                              borderRadius: '50%', 
-                              backgroundColor: item.color 
-                            }} 
-                          />
-                          <Typography variant="caption">
-                            {item.label} ({item.value})
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                ) : (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <Typography variant="body1" paragraph>
-                      No Bloom's Taxonomy data available.
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Questions are not tagged with Bloom's levels.
-                    </Typography>
-                  </Box>
-                )}
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Paper elevation={1} sx={{ p: 3, height: '100%' }}>
-                  <Typography variant="subtitle1" gutterBottom fontWeight="bold">
-                    Statistics
-                  </Typography>
-                  
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={6}>
-                      <Card variant="outlined">
-                        <CardContent sx={{ p: 2, textAlign: 'center' }}>
-                          <Typography variant="body2" color="textSecondary" gutterBottom>
-                            With Bloom Level
-                          </Typography>
-                          <Typography variant="h5" color="primary">
-                            {bloomStats.questionsWithBloom}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            ({bloomStats.percentageWithBloom}%)
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    
-                    <Grid item xs={6}>
-                      <Card variant="outlined">
-                        <CardContent sx={{ p: 2, textAlign: 'center' }}>
-                          <Typography variant="body2" color="textSecondary" gutterBottom>
-                            Marks with Bloom
-                          </Typography>
-                          <Typography variant="h5" color="primary">
-                            {bloomStats.marksWithBloom}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            ({bloomStats.marksPercentageWithBloom}%)
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  </Grid>
-
-                  <Box>
-                    <Typography variant="subtitle1" gutterBottom fontWeight="bold">
-                      Breakdown by Level
-                    </Typography>
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Level</TableCell>
-                            <TableCell align="right">Questions</TableCell>
-                            <TableCell align="right">Marks</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {bloomData.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>
-                                <Box display="flex" alignItems="center" gap={1}>
-                                  <Box
-                                    sx={{
-                                      width: 12,
-                                      height: 12,
-                                      borderRadius: '50%',
-                                      backgroundColor: item.color
-                                    }}
-                                  />
-                                  <Typography variant="body2">
-                                    {item.label}
-                                  </Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell align="right">
-                                <Typography variant="body2">
-                                  {item.value}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align="right">
-                                <Typography variant="body2">
-                                  {item.marks}
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                </Paper>
-              </Grid>
-            </Grid>
-          </Box>
-        </Paper>
+      {/* Bloom's Analysis Section (Toggleable) */}
+      {showBloomAnalysis && hasBloomData && (
+        <BloomAnalysis questions={questions} />
       )}
 
       {/* Questions List */}
       <div className="questions-list">
         <div className="questions-header">
-          <h3>Questions Review</h3>
-          <p className="instructions">
-            Review each question and mark as ✅ Approved or ❌ Change Requested
-            {hasCOData && ' • CO badges show Course Outcomes'}
-            {' • Marks show question weightage'}
-            {bloomData.length > 0 && ' • Colors indicate Bloom\'s Taxonomy levels'}
-          </p>
+          <div className="questions-header-left">
+            <h3>Questions Review</h3>
+            <p className="instructions">
+              Review each question and mark as Approved or Change Requested
+            </p>
+          </div>
+          
+          {moderationStarted && questions.length > 0 && (
+            <div className="questions-header-right">
+              <div className="bulk-actions">
+                <button
+                  className="btn btn-approve-all"
+                  onClick={() => setShowAcceptAllConfirm(true)}
+                  disabled={saving || allApproved}
+                >
+                  <CheckCircleIcon style={{ fontSize: '1rem', marginRight: '4px' }} />
+                  Accept All
+                </button>
+                <button
+                  className="btn btn-reject-all"
+                  onClick={() => setShowRejectAllConfirm(true)}
+                  disabled={saving || allRejected}
+                >
+                  <CancelIcon style={{ fontSize: '1rem', marginRight: '4px' }} />
+                  Reject All
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Accept All Confirmation */}
+        {showAcceptAllConfirm && (
+          <div className="confirmation-modal">
+            <div className="confirmation-content">
+              <h4>Accept All Questions?</h4>
+              <p>This will mark all {questions.length} questions as <strong>Approved</strong>.</p>
+              <p>This action cannot be undone.</p>
+              <div className="confirmation-actions">
+                <button className="btn btn-cancel" onClick={() => setShowAcceptAllConfirm(false)} disabled={saving}>
+                  Cancel
+                </button>
+                <button className="btn btn-confirm-accept" onClick={handleAcceptAll} disabled={saving}>
+                  {saving ? 'Processing...' : 'Yes, Accept All'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject All Confirmation */}
+        {showRejectAllConfirm && (
+          <div className="confirmation-modal">
+            <div className="confirmation-content">
+              <h4>Reject All Questions?</h4>
+              <p>This will mark all {questions.length} questions as <strong>Change Requested</strong>.</p>
+              <p>This action cannot be undone.</p>
+              <div className="confirmation-actions">
+                <button className="btn btn-cancel" onClick={() => setShowRejectAllConfirm(false)} disabled={saving}>
+                  Cancel
+                </button>
+                <button className="btn btn-confirm-reject" onClick={handleRejectAll} disabled={saving}>
+                  {saving ? 'Processing...' : 'Yes, Reject All'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="questions-container">
           {questions.map((question, index) => {
@@ -512,24 +345,8 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
                     {/* Marks display */}
                     {question.marks !== null && question.marks !== undefined && (
                       <span className="marks-badge" title={`Marks: ${question.marks}`}>
-                        [{question.marks} marks]
+                        {question.marks} marks
                       </span>
-                    )}
-                    {/* Bloom's level chip */}
-                    {bloomLevel && (
-                      <Chip 
-                        label={`Bloom: ${bloomLevel}`}
-                        size="small"
-                        variant="outlined"
-                        sx={{ 
-                          fontSize: '0.7rem',
-                          height: 20,
-                          backgroundColor: getBloomColor(bloomLevel),
-                          color: 'white',
-                          fontWeight: 'bold',
-                          ml: 1
-                        }}
-                      />
                     )}
                     {/* CO badge */}
                     {coNumber && <span className="co-badge">CO{coNumber}</span>}
@@ -542,16 +359,18 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
                     <button
                       className={`btn btn-approve ${question.status === 'approved' ? 'active' : ''}`}
                       onClick={() => handleQuestionStatusChange(question.question_id, 'approved')}
-                      disabled={saving || paper.status === 'submitted'}
+                      disabled={saving || !moderationStarted}
                     >
-                      ✅ Approve
+                      <CheckIcon style={{ fontSize: '1rem', marginRight: '4px' }} />
+                      Approve
                     </button>
                     <button
                       className={`btn btn-reject ${question.status === 'change_requested' ? 'active' : ''}`}
                       onClick={() => handleQuestionStatusChange(question.question_id, 'change_requested')}
-                      disabled={saving || paper.status === 'submitted'}
+                      disabled={saving || !moderationStarted}
                     >
-                      ❌ Request Changes
+                      <CloseIcon style={{ fontSize: '1rem', marginRight: '4px' }} />
+                      Request Changes
                     </button>
                   </div>
                 </div>
@@ -570,7 +389,7 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
                     )}
                     {bloomLevel && (
                       <>
-                        <strong>Bloom's Level:</strong> {bloomLevel} ({getBloomLabel(bloomLevel)})
+                        <strong>Bloom's Level:</strong> {bloomLevel}
                       </>
                     )}
                   </div>
@@ -584,13 +403,17 @@ const QuestionModeration = ({ paperId, onBack, onContinue }) => {
       </div>
 
       <div className="bottom-actions">
-        <button className="btn btn-back" onClick={onBack}>← Back to Papers List</button>
+        <button className="btn btn-back" onClick={onBack}>
+          <ArrowBackIcon style={{ fontSize: '1rem', marginRight: '4px' }} />
+          Back to Papers List
+        </button>
         <button 
           className="btn btn-primary" 
           onClick={onContinue}
           disabled={saving || (paper.status === 'submitted' && !hasChanges)}
         >
-          Continue to Paper Moderation →
+          Create Moderation Report
+          <ArrowForwardIcon style={{ fontSize: '1rem', marginLeft: '4px' }} />
         </button>
       </div>
     </div>

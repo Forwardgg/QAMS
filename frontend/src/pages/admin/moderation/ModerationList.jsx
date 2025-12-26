@@ -216,13 +216,6 @@ const ModerationList = () => {
       <div className="filters-section">
         <div className="section-header">
           <h3>Filters</h3>
-          <button 
-            onClick={fetchAllModerations} 
-            className="btn btn-refresh"
-            disabled={loading}
-          >
-            {loading ? 'Loading...' : '↻ Refresh'}
-          </button>
         </div>
         
         <form onSubmit={handleSearch} className="filter-controls">

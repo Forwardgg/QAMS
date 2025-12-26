@@ -30,39 +30,59 @@
 
 .paper-info h2 {
   color: #2d3748;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.75rem 0;
   font-size: 1.1rem;
   font-weight: 500;
 }
 
 .paper-meta {
   display: flex;
+  flex-direction: column;
   gap: 0.75rem;
+}
+
+/* Course code format: CO309: Operating Systems */
+.course-code {
+  background: #4299e1;
+  color: white;
+  padding: 0.35rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: inline-block;
+}
+
+/* Quick Stats - Minimal Clean */
+.quick-stats {
+  display: flex;
+  gap: 1rem;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.course-code {
-  background: #4299e1;
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+.quick-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 2px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+}
+
+.stat-count {
+  font-size: 1rem;
   font-weight: 600;
-  font-size: 0.8rem;
+  color: #212529;
+  line-height: 1;
 }
 
-.course-title {
-  color: #718096;
+.stat-label {
+  color: #6c757d;
+  font-size: 0.65rem;
   font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.paper-status {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 700;
   text-transform: uppercase;
+  margin-top: 0.15rem;
 }
 
 .header-actions {
@@ -72,48 +92,7 @@
   min-width: 180px;
 }
 
-/* Approval Stats */
-.approval-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.stat-item {
-  background: white;
-  padding: 1.25rem;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  border-left: 4px solid #a0aec0;
-}
-
-.stat-item.approved {
-  border-left-color: #48bb78;
-}
-
-.stat-item.change-requested {
-  border-left-color: #f56565;
-}
-
-.stat-item.pending {
-  border-left-color: #ed8936;
-}
-
-.stat-number {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #2d3748;
-  margin-bottom: 0.25rem;
-}
-
-.stat-label {
-  color: #718096;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
+/* Removed old approval-stats section */
 
 /* Questions List */
 .questions-list {
@@ -122,10 +101,23 @@
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   margin-bottom: 1.5rem;
+  position: relative;
 }
 
 .questions-header {
   margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.questions-header-left {
+  flex: 1;
+}
+
+.questions-header-right {
+  flex-shrink: 0;
 }
 
 .questions-list h3 {
@@ -140,8 +132,108 @@
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.4;
+  max-width: 600px;
 }
 
+/* Bulk Actions */
+.bulk-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-direction: column;
+  min-width: 140px;
+}
+
+.btn-approve-all {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  border: none;
+}
+
+.btn-approve-all:hover:not(:disabled) {
+  background: linear-gradient(135deg, #38a169, #2f855a);
+}
+
+.btn-reject-all {
+  background: linear-gradient(135deg, #f56565, #e53e3e);
+  color: white;
+  border: none;
+}
+
+.btn-reject-all:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e53e3e, #c53030);
+}
+
+/* Confirmation Modal */
+.confirmation-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirmation-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.confirmation-content h4 {
+  color: #2d3748;
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.confirmation-content p {
+  color: #4a5568;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.5;
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.btn-cancel {
+  background: #718096;
+  color: white;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background: #4a5568;
+}
+
+.btn-confirm-accept {
+  background: #48bb78;
+  color: white;
+}
+
+.btn-confirm-accept:hover:not(:disabled) {
+  background: #38a169;
+}
+
+.btn-confirm-reject {
+  background: #f56565;
+  color: white;
+}
+
+.btn-confirm-reject:hover:not(:disabled) {
+  background: #e53e3e;
+}
+
+/* Questions Container */
 .questions-container {
   display: flex;
   flex-direction: column;
@@ -274,6 +366,10 @@
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
 }
 
 .btn:disabled {
@@ -411,6 +507,18 @@
   color: #e53e3e;
 }
 
+/* Marks Badge */
+.marks-badge {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+  margin-left: 8px;
+  border: 1px solid #bbdefb;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .question-moderation-container {
@@ -429,6 +537,20 @@
     justify-content: space-between;
   }
   
+  .questions-header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .questions-header-right {
+    width: 100%;
+  }
+  
+  .bulk-actions {
+    flex-direction: row;
+    width: 100%;
+  }
+  
   .question-header {
     flex-direction: column;
     align-items: stretch;
@@ -439,13 +561,26 @@
     justify-content: center;
   }
   
-  .approval-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
   .bottom-actions {
     flex-direction: column;
     text-align: center;
+  }
+  
+  .quick-stats {
+    gap: 0.5rem;
+  }
+  
+  .quick-stat {
+    min-width: 50px;
+    padding: 0.2rem 0.4rem;
+  }
+  
+  .stat-count {
+    font-size: 1rem;
+  }
+  
+  .stat-label {
+    font-size: 0.6rem;
   }
 }
 
@@ -462,10 +597,6 @@
     padding: 1rem;
   }
   
-  .approval-stats {
-    grid-template-columns: 1fr;
-  }
-  
   .paper-meta {
     flex-direction: column;
     align-items: flex-start;
@@ -480,134 +611,30 @@
     padding: 0.5rem 0.75rem;
     font-size: 0.8rem;
   }
-}
-/* Add to QuestionModeration.css */
-
-.marks-badge {
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: 600;
-  margin-left: 8px;
-  border: 1px solid #bbdefb;
-}
-
-.question-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.question-number {
-  font-weight: bold;
-  color: #2c5282;
-}
-
-.co-badge {
-  background: #d4edda;
-  color: #155724;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: 600;
-  border: 1px solid #c3e6cb;
-}
-
-.instructions {
-  color: #666;
-  margin-bottom: 20px;
-  font-size: 0.95em;
-}
-/* Bloom's Taxonomy Analysis Section */
-.bloom-analysis-section {
-  background: white !important;
-  border-radius: 12px !important;
-  margin-bottom: 20px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
-  overflow: hidden !important;
-}
-
-.bloom-analysis-section .MuiTypography-h6 {
-  color: #2c3e50 !important;
-  font-weight: 600 !important;
-  padding-top: 20px !important;
-}
-
-.bloom-analysis-section .MuiCard-root {
-  border-radius: 8px !important;
-  height: 100% !important;
-  transition: transform 0.2s ease !important;
-}
-
-.bloom-analysis-section .MuiCard-root:hover {
-  transform: translateY(-2px) !important;
-}
-
-.bloom-analysis-section .MuiCardContent-root {
-  padding: 16px !important;
-}
-
-.bloom-analysis-section .MuiTypography-h5 {
-  color: #2c3e50 !important;
-  font-weight: 700 !important;
-}
-
-.bloom-analysis-section .MuiTableContainer-root {
-  margin-top: 16px !important;
-  border-radius: 8px !important;
-  overflow: hidden !important;
-  border: 1px solid #e0e0e0 !important;
-}
-
-.bloom-analysis-section .MuiTable-root {
-  background: white !important;
-}
-
-.bloom-analysis-section .MuiTableCell-root {
-  border-bottom: 1px solid #e0e0e0 !important;
-  padding: 8px 16px !important;
-}
-
-/* Question Bloom's level chip styling */
-.question-actions .MuiChip-root {
-  font-weight: 600 !important;
-  border: none !important;
-}
-
-/* Enhanced CO info with Bloom's */
-.question-co-info {
-  background: #f0fff4 !important;
-  border-left: 3px solid #48bb78 !important;
-  padding: 0.75rem !important;
-  margin-top: 1rem !important;
-  border-radius: 0 4px 4px 0 !important;
-  font-size: 0.85rem !important;
-  display: block !important;
-  visibility: visible !important;
-}
-
-.question-co-info strong {
-  color: #2f855a !important;
-  font-weight: 600 !important;
-}
-
-.co-description {
-  color: #718096 !important;
-  font-style: italic !important;
-  font-size: 0.8rem !important;
-}
-
-/* Responsive adjustments for Bloom's section */
-@media (max-width: 768px) {
-  .bloom-analysis-section {
-    margin: 0 -20px 20px -20px !important;
-    border-radius: 0 !important;
+  
+  .bulk-actions {
+    flex-direction: column;
   }
   
-  .bloom-analysis-section .MuiGrid-container {
-    flex-direction: column !important;
+  .course-code {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.75rem;
+  }
+  
+  .quick-stats {
+    gap: 0.25rem;
+  }
+  
+  .quick-stat {
+    min-width: 45px;
+    padding: 0.15rem 0.3rem;
+  }
+  
+  .stat-count {
+    font-size: 0.9rem;
+  }
+  
+  .stat-label {
+    font-size: 0.55rem;
   }
 }

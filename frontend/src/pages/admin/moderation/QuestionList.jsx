@@ -5,27 +5,24 @@ import {
   Paper, 
   Typography, 
   Grid, 
-  Card, 
-  CardContent,
   CircularProgress,
   Button,
   Switch,
   FormControlLabel,
   Alert,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow
+  Chip
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ListIcon from '@mui/icons-material/List';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 import moderatorAPI from '../../../api/moderator.api';
+import questionPaperAPI from '../../../api/questionPaper.api';
 import './QuestionList.css';
+
+// Import the BloomsAnalysis component
+import BloomsAnalysis from './BloomsAnalysis';
 
 const QuestionList = () => {
   const navigate = useNavigate();
@@ -38,152 +35,142 @@ const QuestionList = () => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfMessage, setPdfMessage] = useState({ type: '', text: '' });
   const [showCO, setShowCO] = useState(true);
-  const [bloomData, setBloomData] = useState([]);
+  const [showBloomsAnalysis, setShowBloomsAnalysis] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
   const moderationId = searchParams.get('moderationId');
   const paperId = searchParams.get('paperId');
 
-  // Bloom's Taxonomy color scheme
-  const BLOOM_COLORS = {
-    'L1': '#FF6B6B', // Remember
-    'L2': '#4ECDC4', // Understand
-    'L3': '#45B7D1', // Apply
-    'L4': '#96CEB4', // Analyze
-    'L5': '#FFEAA7', // Evaluate
-    'L6': '#DDA0DD', // Create
-    'UNKNOWN': '#CCCCCC' // Unknown/Not assigned
-  };
-
-  // Bloom's Taxonomy labels
-  const BLOOM_LABELS = {
-    'L1': 'Remember',
-    'L2': 'Understand',
-    'L3': 'Apply',
-    'L4': 'Analyze',
-    'L5': 'Evaluate',
-    'L6': 'Create',
-    'UNKNOWN': 'Not Assigned'
-  };
-
   useEffect(() => {
     loadData();
   }, [moderationId, paperId]);
-
+  const getFullPaperData = async (paperId) => {
+  try {
+    const papersRes = await questionPaperAPI.getAll();
+    
+    const normalizeArrayResponse = (resp) => {
+      if (!resp) return [];
+      if (Array.isArray(resp)) return resp;
+      if (Array.isArray(resp.data)) return resp.data;
+      if (Array.isArray(resp.rows)) return resp.rows;
+      if (Array.isArray(resp.questions)) return resp.questions;
+      const arr = Object.values(resp).find(v => Array.isArray(v));
+      return arr || [];
+    };
+    
+    const papersArray = normalizeArrayResponse(papersRes);
+    return papersArray.find(p => String(p.paper_id) === String(paperId));
+  } catch (error) {
+    console.error('Error getting full paper data:', error);
+    return null;
+  }
+};
   const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (paperId) {
-        const [questionRes, paperRes] = await Promise.all([
-          moderatorAPI.getQuestionReport(paperId),
-          moderatorAPI.getPaperReport(paperId)
-        ]);
+  setLoading(true);
+  setError(null);
+  try {
+    if (paperId) {
+      // Get questions from moderator API (your preferred route)
+      const questionRes = await moderatorAPI.getQuestionReport(paperId);
+      
+      // Get FULL paper data from questionPaperAPI (same as PaperQuestionsManager)
+      const papersRes = await questionPaperAPI.getAll();
+      
+      // Find the specific paper (copy helper from PaperQuestionsManager)
+      const normalizeArrayResponse = (resp) => {
+        if (!resp) return [];
+        if (Array.isArray(resp)) return resp;
+        if (Array.isArray(resp.data)) return resp.data;
+        if (Array.isArray(resp.rows)) return resp.rows;
+        if (Array.isArray(resp.questions)) return resp.questions;
+        const arr = Object.values(resp).find(v => Array.isArray(v));
+        return arr || [];
+      };
+      
+      const papersArray = normalizeArrayResponse(papersRes);
+      const fullPaperData = papersArray.find(p => String(p.paper_id) === String(paperId));
+      
+      if (!fullPaperData) {
+        throw new Error('Paper not found');
+      }
+      
+      // ALSO get the moderator report for moderation data
+      const paperReportRes = await moderatorAPI.getPaperReport(paperId);
+      const moderationData = paperReportRes.data?.data?.moderation || null;
+      
+      console.log('✅ Full paper data with headers:', {
+        semester: fullPaperData.semester,
+        exam_type: fullPaperData.exam_type,
+        academic_year: fullPaperData.academic_year,
+        full_marks: fullPaperData.full_marks,
+        duration: fullPaperData.duration
+      });
+      
+      // Combine: Use full paper data + moderation data
+      setQuestionReport(questionRes.data || []);
+      setPaperData({ 
+        paper: fullPaperData, // This has all header fields!
+        moderation: moderationData,
+        counts: paperReportRes.data?.data?.counts || {},
+        questions: paperReportRes.data?.data?.questions || []
+      });
+      
+    } else if (moderationId) {
+      // Similar logic for moderation flow
+      const moderationRes = await moderatorAPI.getModerationDetails(moderationId);
+      const moderation = moderationRes.data;
+      
+      if (moderation?.paper_id) {
+        const questionRes = await moderatorAPI.getQuestionReport(moderation.paper_id);
+        
+        // Get FULL paper data
+        const papersRes = await questionPaperAPI.getAll();
+        const normalizeArrayResponse = (resp) => {
+          if (!resp) return [];
+          if (Array.isArray(resp)) return resp;
+          if (Array.isArray(resp.data)) return resp.data;
+          if (Array.isArray(resp.rows)) return resp.rows;
+          if (Array.isArray(resp.questions)) return resp.questions;
+          const arr = Object.values(resp).find(v => Array.isArray(v));
+          return arr || [];
+        };
+        
+        const papersArray = normalizeArrayResponse(papersRes);
+        const fullPaperData = papersArray.find(p => String(p.paper_id) === String(moderation.paper_id));
+        
+        if (!fullPaperData) {
+          throw new Error('Paper not found');
+        }
+        
+        const paperReportRes = await moderatorAPI.getPaperReport(moderation.paper_id);
         
         setQuestionReport(questionRes.data || []);
-        setPaperData(paperRes.data || {});
-      } else if (moderationId) {
-        const moderationRes = await moderatorAPI.getModerationDetails(moderationId);
-        const moderation = moderationRes.data;
-        
-        if (moderation?.paper_id) {
-          const [questionRes, paperRes] = await Promise.all([
-            moderatorAPI.getQuestionReport(moderation.paper_id),
-            moderatorAPI.getPaperReport(moderation.paper_id)
-          ]);
-          
-          setQuestionReport(questionRes.data || []);
-          setPaperData({ ...paperRes.data, ...moderation });
-        } else {
-          throw new Error('Paper ID not found in moderation record');
-        }
-      } else {
-        throw new Error('No moderation or paper ID provided');
-      }
-    } catch (error) {
-      console.error('Error loading question data:', error);
-      setError(error.message || 'Failed to load question data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Calculate Bloom's Taxonomy distribution
-  useEffect(() => {
-    if (questionReport && questionReport.length > 0) {
-      const bloomDistribution = {};
-      
-      // Initialize all levels
-      Object.keys(BLOOM_LABELS).forEach(level => {
-        bloomDistribution[level] = { count: 0, marks: 0, questions: [] };
-      });
-
-      // Count questions by bloom level
-      questionReport.forEach(question => {
-        if (question.bloom_level) {
-          const level = question.bloom_level.toUpperCase();
-          if (bloomDistribution[level]) {
-            bloomDistribution[level].count++;
-            bloomDistribution[level].marks += (question.marks || 0);
-            bloomDistribution[level].questions.push(question);
-          }
-        } else {
-          // Handle questions without bloom level
-          bloomDistribution['UNKNOWN'].count++;
-          bloomDistribution['UNKNOWN'].marks += (question.marks || 0);
-          bloomDistribution['UNKNOWN'].questions.push(question);
-        }
-      });
-
-      // Convert to array for pie chart
-      const chartData = Object.keys(bloomDistribution)
-        .filter(level => bloomDistribution[level].count > 0)
-        .map(level => {
-          const data = bloomDistribution[level];
-          const label = BLOOM_LABELS[level] || 'Unknown';
-          return {
-            id: level,
-            value: data.count,
-            label: `${level}: ${label}`,
-            color: BLOOM_COLORS[level] || '#CCCCCC',
-            marks: data.marks,
-            questions: data.questions,
-            percentage: (data.count / questionReport.length * 100).toFixed(1)
-          };
+        setPaperData({ 
+          paper: fullPaperData,
+          moderation: moderation,
+          counts: paperReportRes.data?.data?.counts || {},
+          questions: paperReportRes.data?.data?.questions || []
         });
-
-      setBloomData(chartData);
+        
+      } else {
+        throw new Error('Paper ID not found in moderation record');
+      }
+    } else {
+      throw new Error('No moderation or paper ID provided');
     }
-  }, [questionReport]);
+  } catch (error) {
+    console.error('Error loading question data:', error);
+    setError(error.message || 'Failed to load question data');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const hasQuestions = Array.isArray(questionReport) && questionReport.length > 0;
   
   const sortedQuestions = [...questionReport].sort((a, b) => 
     (a.sequence_number || 0) - (b.sequence_number || 0)
   );
-
-  // Calculate statistics
-  const bloomStats = useMemo(() => {
-    const totalQuestions = sortedQuestions.length;
-    const questionsWithBloom = sortedQuestions.filter(q => q.bloom_level).length;
-    const percentageWithBloom = totalQuestions > 0 ? 
-      Math.round((questionsWithBloom / totalQuestions) * 100) : 0;
-    
-    const totalMarks = sortedQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
-    const marksWithBloom = sortedQuestions
-      .filter(q => q.bloom_level)
-      .reduce((sum, q) => sum + (q.marks || 0), 0);
-    
-    return {
-      totalQuestions,
-      questionsWithBloom,
-      percentageWithBloom,
-      totalMarks,
-      marksWithBloom,
-      marksPercentageWithBloom: totalMarks > 0 ? 
-        Math.round((marksWithBloom / totalMarks) * 100) : 0
-    };
-  }, [sortedQuestions]);
 
   const handleGeneratePdf = async () => {
     if (!paperData?.paper?.paper_id) {
@@ -268,21 +255,8 @@ const QuestionList = () => {
     }
   };
 
-  // Function to create conic gradient for pie chart
-  const getPieChartStyle = () => {
-    if (bloomData.length === 0) return {};
-    
-    let accumulatedPercentage = 0;
-    const gradients = bloomData.map(item => {
-      const start = accumulatedPercentage + '%';
-      accumulatedPercentage += parseFloat(item.percentage);
-      const end = accumulatedPercentage + '%';
-      return `${item.color} ${start} ${end}`;
-    }).join(', ');
-    
-    return {
-      background: `conic-gradient(${gradients})`
-    };
+  const toggleBloomsAnalysis = () => {
+    setShowBloomsAnalysis(!showBloomsAnalysis);
   };
 
   if (loading) {
@@ -364,6 +338,13 @@ const QuestionList = () => {
                 View Report
               </Button>
             )}
+            <Button 
+              startIcon={<ListIcon />}
+              onClick={() => navigate('/admin/moderation/list')}
+              variant="outlined"
+            >
+              View All
+            </Button>
           </Box>
         </Box>
         <Box className="no-data">
@@ -399,6 +380,9 @@ const QuestionList = () => {
         >
           Back to List
         </Button>
+        <Typography variant="h4" component="h1">
+          Question Analysis
+        </Typography>
         <Box className="header-right">
           {moderationId && (
             <Button 
@@ -410,12 +394,14 @@ const QuestionList = () => {
               View Report
             </Button>
           )}
-          <Button 
-            startIcon={<ListIcon />}
-            onClick={() => navigate('/admin/moderation/list')}
-            variant="outlined"
+          <Button
+            startIcon={<AnalyticsIcon />}
+            onClick={toggleBloomsAnalysis}
+            variant={showBloomsAnalysis ? "contained" : "outlined"}
+            color="secondary"
+            className="blooms-toggle-btn"
           >
-            View All
+            {showBloomsAnalysis ? 'Hide' : 'Show'} Blooms
           </Button>
         </Box>
       </Box>
@@ -482,221 +468,10 @@ const QuestionList = () => {
         </Paper>
       )}
 
-      {/* Bloom's Taxonomy Analysis Section */}
-      <Paper className="bloom-analysis-section" elevation={2}>
-        <Typography variant="h5" gutterBottom align="center">
-          Bloom's Taxonomy Analysis
-        </Typography>
-        
-        <Grid container spacing={3} className="bloom-container">
-          <Grid item xs={12} md={6} className="bloom-chart-container">
-            {bloomData.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Box sx={{ position: 'relative', width: 250, height: 250, mb: 3 }}>
-                  {/* CSS-only Pie Chart */}
-                  <Box 
-                    sx={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      borderRadius: '50%',
-                      ...getPieChartStyle(),
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {/* Center hole */}
-                    <Box 
-                      sx={{ 
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '60%',
-                        height: '60%',
-                        borderRadius: '50%',
-                        backgroundColor: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexDirection: 'column',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      <Typography variant="h4" color="primary" fontWeight="bold">
-                        {bloomStats.totalQuestions}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        Total Questions
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-                
-                {/* Legend */}
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1, mb: 2 }}>
-                  {bloomData.map((item) => (
-                    <Box 
-                      key={item.id}
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 0.5,
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1,
-                        backgroundColor: 'rgba(255,255,255,0.8)'
-                      }}
-                    >
-                      <Box 
-                        sx={{ 
-                          width: 12, 
-                          height: 12, 
-                          borderRadius: '50%', 
-                          backgroundColor: item.color 
-                        }} 
-                      />
-                      <Typography variant="caption">
-                        {item.label} ({item.value})
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            ) : (
-              <Box className="no-bloom-data">
-                <Typography variant="body1" paragraph align="center">
-                  No Bloom's Taxonomy data available for this paper.
-                </Typography>
-                <Typography variant="body2" color="textSecondary" align="center">
-                  Please ensure questions are tagged with Bloom's levels.
-                </Typography>
-              </Box>
-            )}
-          </Grid>
-
-          <Grid item xs={12} md={6} className="bloom-stats-container">
-            <Paper elevation={1} sx={{ p: 3, height: '100%' }}>
-              <Typography variant="h6" gutterBottom>
-                Statistics
-              </Typography>
-              
-              <Grid container spacing={2} className="bloom-stats-grid">
-                <Grid item xs={6}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2 }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        Total Questions
-                      </Typography>
-                      <Typography variant="h4" color="primary">
-                        {bloomStats.totalQuestions}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2 }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        With Bloom Level
-                      </Typography>
-                      <Typography variant="h4" color="primary">
-                        {bloomStats.questionsWithBloom}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        ({bloomStats.percentageWithBloom}%)
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2 }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        Total Marks
-                      </Typography>
-                      <Typography variant="h4" color="primary">
-                        {bloomStats.totalMarks}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2 }}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        Marks with Bloom
-                      </Typography>
-                      <Typography variant="h4" color="primary">
-                        {bloomStats.marksWithBloom}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        ({bloomStats.marksPercentageWithBloom}%)
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Bloom's Taxonomy Levels:
-                </Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Level</TableCell>
-                        <TableCell align="right">Questions</TableCell>
-                        <TableCell align="right">Marks</TableCell>
-                        <TableCell align="right">Percentage</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {bloomData.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <Box display="flex" alignItems="center" gap={1}>
-                              <Box
-                                sx={{
-                                  width: 12,
-                                  height: 12,
-                                  borderRadius: '50%',
-                                  backgroundColor: item.color
-                                }}
-                              />
-                              <Typography variant="body2">
-                                {item.label.split(': ')[1]}
-                              </Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2">
-                              {item.value}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2">
-                              {item.marks}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2" color="textSecondary">
-                              {item.percentage}%
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Paper>
+      {/* Blooms Analysis Component (conditionally rendered) */}
+      {showBloomsAnalysis && (
+        <BloomsAnalysis questionReport={questionReport} />
+      )}
 
       <Box className="print-controls">
         <Box className="controls-left">
@@ -708,7 +483,7 @@ const QuestionList = () => {
             color="primary"
             size="large"
           >
-            {isGeneratingPdf ? 'Generating PDF...' : 'Generate Question Paper PDF'}
+            {isGeneratingPdf ? 'Generating PDF...' : 'Generate PDF'}
             {!isPaperApproved && ' (Approved Only)'}
           </Button>
           

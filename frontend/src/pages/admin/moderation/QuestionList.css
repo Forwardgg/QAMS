@@ -359,9 +359,6 @@
   justify-content: space-between;
   align-items: center;
   font-size: 12pt !important;
-  margin-top: 8mm;
-  padding-top: 4mm;
-  border-top: 1px solid #666;
 }
 
 .marks-time-line .full-marks {

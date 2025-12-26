@@ -240,12 +240,6 @@ const ModReport = () => {
         
 <div className="header-right">
   <button 
-    onClick={() => navigate(`/admin/moderation/list`)}
-    className="btn btn-secondary"
-  >
-    View All
-  </button>
-  <button 
     onClick={() => navigate(`/admin/moderation/questions?moderationId=${moderationId}&paperId=${paperId}`)}
     className="btn btn-primary"
   >
