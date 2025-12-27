@@ -345,30 +345,6 @@ const InstructorCO = () => {
                   {viewingCO.description}
                 </div>
               </div>
-              
-              <div className="meta-info">
-                <div className="meta-item">
-                  <span className="meta-label">Created:</span>
-                  <span className="meta-value">
-                    {new Date(viewingCO.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                
-                {viewingCO.updated_at && (
-                  <div className="meta-item">
-                    <span className="meta-label">Last Updated:</span>
-                    <span className="meta-value">
-                      {new Date(viewingCO.updated_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-
-                {canEditCO(viewingCO) && (
-                  <div className="permission-badge">
-                    You have editing permissions for this course outcome
-                  </div>
-                )}
-              </div>
             </div>
 
             <div className="modal-actions">

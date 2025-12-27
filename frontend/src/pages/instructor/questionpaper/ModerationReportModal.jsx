@@ -208,7 +208,7 @@ const ModerationReportModal = ({ moderationData, paperData, onClose }) => {
               onClick={handleGenerateReportPdf}
               disabled={isGeneratingPdf}
             >
-              {isGeneratingPdf ? '🔄 Generating PDF...' : '📋 Generate Formal Report PDF'}
+              {isGeneratingPdf ? 'Generating PDF...' : 'Generate PDF'}
             </button>
             
             {pdfMessage.text && (

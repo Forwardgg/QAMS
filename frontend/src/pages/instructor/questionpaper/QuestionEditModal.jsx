@@ -391,7 +391,7 @@ export default function QuestionEditModal({ question = {}, onSave, onClose }) {
                   onChange={(e) => setMarks(e.target.value === '' ? '' : e.target.value)}
                   min="0"
                   step="1"
-                  placeholder="Enter marks (optional)"
+                  placeholder="Enter marks"
                   aria-label="Question marks"
                   disabled={isUploading}
                 />

@@ -248,23 +248,6 @@ const QuestionPaperForm = ({
                   placeholder="e.g., 180"
                 />
               </div>
-
-              {/* Delete Section - Only show in edit mode */}
-              {mode === 'edit' && paper && (
-                <div className="delete-section">
-                  <h3>Danger Zone</h3>
-                  <div className="delete-content">
-                    <p>Once you delete this question paper, there is no going back. Please be certain.</p>
-                    <button
-                      type="button"
-                      className="btn-delete-danger"
-                      onClick={handleDeleteClick}
-                    >
-                      Delete Paper
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="modal-footer">

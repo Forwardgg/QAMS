@@ -456,10 +456,9 @@ const QuestionCreatePage = () => {
                 value={marks}
                 onChange={(e) => setMarks(e.target.value)}
                 min="0"
-                placeholder="Enter marks (optional)"
+                placeholder="Enter marks"
                 step="1"
               />
-              <small className="form-hint">Leave blank if not applicable</small>
             </div>
           </div>
         </div>

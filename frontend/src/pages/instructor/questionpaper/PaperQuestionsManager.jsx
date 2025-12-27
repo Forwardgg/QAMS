@@ -1,3 +1,4 @@
+// src/frontend/src/pages/instructor/questions/PaperQuestionsManager.jsx
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -305,14 +306,15 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isReordering, setIsReordering] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [activeId, setActiveId] = useState(null);
-  const [showBloomAnalysis, setShowBloomAnalysis] = useState(false); // New state for toggle
+  const [showBloomAnalysis, setShowBloomAnalysis] = useState(false);
 
   const mountedRef = useRef(true);
   const loadAbortRef = useRef(null);
   const pdfAbortRef = useRef(null);
-  const isGeneratingPdfRef = useRef(false); // 🔥 CRITICAL: Use ref instead of state
+  const isGeneratingPdfRef = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -322,7 +324,6 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
   useEffect(() => {
     mountedRef.current = true;
     loadPaperAndQuestions();
-    // Load moderation data after a short delay (non-critical for initial render)
     const timer = setTimeout(() => {
       loadModerationData();
     }, 500);
@@ -431,17 +432,57 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
     return s === 'draft' || s === 'change_requested';
   }, [paper]);
 
+  // FIXED: Check both paper status AND question status
   const needsResubmission = React.useMemo(() => {
-    return questions.some(q => String(q.status || '').toLowerCase() === 'change_requested');
-  }, [questions]);
+    const hasChangeRequestedQuestions = questions.some(q => 
+      String(q.status || '').toLowerCase() === 'change_requested'
+    );
+    
+    // Show button if paper status is 'change_requested' OR there are questions needing changes
+    return String(paper?.status || '').toLowerCase() === 'change_requested' || hasChangeRequestedQuestions;
+  }, [questions, paper?.status]);
 
   const rejectedQuestionsCount = React.useMemo(() => {
     return questions.filter(q => String(q.status || '').toLowerCase() === 'change_requested').length;
   }, [questions]);
 
+  // NEW: Function for initial submission of draft papers
+  const handleSubmitForModeration = async () => {
+    if (!paper || paper.status !== 'draft') return;
+    
+    if (questions.length === 0) {
+      setMessage({ type: 'error', text: 'Cannot submit empty paper. Add at least one question.' });
+      return;
+    }
+    
+    if (!window.confirm(`Submit "${paper?.title}" for moderation? This will send the paper to moderators for review.`)) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      await questionPaperAPI.submitForModeration(paperId);
+      await loadPaperAndQuestions();
+      setMessage({ type: 'success', text: 'Paper submitted for moderation successfully!' });
+    } catch (err) {
+      console.error('Submit error:', err);
+      const msg = err?.response?.data?.message || err?.message || 'Failed to submit paper';
+      setMessage({ type: 'error', text: msg });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleResubmitForModeration = async () => {
-    if (!needsResubmission) {
-      setMessage({ type: 'error', text: 'No changes requested. Paper does not need resubmission.' });
+    if (!paper || paper.status !== 'change_requested') {
+      setMessage({ type: 'error', text: 'Paper is not in a state that requires resubmission.' });
+      return;
+    }
+
+    if (questions.length === 0) {
+      setMessage({ type: 'error', text: 'Cannot submit empty paper. Add at least one question.' });
       return;
     }
 
@@ -598,56 +639,56 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
      OPTIMIZED PDF Export Function
      --------------------------- */
   const exportPdf = async () => {
-  if (!paperId || isGeneratingPdfRef.current) return;
+    if (!paperId || isGeneratingPdfRef.current) return;
 
-  isGeneratingPdfRef.current = true;
-  
-  // Update button state
-  const pdfButton = document.querySelector('.btn-pdf-export');
-  if (pdfButton) {
-    pdfButton.disabled = true;
-    const originalText = pdfButton.innerHTML;
-    pdfButton.innerHTML = '<span style="display: inline-flex; align-items: center;"><DownloadIcon style="font-size: 18px; margin-right: 8px;" />Generating PDF…</span>';
-    pdfButton.dataset.originalText = originalText;
-  }
-
-  setMessage({ type: '', text: '' });
-
-  try {
-    // 🔥 CRITICAL FIX: Use SAME API as admin component
-    const pdfBlob = await moderatorAPI.generatePdf({
-      paperId: paperId, // Pass paperId directly
-      baseUrl: process.env.REACT_APP_BASE_URL || window.location.origin,
-      postOptions: {
-        addPageNumbers: true,
-        pageNumberOptions: { fontSize: 10, marginBottom: 18 },
-      },
-      // Optional: add filename if needed
-      filename: `${paper?.course_code || 'paper'}-${paper?.title || 'questions'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
-    });
-
-    // Use same download method
-    moderatorAPI.downloadPdf(
-      pdfBlob, 
-      `${paper?.course_code || 'paper'}-${paper?.title || 'questions'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
-    );
-
-    setMessage({ type: 'success', text: 'PDF generated and downloaded!' });
-  } catch (error) {
-    console.error('PDF generation error:', error);
-    setMessage({ type: 'error', text: error.message || 'Failed to generate PDF' });
-  } finally {
-    // Restore button state
-    isGeneratingPdfRef.current = false;
+    isGeneratingPdfRef.current = true;
+    
+    // Update button state
+    const pdfButton = document.querySelector('.btn-pdf-export');
     if (pdfButton) {
-      pdfButton.disabled = false;
-      const originalText = pdfButton.dataset.originalText;
-      if (originalText) {
-        pdfButton.innerHTML = originalText;
+      pdfButton.disabled = true;
+      const originalText = pdfButton.innerHTML;
+      pdfButton.innerHTML = '<span style="display: inline-flex; align-items: center;"><DownloadIcon style="font-size: 18px; margin-right: 8px;" />Generating PDF…</span>';
+      pdfButton.dataset.originalText = originalText;
+    }
+
+    setMessage({ type: '', text: '' });
+
+    try {
+      // 🔥 CRITICAL FIX: Use SAME API as admin component
+      const pdfBlob = await moderatorAPI.generatePdf({
+        paperId: paperId, // Pass paperId directly
+        baseUrl: process.env.REACT_APP_BASE_URL || window.location.origin,
+        postOptions: {
+          addPageNumbers: true,
+          pageNumberOptions: { fontSize: 10, marginBottom: 18 },
+        },
+        // Optional: add filename if needed
+        filename: `${paper?.course_code || 'paper'}-${paper?.title || 'questions'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
+      });
+
+      // Use same download method
+      moderatorAPI.downloadPdf(
+        pdfBlob, 
+        `${paper?.course_code || 'paper'}-${paper?.title || 'questions'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
+      );
+
+      setMessage({ type: 'success', text: 'PDF generated and downloaded!' });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      setMessage({ type: 'error', text: error.message || 'Failed to generate PDF' });
+    } finally {
+      // Restore button state
+      isGeneratingPdfRef.current = false;
+      if (pdfButton) {
+        pdfButton.disabled = false;
+        const originalText = pdfButton.dataset.originalText;
+        if (originalText) {
+          pdfButton.innerHTML = originalText;
+        }
       }
     }
-  }
-};
+  };
 
   if (isLoading) {
     return (
@@ -717,6 +758,17 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
       {/* Messages */}
       {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
+      {/* Submit for Moderation button (for draft papers) */}
+      {paper.status === 'draft' && questions.length > 0 && (
+        <div className="submit-section">
+          <button className="btn-submit" onClick={handleSubmitForModeration} disabled={isSubmitting}>
+            <CheckCircleIcon sx={{ fontSize: 18, marginRight: 1 }} />
+            {isSubmitting ? 'Submitting...' : 'Submit for Moderation'}
+          </button>
+          <p className="submit-note">Ready to send this paper for moderator review?</p>
+        </div>
+      )}
+
       {/* Bloom's Taxonomy Analysis - Conditionally Rendered */}
       {showBloomAnalysis && (
         <BloomAnalysis questions={questions} />
@@ -732,8 +784,8 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
         </div>
       )}
 
-      {/* Moderation alert */}
-      {needsResubmission && (
+      {/* Resubmit for Moderation button (for change_requested papers) */}
+      {paper.status === 'change_requested' && questions.length > 0 && (
         <div className="moderation-alert">
           <div className="alert-content">
             <div className="alert-text">
@@ -741,7 +793,11 @@ const PaperQuestionsManager = ({ paperId, onBack }) => {
                 <WarningIcon sx={{ fontSize: 18, color: '#856404', marginRight: 1, verticalAlign: 'middle' }} />
                 Moderation Required
               </strong>
-              <p>{rejectedQuestionsCount} question(s) need changes.</p>
+              <p>
+                {rejectedQuestionsCount > 0 
+                  ? `${rejectedQuestionsCount} question(s) need changes.`
+                  : 'Paper needs to be resubmitted after making changes.'}
+              </p>
             </div>
             <button className="btn-resubmit" onClick={handleResubmitForModeration} disabled={isResubmitting}>
               <RefreshIcon sx={{ fontSize: 18, marginRight: 1 }} />

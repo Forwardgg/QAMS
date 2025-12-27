@@ -116,7 +116,7 @@ const CO = () => {
   };
 
   const getSortIcon = (field) => {
-    if (sortField !== field) return '↕️';
+    if (sortField !== field) return '↕';
     return sortDirection === 'asc' ? '↑' : '↓';
   };
 
